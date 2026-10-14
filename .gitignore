@@ -1,0 +1,16 @@
+# dependencies and build output
+node_modules/
+dist/
+dev-dist/
+
+# local assistant/tooling config (machine-specific paths)
+.claude/
+
+# notes and backups — personal data, never committed
+/private-data/
+notes-backup-*.json
+
+# local junk
+*.local
+.DS_Store
+Thumbs.db
