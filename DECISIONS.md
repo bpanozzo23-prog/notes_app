@@ -42,3 +42,22 @@ Append-only. One dated line per decision: what was decided, then why, after the 
 - 2026-10-14 — `AGENTS.md` is the one instructions file; `CLAUDE.md` is only `@AGENTS.md`. — Claude
   Code follows the `@` import, so one file serves both tools (the pattern from `research-workflow`).
   mi-cuaderno's three-file layout predates that and is not copied.
+
+## Spike result
+
+- 2026-10-14 — **Tiptap passes on the Galaxy S25 Ultra with Samsung Keyboard; it is the editor.**
+  Owner-verified in Chrome: predictive text, swipe typing, Enter/Backspace, mid-word bold, the
+  selection pop-up, highlight across paragraphs, `## ` / `- ` / `[] ` / `---` typing shortcuts,
+  paste from Samsung Notes and Chrome, and a bottom-fixed toolbar that stays above the keyboard.
+  None of the forum-reported Android failures (stray newlines, duplicated characters) appeared.
+- 2026-10-14 — Build the editor command chain per tap, never during render. — The first spike
+  cached `editor.chain().focus()` at render; a chain carries a snapshot of the document, so later
+  taps were rejected (dead toolbar) or, once, applied over newer text (cursor jumped to an old
+  position typing bold). Toolbar state comes from `useEditorState`, since Tiptap v3 does not
+  re-render on every transaction.
+- 2026-10-14 — Editor DOM carries `autocorrect="on"`, `autocapitalize="sentences"`,
+  `spellcheck="true"`. — Without them Samsung Keyboard only underlined misspellings; with them it
+  corrects on space, as in native apps.
+- 2026-10-14 — Buttons use `onPointerDown` `preventDefault` to keep focus in the editor. — Keeps
+  the keyboard open across a toolbar tap; the earlier touchstart/touchend handling was replaced
+  with this simpler form at the same time as the chain fix.

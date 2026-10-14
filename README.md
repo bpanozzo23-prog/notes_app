@@ -11,10 +11,10 @@ LLM can read. The code may become public; the notes never are.
 
 ## Status
 
-- **Spike — in progress** (started 2026-10-14). A throwaway Tiptap editor served from the XPS dev
-  server, to be typed into on the owner's Galaxy S25 Ultra with Samsung Keyboard. Its only job is to
-  answer whether a ProseMirror-based editor is usable on that phone. Result goes in `DECISIONS.md`.
-- **Phase 1 — not started.** The core notebook (see the brief, §Phases).
+- **Spike — passed, 2026-10-14.** A throwaway Tiptap editor, typed into on the owner's Galaxy S25
+  Ultra with Samsung Keyboard: typing, swipe, shortcuts, selection pop-up and a keyboard-aware
+  toolbar all behave. Details under "Spike result" in `DECISIONS.md`. Tiptap is the editor.
+- **Phase 1 — being planned.** The core notebook (see the brief, §Phases).
 
 ## Running it
 

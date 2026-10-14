@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { EditorContent, useEditor } from "@tiptap/react";
+import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import StarterKit from "@tiptap/starter-kit";
 import { TextStyleKit } from "@tiptap/extension-text-style";
@@ -50,19 +50,17 @@ const CHECKLIST = [
   "With the keyboard open: is the toolbar visible? Scroll the note. Rotate the phone.",
 ];
 
+// Every button must (a) not steal focus from the editor, or the keyboard closes, and (b) build
+// its command chain at tap time. A chain created during render holds a stale snapshot of the
+// document; running it later is rejected, or worse, applied over newer text. That was the first
+// spike's dead toolbar.
 function ToolButton({ onClick, active, label, children }) {
   return (
     <button
       type="button"
       aria-label={label}
       aria-pressed={active}
-      // mousedown/touchstart preventDefault keeps focus (and the keyboard) in the editor.
-      onMouseDown={(e) => e.preventDefault()}
-      onTouchStart={(e) => e.preventDefault()}
-      onTouchEnd={(e) => {
-        e.preventDefault();
-        onClick();
-      }}
+      onPointerDown={(e) => e.preventDefault()}
       onClick={onClick}
       className={
         "flex h-10 w-10 shrink-0 items-center justify-center rounded-md " +
@@ -79,12 +77,7 @@ function ColorDot({ color, active, onClick }) {
     <button
       type="button"
       aria-label={color[0]}
-      onMouseDown={(e) => e.preventDefault()}
-      onTouchStart={(e) => e.preventDefault()}
-      onTouchEnd={(e) => {
-        e.preventDefault();
-        onClick();
-      }}
+      onPointerDown={(e) => e.preventDefault()}
       onClick={onClick}
       className={
         "flex h-10 w-8 shrink-0 items-center justify-center " + (active ? "rounded-md bg-gray-200" : "")
@@ -119,7 +112,14 @@ export default function Spike() {
       }
     })(),
     editorProps: {
-      attributes: { class: "px-4 pb-24 pt-2" },
+      attributes: {
+        class: "px-4 pb-24 pt-2",
+        // Hints for the Android keyboard. Chrome honours autocorrect/autocapitalize on
+        // contenteditable; whether Samsung Keyboard does is one of the things being tested.
+        autocorrect: "on",
+        autocapitalize: "sentences",
+        spellcheck: "true",
+      },
     },
     onUpdate: ({ editor }) => {
       try {
@@ -128,6 +128,29 @@ export default function Spike() {
         /* storage unavailable: the spike still works, it just will not survive a reload */
       }
     },
+  });
+
+  // Tiptap v3 does not re-render on every transaction; subscribe to the bits the UI shows.
+  const ui = useEditorState({
+    editor,
+    selector: ({ editor }) =>
+      editor
+        ? {
+            bold: editor.isActive("bold"),
+            italic: editor.isActive("italic"),
+            underline: editor.isActive("underline"),
+            strike: editor.isActive("strike"),
+            highlight: editor.isActive("highlight"),
+            h1: editor.isActive("heading", { level: 1 }),
+            h2: editor.isActive("heading", { level: 2 }),
+            bulletList: editor.isActive("bulletList"),
+            orderedList: editor.isActive("orderedList"),
+            taskList: editor.isActive("taskList"),
+            blockquote: editor.isActive("blockquote"),
+            color: editor.getAttributes("textStyle").color ?? null,
+            html: showHtml ? editor.getHTML() : "",
+          }
+        : null,
   });
 
   // Record the last few input events so a misbehaviour can be described precisely. On Android
@@ -152,10 +175,37 @@ export default function Spike() {
     };
   }, [editor]);
 
-  if (!editor) return null;
+  if (!editor || !ui) return null;
 
-  const c = editor.chain().focus();
-  const currentColor = editor.getAttributes("textStyle").color ?? null;
+  // Fresh chain per tap (see ToolButton).
+  const run = (build) => build(editor.chain().focus()).run();
+
+  const markButtons = (size) => (
+    <>
+      <ToolButton label="Bold" active={ui.bold} onClick={() => run((c) => c.toggleBold())}>
+        <Bold size={size} />
+      </ToolButton>
+      <ToolButton label="Italic" active={ui.italic} onClick={() => run((c) => c.toggleItalic())}>
+        <Italic size={size} />
+      </ToolButton>
+      <ToolButton label="Underline" active={ui.underline} onClick={() => run((c) => c.toggleUnderline())}>
+        <Underline size={size} />
+      </ToolButton>
+      <ToolButton label="Highlight" active={ui.highlight} onClick={() => run((c) => c.toggleHighlight())}>
+        <Highlighter size={size} />
+      </ToolButton>
+    </>
+  );
+
+  const colorButtons = (colors) =>
+    colors.map((color) => (
+      <ColorDot
+        key={color[0]}
+        color={color}
+        active={ui.color === color[1]}
+        onClick={() => run((c) => (color[1] ? c.setColor(color[1]) : c.unsetColor()))}
+      />
+    ));
 
   return (
     <div className="mx-auto flex min-h-full max-w-2xl flex-col">
@@ -202,39 +252,13 @@ export default function Spike() {
         options={{ placement: "bottom", offset: 12 }}
         className="flex gap-0.5 rounded-lg border border-gray-200 bg-white p-0.5 shadow-lg"
       >
-        <ToolButton label="Bold" active={editor.isActive("bold")} onClick={() => c.toggleBold().run()}>
-          <Bold size={18} />
-        </ToolButton>
-        <ToolButton label="Italic" active={editor.isActive("italic")} onClick={() => c.toggleItalic().run()}>
-          <Italic size={18} />
-        </ToolButton>
-        <ToolButton
-          label="Underline"
-          active={editor.isActive("underline")}
-          onClick={() => c.toggleUnderline().run()}
-        >
-          <Underline size={18} />
-        </ToolButton>
-        <ToolButton
-          label="Highlight"
-          active={editor.isActive("highlight")}
-          onClick={() => c.toggleHighlight().run()}
-        >
-          <Highlighter size={18} />
-        </ToolButton>
-        {COLORS.slice(1, 4).map((color) => (
-          <ColorDot
-            key={color[0]}
-            color={color}
-            active={currentColor === color[1]}
-            onClick={() => c.setColor(color[1]).run()}
-          />
-        ))}
+        {markButtons(18)}
+        {colorButtons(COLORS.slice(1, 4))}
       </BubbleMenu>
 
       {showHtml && (
         <pre className="mx-4 mb-24 max-h-48 overflow-auto rounded border border-gray-200 bg-white p-2 text-[11px] whitespace-pre-wrap">
-          {editor.getHTML()}
+          {ui.html}
         </pre>
       )}
 
@@ -247,93 +271,51 @@ export default function Spike() {
           </div>
         )}
         <div className="flex gap-0.5 overflow-x-auto px-2 py-1 pb-[max(0.25rem,env(safe-area-inset-bottom))]">
-          <ToolButton label="Bold" active={editor.isActive("bold")} onClick={() => c.toggleBold().run()}>
-            <Bold size={20} />
-          </ToolButton>
-          <ToolButton label="Italic" active={editor.isActive("italic")} onClick={() => c.toggleItalic().run()}>
-            <Italic size={20} />
-          </ToolButton>
-          <ToolButton
-            label="Underline"
-            active={editor.isActive("underline")}
-            onClick={() => c.toggleUnderline().run()}
-          >
-            <Underline size={20} />
-          </ToolButton>
-          <ToolButton
-            label="Strikethrough"
-            active={editor.isActive("strike")}
-            onClick={() => c.toggleStrike().run()}
-          >
+          {markButtons(20)}
+          <ToolButton label="Strikethrough" active={ui.strike} onClick={() => run((c) => c.toggleStrike())}>
             <Strikethrough size={20} />
           </ToolButton>
-          <ToolButton
-            label="Highlight"
-            active={editor.isActive("highlight")}
-            onClick={() => c.toggleHighlight().run()}
-          >
-            <Highlighter size={20} />
-          </ToolButton>
-          {COLORS.map((color) => (
-            <ColorDot
-              key={color[0]}
-              color={color}
-              active={currentColor === color[1]}
-              onClick={() => (color[1] ? c.setColor(color[1]).run() : c.unsetColor().run())}
-            />
-          ))}
+          {colorButtons(COLORS)}
           <ToolButton
             label="Heading 1"
-            active={editor.isActive("heading", { level: 1 })}
-            onClick={() => c.toggleHeading({ level: 1 }).run()}
+            active={ui.h1}
+            onClick={() => run((c) => c.toggleHeading({ level: 1 }))}
           >
             <Heading1 size={20} />
           </ToolButton>
           <ToolButton
             label="Heading 2"
-            active={editor.isActive("heading", { level: 2 })}
-            onClick={() => c.toggleHeading({ level: 2 }).run()}
+            active={ui.h2}
+            onClick={() => run((c) => c.toggleHeading({ level: 2 }))}
           >
             <Heading2 size={20} />
           </ToolButton>
-          <ToolButton
-            label="Bullet list"
-            active={editor.isActive("bulletList")}
-            onClick={() => c.toggleBulletList().run()}
-          >
+          <ToolButton label="Bullet list" active={ui.bulletList} onClick={() => run((c) => c.toggleBulletList())}>
             <List size={20} />
           </ToolButton>
           <ToolButton
             label="Numbered list"
-            active={editor.isActive("orderedList")}
-            onClick={() => c.toggleOrderedList().run()}
+            active={ui.orderedList}
+            onClick={() => run((c) => c.toggleOrderedList())}
           >
             <ListOrdered size={20} />
           </ToolButton>
-          <ToolButton
-            label="Checklist"
-            active={editor.isActive("taskList")}
-            onClick={() => c.toggleTaskList().run()}
-          >
+          <ToolButton label="Checklist" active={ui.taskList} onClick={() => run((c) => c.toggleTaskList())}>
             <ListChecks size={20} />
           </ToolButton>
-          <ToolButton
-            label="Quote"
-            active={editor.isActive("blockquote")}
-            onClick={() => c.toggleBlockquote().run()}
-          >
+          <ToolButton label="Quote" active={ui.blockquote} onClick={() => run((c) => c.toggleBlockquote())}>
             <Quote size={20} />
           </ToolButton>
-          <ToolButton label="Divider" onClick={() => c.setHorizontalRule().run()}>
+          <ToolButton label="Divider" onClick={() => run((c) => c.setHorizontalRule())}>
             <Minus size={20} />
           </ToolButton>
-          <ToolButton label="Clear formatting" onClick={() => c.unsetAllMarks().clearNodes().run()}>
+          <ToolButton label="Clear formatting" onClick={() => run((c) => c.unsetAllMarks().clearNodes())}>
             <Eraser size={20} />
           </ToolButton>
-          <ToolButton label="Undo" onClick={() => c.undo().run()}>
+          <ToolButton label="Undo" onClick={() => run((c) => c.undo())}>
             <Undo2 size={20} />
           </ToolButton>
-          <ToolButton label="Redo" onClick={() => c.redo().run()}>
+          <ToolButton label="Redo" onClick={() => run((c) => c.redo())}>
             <Redo2 size={20} />
           </ToolButton>
         </div>
