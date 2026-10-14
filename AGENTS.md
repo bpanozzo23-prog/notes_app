@@ -1,14 +1,50 @@
-# notes_app — Codex entry point
+# notes_app — instructions for agents
 
-**Read `docs/AGENT-GUIDE.md` before doing anything else.** It is the single shared copy of the
-read order, working agreement and environment for every agent on this project. `CLAUDE.md`
-(Claude Code) points at the same file. Do not restate its content here.
+These apply to any agent working in this repository (Claude Code, Codex). `CLAUDE.md` imports
+this file; rules live here once.
 
-Codex-specific notes only:
+A personal notes app (PWA) for one owner, one phone, no server. Simplicity and durability beat
+features; the owner's notes are the one thing that must never be lost or leaked.
 
-- **The owner's real browser data is not available in Codex's test browser.** Verify against
-  seeded fixture data; never treat an empty notebook as the owner's actual state.
-- **On the XPS the shell is bash** inside `tmux` over SSH. Plain `npm` is correct; there is no
-  browser pane, so report the Tailscale URL for the owner to check on the phone.
-- **Subagents:** at most two, read-only, for substantial reviews or independent investigations.
-  The primary agent owns implementation, decisions and final synthesis.
+## Read order
+
+1. `README.md` → Status: which phase is in progress.
+2. `docs/BRIEF.md`: the contract. Read the sections a change touches; read all of it before
+   planning a phase or changing storage, the editor, the data model, backup or the Claude policy.
+3. `DECISIONS.md`: search it for the component or concept before re-litigating a choice.
+4. The code the task touches. Look for existing components and utilities before adding a
+   duplicate.
+
+## Working agreement
+
+- **Propose before building** anything larger than a fix: a short plain-language plan, then wait
+  for approval. In Claude Code, use Plan Mode for this.
+- **Record decisions as they are made**, in `DECISIONS.md`, with absolute dates and the reason.
+- **Verify on the phone.** The dev server runs on the XPS with `--host`; report the Tailscale URL
+  (`http://brent-dell-system-xps-l502x:5174/`) and ask the owner to check. The agent has no screen:
+  say plainly what it did not see.
+- **Never commit a note, a backup or a key.** `.gitignore` covers the known paths; keep it that way
+  and check `git status` before every commit. Commit only when asked.
+- **Explain choices and define jargon the first time it appears.** The owner reads everything.
+- **Copy mi-cuaderno's patterns, not its code.** `~/code/mi-cuaderno` has the Dexie layer, backup
+  export/import, the on-device Anthropic key with a spend cap, and the PWA/GitHub Pages setup.
+  Read them when building the equivalent here.
+
+## Environment
+
+- The XPS (`uname` says `Linux`) is where the CLIs run, in bash inside `tmux` over SSH. There is
+  no browser pane. The owner's machines and how they connect are documented in `~/code/devices`,
+  not here.
+- `npm run dev` serves on port 5174 with `--host` (mi-cuaderno uses 5173). Node 24, npm 11.
+- Multi-line commit messages: a bash heredoc (`git commit -F - <<'MSG' … MSG`); read the message
+  back with `git log -1 --pretty=%B`.
+- **Never run `npx skills remove`** (it switched a checkout's branch mid-command once in
+  mi-cuaderno).
+
+## Tool notes
+
+- **Claude Code:** `/rc` hands the running session to the Claude mobile app, which is how the
+  owner steers it from the phone.
+- **Codex:** the owner's real browser data is not available in Codex's test browser; verify
+  against seeded fixture data and never treat an empty notebook as the owner's actual state.
+  Subagents: at most two, read-only, for substantial reviews or independent investigations.

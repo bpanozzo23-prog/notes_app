@@ -36,3 +36,9 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   scale; revisit only if the notebook grows past what a request holds.
 - 2026-10-14 — Reuse mi-cuaderno's Phase 6 policy: owner's own key on-device, spend cap, off by
   default, propose-then-approve for any change. — Already thought through and lived with.
+
+## Repo
+
+- 2026-10-14 — `AGENTS.md` is the one instructions file; `CLAUDE.md` is only `@AGENTS.md`. — Claude
+  Code follows the `@` import, so one file serves both tools (the pattern from `research-workflow`).
+  mi-cuaderno's three-file layout predates that and is not copied.

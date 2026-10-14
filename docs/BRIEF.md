@@ -1,7 +1,7 @@
 # notes_app — Project Brief (v1)
 
 **For:** coding agents working through Claude Code or Codex, and the owner. This is the product
-contract; `docs/AGENT-GUIDE.md` says how to work, `DECISIONS.md` records why.
+contract; `AGENTS.md` says how to work, `DECISIONS.md` records why.
 **Owner:** the sole builder and only user.
 **Written:** 2026-10-14, from the conversation that started the project. Amend with strikethrough
 plus the replacement so the original stays readable.

@@ -7,7 +7,7 @@ LLM can read. The code may become public; the notes never are.
 - **Brief:** [docs/BRIEF.md](docs/BRIEF.md) — the contract: what it is for, what it is not, the
   feature tiers and the decisions already taken.
 - **Decision log:** [DECISIONS.md](DECISIONS.md) — dated reasoning, append-only.
-- **Agent workflow:** [docs/AGENT-GUIDE.md](docs/AGENT-GUIDE.md) — shared by Claude Code and Codex.
+- **Agent instructions:** [AGENTS.md](AGENTS.md) — one file for Claude Code and Codex (`CLAUDE.md` imports it).
 
 ## Status
 
