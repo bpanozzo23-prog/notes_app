@@ -9,6 +9,7 @@ dev-dist/
 # notes and backups — personal data, never committed
 /private-data/
 notes-backup-*.json
+before-import-*.json
 
 # local junk
 *.local

@@ -96,3 +96,14 @@ it safe.
 2. Formatting layer (Tier 2).
 3. Claude (Tier 3).
 4. Tier 4 items as the owner asks for them.
+
+## 9. Notes for later phases (from the 2026-10-16 Codex plan review)
+
+- **Phase 2:** images need durable attachment records (a `files` table holding blobs, referenced
+  by id from the HTML, included in backups), never temporary `blob:` URLs in note content. Named
+  styles apply a snapshot of formatting rather than staying linked to an editable definition. A
+  manually ordered colour palette takes precedence over recent-first. Callouts are a custom node
+  added to the supported HTML vocabulary.
+- **Phase 3:** before applying a Claude-proposed edit, check the note's `rev` still matches the one
+  Claude was shown. Images break the assumption that the whole notebook fits one request.
+- **Phase 4:** `tombstones` and `rev` are what sync uses for deletion tracking and conflicts.
