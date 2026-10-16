@@ -134,3 +134,46 @@ Append-only. One dated line per decision: what was decided, then why, after the 
 - 2026-10-16 — Importing a backup replaces only the exportable preferences; device-local ones
   survive. — Review fix: clearing the whole `prefs` table on import would have wiped a Phase 3
   API key, which is never in a backup, every time the owner restored one.
+
+## Phase 1b implementation
+
+- 2026-10-16 — One versioned stack lives under `history.state.notesNavigation`; each visit has
+  a screen, optional note id or list filter, a visit key and vertical scroll position. — No router,
+  per-tab stacks or note URLs are needed. Restored state is allowlisted and sanitised. Missing or
+  trashed destinations become the previous list; missing folder filters become All. Other owners'
+  history-state fields are retained. Scroll restoration is manual, with a per-visit memory copy
+  for a just-popped entry that the browser no longer lets us rewrite.
+- 2026-10-16 — New-note creation reserves one history visit and immediately replaces it with
+  the persisted note. — Back returns directly to the filtered list; there is no draft/missing-note
+  entry. Ordinary moves push a visit. Filter changes replace the current list visit.
+- 2026-10-16 — Back leaves the editor mounted and inert (temporarily unable to accept input)
+  while the save queue flushes. A failed Back returns the browser with `history.go(1)` and keeps
+  Not saved visible. Repeated Back presses coalesce; recovery uses the full traversed distance,
+  and a failed Forward reverses direction. — A slow write must neither discard the current editor
+  nor retry in a loop during recovery. UI actions and history changes share one operation guard.
+- 2026-10-16 — `useNotebook()` owns live notes, Trash, ordered folders and preferences, refreshed
+  on boot, navigation and mutations. — Explicit refreshes are enough for this one-owner app and
+  avoid a new state library. Current editor content stays local and never receives save echoes.
+  Tags are derived from live notes, ordered by frequency then name; pinning sorts before recency.
+- 2026-10-16 — Confirmations and the folder sheet share a focus-trapped dialog with an inert
+  background, Escape dismissal and focus restoration. Cancel receives initial confirmation focus;
+  failures are also shown inside the dialog. — Destructive actions remain deliberate and usable
+  with a keyboard or screen reader. Folder deletion counts notes in Trash as well as live notes.
+- 2026-10-16 — Delete now is restricted to Trash and shares the existing purge transaction:
+  remove the note, write a tombstone, neutralise live links without changing their recency. —
+  Immediate deletion must obey the same durability and future-sync rules as expiration.
+- 2026-10-16 — The update banner stays visible with Reload disabled and a reason during pending,
+  saving or failed saves. This supersedes the earlier “banner suppressed” wording, as requested
+  for step 1b. Reload flushes again and locks editing while activation is requested; the final
+  service-worker activation callback also flushes, including activation initiated by another tab.
+  A failed flush keeps the app open for explicit retry. The initial offline-ready message lasts
+  four seconds. Registration failures appear in Settings.
+- 2026-10-16 — The Vite base is `/notes_app/`; HTML icon paths use `%BASE_URL%` and manifest
+  icons are relative. Service-worker registration uses the plugin's generated base-aware code.
+  The workflow matches the requested Node 24 and Pages action versions. — No runtime path assumes
+  mi-cuaderno's deployment. Creating the GitHub repo, enabling Pages and pushing are left to the
+  reviewer under this task's explicit instructions; no commit, package install or deploy was done.
+- 2026-10-16 — Tests use jsdom, fake-indexeddb and seeded fixtures, with the PWA virtual module
+  replaced only in the test configuration. — Actual Android keyboard/Back gestures, the 375 px
+  layout, download completion, installed offline startup and two-build update behavior still need
+  owner verification. Search and internal-link navigation remain deferred to 1c.

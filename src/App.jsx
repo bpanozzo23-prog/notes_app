@@ -1,194 +1,138 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useRegisterSW } from "virtual:pwa-register/react";
 import { getPref, setPref } from "./db/db.js";
-import { createNote, liveNotes, purgeExpired, trashNote, updateNote } from "./db/notes.js";
-import { buildBackup, backupFilename, importBackup, validateBackup } from "./db/backup.js";
-import { downloadJson, readFileAsText } from "./lib/file.js";
-import { nowIso } from "./lib/dates.js";
-import { firstLine } from "./lib/text.js";
+import { createNote, purgeExpired, trashNote, updateNote } from "./db/notes.js";
 import { SaveQueue } from "./lib/saveQueue.js";
-import { APP_VERSION, SCHEMA_VERSION } from "./version.js";
-import NoteEditor from "./editor/NoteEditor.jsx";
+import useNotebook from "./lib/useNotebook.js";
+import { activeEntry, createNavigationController, initialNavigation } from "./lib/navigation.js";
 import { DEFAULT_TOOLBAR } from "./editor/actions.js";
+import NotesList from "./screens/NotesList.jsx";
+import Note from "./screens/Note.jsx";
+import Folders from "./screens/Folders.jsx";
+import Trash from "./screens/Trash.jsx";
+import Settings from "./screens/Settings.jsx";
 
 export default function App() {
   const [queue] = useState(() => new SaveQueue({ save: updateNote }));
   const status = useSyncExternalStore(queue.subscribe, queue.getSnapshot);
-  const [view, setView] = useState("list");
-  const [notes, setNotes] = useState([]);
-  const [note, setNote] = useState(null);
-  const [toolbar, setToolbar] = useState(DEFAULT_TOOLBAR);
-  const [persisted, setPersisted] = useState(undefined);
-  const [lastBackupAt, setLastBackupAt] = useState(undefined);
-  const [preview, setPreview] = useState(null);
+  const notebook = useNotebook();
+  const { refresh } = notebook;
+  const [navigation, setNavigation] = useState(initialNavigation);
+  const [busy, setBusy] = useState(true);
+  const [ready, setReady] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [busy, setBusy] = useState(true);
-  const operation = useRef(false);
-
-  async function refresh() {
-    const [rows, savedToolbar, savedPersistence, backupAt] = await Promise.all([
-      liveNotes(), getPref("toolbar"), getPref("storagePersisted"), getPref("lastBackupAt"),
-    ]);
-    setNotes(rows);
-    setToolbar(Array.isArray(savedToolbar) ? savedToolbar : DEFAULT_TOOLBAR);
-    // A backup's persistence flag is from its source device. Prefer this browser's answer.
-    const actualPersistence = await navigator.storage?.persisted?.().catch(() => undefined);
-    setPersisted(navigator.storage?.persist ? actualPersistence ?? savedPersistence : "unavailable");
-    setLastBackupAt(backupAt);
-  }
+  const [waitingForReload, setWaitingForReload] = useState(false);
+  const [workerReady, setWorkerReady] = useState(false);
+  const activatedWorker = useRef(false);
+  const [registrationError, setRegistrationError] = useState("");
+  const [nav] = useState(() => createNavigationController({
+    prepare: async () => { await queue.flush(); return refresh(); },
+    onChange: setNavigation,
+    onBusy: setBusy,
+    onError: (error) => setError(error.message || "The operation failed. Please try again."),
+  }));
+  const { needRefresh: [needRefresh], offlineReady: [offlineReady, setOfflineReady], updateServiceWorker } = useRegisterSW({
+    // Guard the final controller-change reload too: activation can come from another tab.
+    onNeedReload: () => { activatedWorker.current = true; setWorkerReady(true); },
+    onRegisterError: (error) => setRegistrationError(error.message || "Offline setup failed. Reopen the app to try again."),
+  });
 
   useEffect(() => {
-    let mounted = true;
-    purgeExpired().then(() => { if (mounted) return refresh(); }).catch((error) => {
-      if (mounted) setError(error.message);
-    }).finally(() => { if (mounted) setBusy(false); });
-    const flush = () => { queue.flush().catch(() => {}); }; // The queue retains and displays failures.
+    const stop = nav.start();
+    // The blank boot screen's scroll must not overwrite the saved visit before rows load.
+    void nav.run(async () => { await purgeExpired(); nav.restore(await refresh()); setReady(true); }, { captureScroll: false });
+    const flush = () => { queue.flush().catch(() => {}); };
     const hidden = () => { if (document.visibilityState === "hidden") flush(); };
     document.addEventListener("visibilitychange", hidden);
     window.addEventListener("pagehide", flush);
     return () => {
-      mounted = false;
+      stop();
       document.removeEventListener("visibilitychange", hidden);
       window.removeEventListener("pagehide", flush);
       flush();
     };
-  }, [queue]);
+  }, [nav, queue, refresh]);
 
-  async function run(task) {
-    if (operation.current) return;
-    operation.current = true;
-    setBusy(true);
-    setError("");
-    setMessage("");
-    try { await task(); }
-    catch (error) { setError(error.message || "The operation failed. Please try again."); }
-    finally { operation.current = false; setBusy(false); }
+  const route = activeEntry(navigation);
+  useLayoutEffect(() => { if (ready) window.scrollTo(0, route.scrollY); }, [route.key, route.screen, ready]);
+  useEffect(() => {
+    if (!offlineReady) return;
+    const timer = setTimeout(() => setOfflineReady(false), 4000);
+    return () => clearTimeout(timer);
+  }, [offlineReady, setOfflineReady]);
+
+  // Consume once; a failed flush stays visible until an explicit retry, never a reload loop.
+  useEffect(() => {
+    if (!workerReady || busy) return;
+    setWorkerReady(false);
+    void nav.run(async () => {
+      try { await queue.flush(); window.location.reload(); }
+      finally { setWaitingForReload(false); }
+    });
+  }, [workerReady, busy, nav, queue]);
+
+  function run(task) {
+    setMessage(""); setError("");
+    return nav.run(task);
   }
-
-  async function leave(next) {
-    await queue.flush();
-    await refresh();
-    setView(next);
-    setNote(null);
-  }
-
-  function edit(patch) {
-    queue.schedule(note.id, patch);
-    setNote((current) => ({ ...current, ...patch }));
-  }
-
+  function open(entry) { setMessage(""); setError(""); void nav.open(entry); }
+  function back() { setMessage(""); setError(""); nav.back(); }
   async function newNote() {
     await queue.flush();
-    const created = await createNote();
-    setNote(created);
-    setView("note");
+    const currentFilter = activeEntry(nav.current).filter;
+    const created = await createNote({ folderId: currentFilter?.type === "folder" ? currentFilter.value : null });
     if (await getPref("storagePersisted") === undefined) {
       let granted = false;
       try { granted = await navigator.storage?.persist?.() ?? false; }
-      catch { /* Unsupported or denied: the note is still saved. */ }
+      catch { /* The saved note is usable even if persistence is denied. */ }
       await setPref("storagePersisted", granted);
-      setPersisted(navigator.storage?.persist ? granted : "unavailable");
     }
-  }
-
-  async function exportFile() {
-    await queue.flush();
-    const backup = await buildBackup();
-    downloadJson(backup, backupFilename());
-    const at = nowIso();
-    await setPref("lastBackupAt", at);
-    setLastBackupAt(at);
-    setMessage("Backup download started.");
-  }
-
-  async function replaceFromPreview() {
-    if (!preview?.result.ok) return;
-    await queue.flush();
-    const before = await buildBackup();
-    const after = preview.result.envelope;
-    if (!window.confirm(`Replace ${before.notes.length} notes and ${before.folders.length} folders with ${after.notes.length} notes and ${after.folders.length} folders?`)) return;
-    downloadJson(before, `before-import-${backupFilename()}`);
-    await importBackup(after);
-    setPreview(null);
     await refresh();
-    setMessage("Backup imported. Your previous notebook's safety download was started first.");
+    nav.openCreated(created.id);
   }
-
-  return <main className="mx-auto flex min-h-full max-w-2xl flex-col">
-    <header className="flex items-center justify-between gap-3 px-4 py-3">
-      <h1 className="font-semibold">{view === "settings" ? "Settings" : "Notes"}</h1>
-      <div className="flex items-center gap-4">
-        {view === "note" && <span role="status" className={`text-xs ${status === "error" ? "font-semibold text-red-700" : "text-gray-500"}`}>{status === "error" ? "Not saved" : status}</span>}
-        {view === "list" ? <button disabled={busy} onClick={() => run(() => leave("settings"))}>Settings</button> :
-          <button disabled={busy} onClick={() => run(() => leave("list"))}>Back</button>}
-      </div>
-    </header>
-    {error && <p role="alert" className="mx-4 mb-3 text-sm text-red-700">{error}</p>}
-    {status === "error" && <div role="alert" className="mx-4 mb-3 text-sm text-red-700">
+  async function deleteNote(id) {
+    const success = await run(async () => { await queue.flush(); await trashNote(id); await refresh(); });
+    if (success && activeEntry(nav.current).screen === "note") nav.back();
+  }
+  const saveBlocksReload = ["pending", "saving", "error"].includes(status);
+  const reloadReason = status === "error" ? "Save failed. Retry save before reloading." : saveBlocksReload ? "Waiting for your notes to save." : "";
+  const updateState = registrationError ? `Offline setup: ${registrationError}` : needRefresh || activatedWorker.current
+    ? `Update available.${reloadReason ? ` ${reloadReason}` : " Ready to reload."}` : offlineReady ? "Ready to work offline" : "No update waiting.";
+  async function reload() {
+    // Check the queue itself as well as the rendered button, in case a keystroke just arrived.
+    if (queue.status !== "idle") return;
+    await run(async () => {
+      await queue.flush();
+      if (activatedWorker.current) { window.location.reload(); return; }
+      setWaitingForReload(true);
+      try { await updateServiceWorker(true); }
+      catch (error) { setWaitingForReload(false); throw error; }
+    });
+  }
+  const locked = busy || waitingForReload || workerReady;
+  const shared = { busy: locked, onBack: back, run, refresh, error };
+  const selected = notebook.notes.find((note) => note.id === route.noteId);
+  return <main className="mx-auto flex min-h-dvh max-w-2xl flex-col">
+    {(needRefresh || activatedWorker.current) && <aside aria-label="App update" className="border-b border-[var(--color-line)] bg-blue-50 px-4 py-2 text-sm">
+      <div className="flex items-center justify-between gap-2"><span>Update available —</span><button className="min-h-11 underline" disabled={locked || saveBlocksReload} onClick={reload}>Reload</button></div>
+      {reloadReason && <p className="text-xs">{reloadReason}</p>}
+      {waitingForReload && <p className="text-xs">Reloading…</p>}
+    </aside>}
+    {offlineReady && <p role="status" className="bg-green-50 px-4 py-2 text-sm">Ready to work offline</p>}
+    {error && <p role="alert" className="mx-4 my-3 text-sm text-red-700">{error}</p>}
+    {status === "error" && <div role="alert" className="mx-4 my-3 text-sm text-red-700">
       <p>Not saved. {queue.error?.message}</p>
-      <button className="underline" disabled={busy} onClick={() => run(() => queue.flush())}>Retry save</button>
+      <button className="min-h-11 underline" disabled={locked} onClick={() => run(() => queue.flush())}>Retry save</button>
     </div>}
-    {message && <p role="status" className="mx-4 mb-3 text-sm">{message}</p>}
-
-    {view === "list" && <section className="px-4">
-      <button className="app-button mb-4" disabled={busy} onClick={() => run(newNote)}>+ New note</button>
-      {!busy && !notes.length && <p className="text-gray-500">No notes yet.</p>}
-      <ul className="divide-y divide-gray-200">
-        {notes.map((row) => <li key={row.id}>
-          <button className="w-full py-4 text-left" disabled={busy} onClick={() => { setNote(row); setView("note"); setMessage(""); }}>
-            <span className="block truncate">{row.title.trim() || firstLine(row.text) || "Untitled note"}</span>
-          </button>
-        </li>)}
-      </ul>
-    </section>}
-
-    {view === "note" && note && <section className="flex flex-1 flex-col" inert={busy} onBlur={() => { queue.flush().catch(() => {}); }}>
-      <div className="flex items-center gap-3 px-4">
-        <input className="min-w-0 flex-1 bg-transparent py-2 text-xl font-semibold outline-none" aria-label="Title" placeholder="Title (optional)"
-          value={note.title} onChange={(event) => edit({ title: event.target.value })} />
-        <button className="text-sm text-red-700" disabled={busy} onClick={() => run(async () => {
-          if (!window.confirm("Move this note to Trash?")) return;
-          await queue.flush();
-          await trashNote(note.id);
-          await leave("list");
-        })}>Delete</button>
-      </div>
-      <NoteEditor note={note} onChange={(html) => edit({ html })} toolbarIds={toolbar} />
-    </section>}
-
-    {view === "settings" && <section className="space-y-6 px-4 pb-8">
-      <div className="space-y-2">
-        <h2 className="font-semibold">Backup</h2>
-        <button className="app-button" disabled={busy} onClick={() => run(exportFile)}>Export backup</button>
-        <p className="text-sm text-gray-600">Last backup: {lastBackupAt ? new Date(lastBackupAt).toLocaleString() : "Not yet exported"}</p>
-      </div>
-      <div className="space-y-3">
-        <label className="block font-semibold" htmlFor="backup-file">Import backup</label>
-        <input id="backup-file" type="file" accept=".json,application/json" disabled={busy} className="block w-full text-sm"
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            event.target.value = "";
-            if (!file) return;
-            setPreview(null);
-            run(async () => {
-              await queue.flush();
-              const result = validateBackup(await readFileAsText(file));
-              setPreview({ name: file.name, result });
-            });
-          }} />
-        {preview && <div className="space-y-2 rounded border border-gray-300 p-3 text-sm">
-          <p className="break-all">{preview.name}</p>
-          <p>{preview.result.summary.notes} notes ({preview.result.summary.trashed} in Trash), {preview.result.summary.folders} folders, {preview.result.summary.tombstones} deletion records.</p>
-          {preview.result.summary.willUpgrade && <p>This file will be upgraded to the current format.</p>}
-          {preview.result.errors.map((error, index) => <p role="alert" className="text-red-700" key={index}>{error}</p>)}
-          {preview.result.warnings.map((warning, index) => <p className="text-amber-800" key={index}>{warning}</p>)}
-          {preview.result.ok && <button className="app-button" disabled={busy} onClick={() => run(replaceFromPreview)}>Replace notebook</button>}
-        </div>}
-      </div>
-      <div className="space-y-2 text-sm">
-        <p>Persistent storage: {persisted === "unavailable" ? "Unavailable in this browser" : persisted === undefined ? "Not requested yet" : persisted ? "Granted" : "Not granted"}</p>
-        <p>App version: {APP_VERSION} · Schema version: {SCHEMA_VERSION}</p>
-      </div>
-    </section>}
+    {message && <p role="status" className="mx-4 my-3 text-sm">{message}</p>}
+    <div className="flex flex-1 flex-col" inert={locked} aria-busy={locked}>
+      {route.screen === "list" && <NotesList {...notebook} busy={locked} trashCount={notebook.trash.length} filter={route.filter} onFilter={nav.setFilter} onOpen={open} onNew={() => run(newNote)} />}
+      {route.screen === "note" && selected && <Note key={route.key} {...shared} initialNote={selected} notes={notebook.notes} folders={notebook.folders} queue={queue} status={status} onDelete={deleteNote}
+        toolbarIds={Array.isArray(notebook.prefs.toolbar) ? notebook.prefs.toolbar : DEFAULT_TOOLBAR} />}
+      {route.screen === "folders" && <Folders {...notebook} {...shared} />}
+      {route.screen === "trash" && <Trash trash={notebook.trash} {...shared} />}
+      {route.screen === "settings" && <Settings {...shared} notebook={notebook} queue={queue} setMessage={setMessage} updateState={updateState} />}
+    </div>
   </main>;
 }

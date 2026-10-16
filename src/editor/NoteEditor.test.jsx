@@ -66,3 +66,14 @@ it("recognises a colour after saved HTML has normalised it to rgb", () => {
   act(() => { currentEditor().commands.setTextSelection(2); });
   expect(screen.getByRole("button", { name: "Red" }).getAttribute("aria-pressed")).toBe("true");
 });
+
+it("a tap on the empty body surface focuses the editor at the end", async () => {
+  const view = render(<NoteEditor note={noteFixture({ html: "<p>End of note</p>" })} onChange={() => {}} />);
+  // jsdom has no Range geometry. Focus and selection are real; visual scrolling is a phone check.
+  const scroll = vi.spyOn(currentEditor().view, "scrollToSelection").mockImplementation(() => {});
+  act(() => currentEditor().commands.setTextSelection(1));
+  fireEvent.click(view.container.querySelector("[data-editor-surface]"));
+  await waitFor(() => expect(currentEditor().isFocused).toBe(true));
+  expect(currentEditor().state.selection.from).toBe(currentEditor().state.doc.content.size - 1);
+  scroll.mockRestore();
+});

@@ -25,7 +25,11 @@ function NoteDocument({ note, onChange, toolbarIds }) {
   });
   if (!editor) return null;
   return <>
-    <EditorContent editor={editor} className="flex-1" />
+    <div className="flex flex-1 flex-col" data-editor-surface onClick={(event) => {
+      if (!event.target.closest(".ProseMirror")) editor.commands.focus("end");
+    }}>
+      <EditorContent editor={editor} className="flex-1" />
+    </div>
     <Toolbar editor={editor} ids={toolbarIds} />
     <SelectionMenu editor={editor} />
   </>;

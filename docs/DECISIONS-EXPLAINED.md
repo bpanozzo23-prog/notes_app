@@ -225,3 +225,15 @@ approved preferences go into a backup; unrelated settings such as a future API k
 Deleted targets lose their links at purge time. If the linking note was also in Trash, restoring
 it cleans up links to already-purged notes then. Neither operation makes old notes look newly
 edited in the list.
+
+### 17. Back, Trash and app updates in Phase 1b
+
+Android Back and the app's Back button return to the list with its filter and scroll position
+remembered. They finish saving first; if saving fails, the note stays open with **Not saved** so
+you can retry. Deleting a note puts it in Trash for 30 days, where you can restore it. **Delete now**
+asks for confirmation and removes it permanently; deleting a folder keeps its notes under “No
+folder”. An app update shows **Update available — Reload**, but Reload is disabled while notes
+are waiting to save or a save has failed. Once saving succeeds, Reload checks again before applying
+the update. A brief **Ready to work offline** message marks the first offline installation. The
+published app and the phone's dev URL have separate storage, so use a backup to move notes between
+them. These phone and installation behaviors still need the owner's check after deployment.

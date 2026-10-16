@@ -88,19 +88,33 @@ export async function purgeExpired(now = new Date()) {
   const cutoff = new Date(new Date(now).getTime() - TRASH_RETENTION_MS).toISOString();
   return db.transaction("rw", db.notes, db.tombstones, async () => {
     const expired = await db.notes.where("deletedAt").below(cutoff).toArray();
-    const ids = new Set(expired.map((note) => note.id));
-    if (!ids.size) return 0;
-    await db.tombstones.bulkPut([...ids].map((id) => ({ id, purgedAt: at })));
-    await db.notes.bulkDelete([...ids]);
-    await db.notes.filter((note) => note.deletedAt === null).modify((note) => {
-      const html = neutralizeNoteLinks(note.html, ids);
-      if (html === note.html) return false;
-      note.html = html;
-      note.text = htmlToText(html);
-      note.linkedIds = extractNoteLinks(html);
-      note.rev += 1; // Link cleanup is housekeeping, not a recency change.
-    });
-    return ids.size;
+    return purgeRows(expired, at);
+  });
+}
+
+// Both purge paths run this inside the same notes/tombstones transaction.
+async function purgeRows(rows, at) {
+  const ids = new Set(rows.map((note) => note.id));
+  if (!ids.size) return 0;
+  await db.tombstones.bulkPut([...ids].map((id) => ({ id, purgedAt: at })));
+  await db.notes.bulkDelete([...ids]);
+  await db.notes.filter((note) => note.deletedAt === null).modify((note) => {
+    const html = neutralizeNoteLinks(note.html, ids);
+    if (html === note.html) return false;
+    note.html = html;
+    note.text = htmlToText(html);
+    note.linkedIds = extractNoteLinks(html);
+    note.rev += 1; // Link cleanup is housekeeping, not a recency change.
+  });
+  return ids.size;
+}
+
+export async function purgeNow(id) {
+  return db.transaction("rw", db.notes, db.tombstones, async () => {
+    const note = await db.notes.get(id);
+    if (!note) throw new Error("Note does not exist");
+    if (note.deletedAt === null) throw new Error("Move the note to Trash before deleting it permanently");
+    return purgeRows([note], nowIso());
   });
 }
 

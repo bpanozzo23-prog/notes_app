@@ -106,3 +106,17 @@ it("orders live notes newest first and handles preferences", async () => {
   await delPref("toolbar");
   expect(await getPref("toolbar")).toBeUndefined();
 });
+
+it("purgeNow refuses a live note and rolls back deletion if tombstone creation fails", async () => {
+  const { purgeNow } = await import("./notes.js");
+  const target = await createNote();
+  await expect(purgeNow(target.id)).rejects.toThrow("Move the note to Trash");
+  await trashNote(target.id);
+  const tombstones = vi.spyOn(db.tombstones, "bulkPut").mockRejectedValueOnce(new Error("Disk full"));
+  await expect(purgeNow(target.id)).rejects.toThrow("Disk full");
+  expect(await getNote(target.id)).toBeTruthy();
+  expect(await db.tombstones.get(target.id)).toBeUndefined();
+  tombstones.mockRestore();
+  expect(await purgeNow(target.id)).toBe(1);
+  await expect(purgeNow(target.id)).rejects.toThrow("does not exist");
+});
