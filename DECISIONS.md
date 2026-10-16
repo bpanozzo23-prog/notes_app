@@ -97,3 +97,40 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   try to open a `note:` URL.
 - 2026-10-16 — Deploy to GitHub Pages in step 1b, before search and links. — The dev server and
   the published app have separate browser storage; trial notes should accumulate in the real one.
+
+## Phase 1a implementation
+
+- 2026-10-16 — Live notes use a filtered scan; Trash uses the `deletedAt` index. — IndexedDB
+  omits null values from indexes, so the direction's suggested indexed lookup for live notes is
+  not possible. The small notebook makes a scan appropriate.
+- 2026-10-16 — New notes start at `rev: 1`; identical content patches still increment `rev` but
+  do not advance `updatedAt`. — A write and an actual content change are different events.
+- 2026-10-16 — Folders contain `{ id, name, position }`, with zero-based integer positions;
+  reorder accepts a complete permutation. — No folder timestamps or partial-reorder rules are
+  needed for this step, and an incomplete reorder must not silently drop a folder.
+- 2026-10-16 — Restoring a note also neutralises links to existing tombstones without changing
+  recency. — A source note can be in Trash when its target is purged, so live-only purge cleanup
+  would otherwise leave a permanently broken link after restore.
+- 2026-10-16 — The save queue injects its clock, timer functions and writer; failed patches stay
+  in memory and merge underneath newer fields. Retry waits for the next schedule or flush, and
+  flush rejects on failure. — Avoids a retry loop against full storage, preserves the latest edit,
+  and stops navigation or backup replacement from proceeding with an unsuccessful save.
+- 2026-10-16 — NoteEditor keys its inner editor by note id, creating a new editor on a switch.
+  — This resets document and undo history together through React's lifecycle; same-id updates
+  never reload saved HTML into the active editor. The screen is inert during awaited navigation
+  and destructive actions so new typing cannot race a completed flush.
+- 2026-10-16 — Backup validation reports `warnings` separately from blocking `errors`, requires
+  canonical UTC timestamps and positive revisions, and rejects duplicate ids across tables.
+  — Dates must sort correctly in string indexes; a live note and its tombstone cannot coexist.
+  Missing note links remain importable and are shown in the preview.
+- 2026-10-16 — Schema 1 is the first backup format; no schema-0 format is invented. Pure upgrade
+  functions and validators run one version at a time, with synthetic future versions testing the
+  runner until a real v2 exists. — Keeps the upgrade path explicit without pretending to support
+  files that were never produced by this app.
+- 2026-10-16 — Vitest uses jsdom and fake-indexeddb, with a fresh database before every database
+  test; text helpers also run in Node without a DOM. Component tests exercise the real Tiptap
+  editor and seeded data. — Covers storage, failure recovery and editor lifecycle without access
+  to the owner's notes; physical keyboard and download behavior remain phone checks.
+- 2026-10-16 — Importing a backup replaces only the exportable preferences; device-local ones
+  survive. — Review fix: clearing the whole `prefs` table on import would have wiped a Phase 3
+  API key, which is never in a backup, every time the owner restored one.

@@ -39,7 +39,8 @@ Free-form Spanish notes are welcome here.
 
 - **Tiptap** (ProseMirror) rich-text editor, subject to the spike (§8) passing.
 - **Storage format is HTML**, not Markdown: the owner's formatting wishes include colour, font
-  size and underline, which Markdown cannot express. Tiptap reads and writes HTML without loss, and
+  size and underline, which Markdown cannot express. Tiptap reads and writes HTML ~~without loss~~
+  within the configured extensions' supported vocabulary (clarified 2026-10-16), and
   an LLM reads HTML fine. A Markdown projection may be derived for display or search but is never
   the source of truth.
 - **Everything about the toolbar is data**, so the owner can add, remove and reorder entries, and

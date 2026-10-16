@@ -5,7 +5,7 @@ this one is for the owner: what was chosen, why, what it means for the app, what
 and how hard it would be to reverse ("lock-in"). Ordered by lock-in, hardest first. Updated whenever
 `DECISIONS.md` gains an entry with consequences for how the app behaves.
 
-Last updated 2026-10-16, after the Codex review of the Phase 1 plan.
+Last updated 2026-10-16, during the Phase 1a implementation.
 
 ---
 
@@ -201,3 +201,27 @@ than importing files. Two personal apps sharing code becomes a chore. **Lock-in:
 
 Dark mode and a wider desktop layout are not in Phase 1. The colour system is set up so dark mode
 is a later addition, not a redo. **Lock-in: none.**
+
+### 16. What Phase 1a adds, and how failures behave
+
+The first working slice has a notes list, an editor, and Settings for backups. Folder and Trash
+operations exist underneath, with their screens coming in 1b. The toolbar is already a list of
+action names; its customisation screen comes later. Opening a different note creates a fresh
+editor, so Undo cannot bring text across from the previous note.
+
+If saving fails, **Not saved** remains visible and the latest text stays in memory. Retry save,
+typing again, or Back tries the write again. Back waits for a successful save; export and import
+also wait. Closing or killing the browser before a successful retry can still lose that unsaved
+text. Automated tests deliberately fail writes to check this behavior; the owner's phone check
+is still needed for switching apps and keyboard composition.
+
+Import first shows the file's counts and any errors. Missing folders block the import; missing
+note links appear as warnings. Confirming replacement starts a download of the existing notebook
+before changing storage. The browser does not tell the app whether a download ultimately reached
+the Downloads folder, so verify both files on the phone. Replacement itself is one transaction:
+all tables change together, or the old notebook stays intact if a write fails. Only the three
+approved preferences go into a backup; unrelated settings such as a future API key are excluded.
+
+Deleted targets lose their links at purge time. If the linking note was also in Trash, restoring
+it cleans up links to already-purged notes then. Neither operation makes old notes look newly
+edited in the list.
