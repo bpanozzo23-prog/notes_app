@@ -5,7 +5,7 @@ this one is for the owner: what was chosen, why, what it means for the app, what
 and how hard it would be to reverse ("lock-in"). Ordered by lock-in, hardest first. Updated whenever
 `DECISIONS.md` gains an entry with consequences for how the app behaves.
 
-Last updated 2026-10-17, with step 2a (§31).
+Last updated 2026-10-17, with step 2b (§32).
 
 ---
 
@@ -445,4 +445,19 @@ The colour lists exist already (12 text colours, 8 highlights) but have no scree
 **What you'll notice:** Settings shows "Schema version: 2" and app version 0.2.0. The import
 confirmation adds "Your toolbar, colours and styles will be replaced by the backup's."
 **Lock-in: none** beyond §22.
+
+### 32. Step 2b: your toolbar and pop-up
+
+**Chosen:** Settings → Formatting has two screens, **Toolbar** and **Selection pop-up**. Each
+lists its buttons in order: ↑ and ↓ move a button one place; ⋮ offers Move to top, Move to bottom
+and Remove; **Add buttons** lists everything available by group; **Reset** returns to the
+defaults. Changes apply immediately. The toolbar screen also picks the layout (one swiping row,
+two rows, or one row + ⋯ More) and shows a live preview; in the two layouts with ⋯ More, a line
+in the list shows where the More panel starts. The selection pop-up shows at most two rows and
+also uses ⋯ More beyond that (instead of the planned sideways scroll, so both behave the same).
+Long-pressing any formatting button shows its name instead of applying it. Android Back now
+closes an open panel, sheet or confirmation before it leaves the screen.
+**Why:** the first thing you asked Phase 2 for. ⋯ More keeps the keyboard open and your
+selection in place, because it is a panel above the toolbar rather than a separate window.
+**Lock-in: none.** All of it is settings and app behaviour; nothing is written into notes.
 

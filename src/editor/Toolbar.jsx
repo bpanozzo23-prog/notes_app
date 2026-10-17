@@ -1,5 +1,10 @@
+import { useEffect } from "react";
 import { useEditorState } from "@tiptap/react";
+import { Ellipsis } from "lucide-react";
 import { resolveAction, DEFAULT_TOOLBAR } from "./actions.js";
+import ActionButton, { ActionIcon } from "./ActionButton.jsx";
+import { MORE_BUTTON, splitToolbar } from "./toolbarLayout.js";
+import { useToolbarSize } from "./useToolbarSize.js";
 
 export function ActionButtons({ editor, ids, formatting, ui = {}, size = 20, readOnly = false }) {
   const active = useEditorState({
@@ -9,24 +14,34 @@ export function ActionButtons({ editor, ids, formatting, ui = {}, size = 20, rea
   return ids.map((id, index) => {
     const action = resolveAction(id, formatting);
     if (!action) return null;
-    const Icon = action.icon;
-    return (
-      <button key={`${id}:${index}`} type="button" disabled={readOnly} aria-label={action.label}
-        aria-pressed={action.kind === "toggle" ? active?.[id] : undefined}
-        onPointerDown={(event) => event.preventDefault()}
-        onClick={() => action.run({ editor, ui })}
-        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-md ${active?.[id] ? "bg-blue-100 text-blue-700" : "text-gray-700 active:bg-gray-200"}`}>
-        {id.startsWith("color:") ? <span className="block h-5 w-5 rounded-full border border-gray-300"
-          style={{ background: action.color ?? "linear-gradient(135deg,#fff 45%,#999 50%,#fff 55%)" }} /> : <Icon size={size} />}
-      </button>
-    );
+    return <ActionButton key={`${id}:${index}`} label={action.label} disabled={readOnly}
+      pressed={action.kind === "toggle" ? !!active?.[id] : undefined}
+      expanded={action.tray ? ui.openTray === action.tray : undefined}
+      onAction={() => {
+        if (!editor) return;
+        if (ui.runAction) ui.runAction(action);
+        else if (action.tray) ui.toggleTray?.(action.tray);
+        else action.run({ editor, ui });
+      }}><ActionIcon action={action} size={size} /></ActionButton>;
   });
 }
 
-export default function Toolbar({ editor, ids = DEFAULT_TOOLBAR, formatting, ui, readOnly }) {
-  return <div role="toolbar" aria-label="Formatting" className="fixed inset-x-0 bottom-0 border-t border-gray-200 bg-white/95 backdrop-blur">
-    <div className="mx-auto flex max-w-2xl gap-0.5 overflow-x-auto px-2 py-1 pb-[max(0.25rem,env(safe-area-inset-bottom))]">
-      <ActionButtons editor={editor} ids={ids} formatting={formatting} ui={ui} readOnly={readOnly} />
+export function ActionRows({ rows, more, source, editor, formatting, ui, readOnly, size }) {
+  return rows.map((row, index) => <div className="action-row" key={index}>
+    <ActionButtons editor={editor} ids={row.filter((id) => id !== MORE_BUTTON)} formatting={formatting} ui={ui} readOnly={readOnly} size={size} />
+    {row.includes(MORE_BUTTON) && <ActionButton label="More" disabled={readOnly}
+      expanded={ui?.openTray === "more" && ui?.traySource === source}
+      onAction={() => { if (editor) ui?.toggleTray?.("more", { ids: more, source }); }}><Ellipsis size={22} aria-hidden="true" /></ActionButton>}
+  </div>);
+}
+
+export default function Toolbar({ editor = null, ids = DEFAULT_TOOLBAR, layout = "scroll", formatting, ui, readOnly, onCapacity }) {
+  const { ref, perRow } = useToolbarSize();
+  const split = splitToolbar(ids.filter((id) => resolveAction(id, formatting)), perRow, layout);
+  useEffect(() => { onCapacity?.(perRow); }, [perRow, onCapacity]);
+  return <div role="toolbar" aria-label={editor ? "Formatting" : "Toolbar preview"} className="border-t border-gray-200 bg-white/95 backdrop-blur">
+    <div ref={ref} className={`toolbar-inner mx-auto max-w-2xl px-2 py-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] ${layout === "scroll" ? "overflow-x-auto" : ""}`}>
+      <ActionRows {...split} source="toolbar" editor={editor} formatting={formatting} ui={ui} readOnly={readOnly || !editor} />
     </div>
   </div>;
 }

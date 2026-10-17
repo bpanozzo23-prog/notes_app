@@ -329,3 +329,36 @@ Append-only. One dated line per decision: what was decided, then why, after the 
 - 2026-10-17 — The owner verified 2a on the published app: update applied, notes intact,
   schema 2 shown, export/import round trip, the pre-update v1 backup previews as "will be
   upgraded", selection pop-up unchanged: "Everything checks out."
+
+## Phase 2b implementation
+
+- 2026-10-17 — The selection pop-up puts overflow behind ⋯ More in its last slot, opening
+  the same tray as the toolbar; it no longer scrolls its second row sideways. — The step 2b
+  task explicitly changes the direction file so both surfaces behave the same way.
+- 2026-10-17 — Toolbar buttons stay 40 px wide with 2 px gaps; the measured content width
+  determines capacity, and the Settings preview supplies that same capacity to the list's
+  More divider. Unknown ids consume no slots. — The preview and the note must agree at phone
+  width and after a resize, including with imported unavailable or duplicate buttons.
+- 2026-10-17 — A cursor inside a link keeps Open and Remove link on the first pop-up row;
+  formatting uses the second row with More as needed. — Keeps the existing readable link
+  commands and still honours the two-row limit.
+- 2026-10-17 — The row's ⋮ opens the shared sheet for Move to top, Move to bottom and Remove.
+  — Reuses the existing phone-sized targets, focus handling, Escape and Android Back behaviour
+  instead of adding another kind of menu.
+- 2026-10-17 — Mounted dialogs and trays register dismissal callbacks with navigation; the
+  most recently opened overlay closes first, and history recovers without a flush or a new
+  visit. Busy operations retain their existing Back handling. — One shared path covers old
+  confirmations, pickers and import as well as the new sheets and trays.
+- 2026-10-17 — Reset removes the toolbar and layout preferences in one guarded transaction;
+  the pop-up reset removes only its own preference. — A failed reset cannot leave half a
+  toolbar reset behind, and absent preferences keep following future defaults.
+- 2026-10-17 — Finger and pen share the 500 ms label gesture; movement over 10 px cancels
+  both the label and that tap. Pen hover optionally labels after 300 ms. — A swipe must not
+  accidentally format text; hover is an extra and no action depends on detecting a pen.
+- 2026-10-17 — The pop-up's Floating UI boundary reserves the positioning gap as well as
+  an 8 px edge. — The 375 × 450 screenshots caught Tiptap applying its gap after the boundary
+  shift, clipping 4 px off the top.
+- 2026-10-17 — The Add sheet initially focuses its first group heading. — At reduced height,
+  automatic focus on the first enabled Add button scrolled past the sheet's title.
+- 2026-10-17 — Done stays in a separate footer outside the Add sheet's scrolling rows. —
+  Keeps it reachable without rows peeking below or being covered by a sticky button.

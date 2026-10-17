@@ -152,3 +152,15 @@ button:disabled { cursor: default; opacity: 0.5; }
 .tag-chip { display: inline-flex; align-items: center; border: 1px solid var(--color-line); border-radius: 1rem; background: #f1efe9; }
 .app-input { min-height: 44px; border: 1px solid var(--color-line); border-radius: 0.5rem; padding: 0.5rem 0.75rem; background: transparent; }
 button:focus-visible, input:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+
+/* The 40 px button and 2 px gap match toolbarLayout.js. */
+.action-row { display: flex; gap: 2px; }
+.action-row + .action-row { margin-top: 2px; }
+.toolbar-inner { min-height: 48px; }
+.formatting-button { width: 40px; height: 40px; color: #374151; }
+.formatting-button-text { min-height: 40px; border-radius: 6px; padding: 0 8px; font-size: 14px; }
+.formatting-button, .formatting-button-text { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.formatting-button:active, .formatting-button-text:active { background: #e5e7eb; }
+.formatting-button[aria-expanded="true"] { background: #dbeafe; color: #1d4ed8; }
+.toolbar-preview button:disabled { opacity: 1; }
+.action-label { position: fixed; z-index: 70; max-width: min(240px, calc(100vw - 16px)); pointer-events: none; border-radius: 6px; background: #1f2328; color: white; padding: 5px 9px; font-size: 13px; }

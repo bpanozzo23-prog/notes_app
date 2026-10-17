@@ -1,7 +1,7 @@
 import { newId, SAFE_STRING } from "./ids.js";
 
 export const NAVIGATION_KEY = "notesNavigation";
-const SCREENS = ["list", "note", "folders", "trash", "settings"];
+const SCREENS = ["list", "note", "folders", "trash", "settings", "settings-toolbar", "settings-selection"];
 const safeString = (value) => typeof value === "string" && SAFE_STRING.test(value);
 const safeScroll = (value) => Number.isFinite(value) && value >= 0 ? value : 0;
 export const activeEntry = (navigation) => navigation.stack.at(-1);
@@ -28,6 +28,9 @@ export function sanitizeNavigation(raw) {
     while (keys.has(key)) key = `restored-${index}-${++suffix}`;
     keys.add(key);
     const base = { key, scrollY: safeScroll(entry?.scrollY) };
+    if (index > 0 && typeof entry?.screen === "string" && entry.screen.startsWith("settings-") && !SCREENS.includes(entry.screen)) {
+      return { ...base, screen: "settings" };
+    }
     if (!SCREENS.includes(entry?.screen) || (index === 0 && entry.screen !== "list") ||
         (entry.screen === "note" && !safeString(entry.noteId))) {
       return { ...base, screen: "list", filter: { type: "all" } };
@@ -82,6 +85,7 @@ export function createNavigationController({ win = window, prepare, onChange, on
   let stopped = false;
   let pendingPop = null;
   let recovering = false;
+  const overlays = new Set();
   const scrollByKey = new Map();
   const emit = () => { if (!stopped) onChange(navigation); };
   const setBusy = (value) => { busy = value; if (!stopped) onBusy(value); };
@@ -100,7 +104,7 @@ export function createNavigationController({ win = window, prepare, onChange, on
     emit();
   }
   function recoverPop(error) {
-    onError(error);
+    if (error) onError(error);
     const delta = navigation.stack.length - pendingPop.stack.length;
     pendingPop = null;
     if (delta) {
@@ -146,6 +150,11 @@ export function createNavigationController({ win = window, prepare, onChange, on
     } else if (!busy) {
       // The browser has already moved: do not overwrite its destination with captureScroll().
       scrollByKey.set(activeEntry(navigation).key, win.scrollY);
+      if ([...overlays].reverse().some((close) => close())) {
+        setBusy(true);
+        recoverPop();
+        return;
+      }
       void settlePop();
     }
   }
@@ -186,6 +195,7 @@ export function createNavigationController({ win = window, prepare, onChange, on
       };
     },
     run,
+    registerOverlay(close) { overlays.add(close); return () => overlays.delete(close); },
     restore(data) { commit(resolveDestination(navigation, data)); },
     open(entry) {
       return run(async () => {

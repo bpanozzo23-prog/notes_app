@@ -1,5 +1,6 @@
 import { createContext, useContext, useId, useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
+import { useOverlay } from "../lib/overlays.jsx";
 
 const focusables = (node) => [...node.querySelectorAll('button:not(:disabled), input:not(:disabled), [tabindex="0"]')];
 
@@ -9,7 +10,8 @@ export default function Dialog(props) {
   return useContext(DialogLock) ? null : <DialogPanel {...props} />;
 }
 
-function DialogPanel({ title, children, onClose, busy = false, sheet = false, descriptionId }) {
+function DialogPanel({ title, children, onClose, busy = false, sheet = false, descriptionId, footer }) {
+  useOverlay(true, onClose, busy);
   const titleId = useId();
   const panel = useRef(null);
   const layer = useRef(null);
@@ -30,7 +32,7 @@ function DialogPanel({ title, children, onClose, busy = false, sheet = false, de
 
   return createPortal(<div ref={layer} className={`fixed inset-0 z-50 flex justify-center bg-black/30 ${sheet ? "items-end" : "items-center p-4"}`}>
     <div ref={panel} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId} aria-busy={busy} tabIndex={-1}
-      className={`w-full max-w-md overflow-y-auto bg-[var(--color-paper)] p-5 shadow-xl max-h-[85dvh] ${sheet ? "rounded-t-2xl pb-[max(1.25rem,env(safe-area-inset-bottom))]" : "rounded-xl"}`}
+      className={`w-full max-w-md bg-[var(--color-paper)] shadow-xl max-h-[85dvh] ${sheet ? "rounded-t-2xl" : "rounded-xl"} ${footer ? "flex flex-col overflow-hidden" : "overflow-y-auto p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]"}`}
       onKeyDown={(event) => {
         if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); if (!busy) onClose(); }
         if (event.key !== "Tab") return;
@@ -43,8 +45,11 @@ function DialogPanel({ title, children, onClose, busy = false, sheet = false, de
           event.preventDefault(); first.focus();
         }
       }}>
-      <h2 id={titleId} className="mb-3 break-words text-lg font-semibold">{title}</h2>
-      {children}
+      <div className={footer ? "min-h-0 overflow-y-auto p-5" : undefined}>
+        <h2 id={titleId} className="mb-3 break-words text-lg font-semibold">{title}</h2>
+        {children}
+      </div>
+      {footer && <div className="shrink-0 border-t border-[var(--color-line)] px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">{footer}</div>}
     </div>
   </div>, document.body);
 }

@@ -1,5 +1,5 @@
 import {
-  Bold, Italic, Underline, Strikethrough, Highlighter, Heading1, Heading2, List,
+  Bold, Italic, Underline, Strikethrough, Highlighter, Heading1, Heading2, Heading3, List,
   ListOrdered, ListChecks, Quote, Minus, Undo2, Redo2, Eraser, Link, Circle,
 } from "lucide-react";
 
@@ -35,6 +35,7 @@ export const actions = [
     .map(([color, label]) => colorAction(color, label)),
   action("h1", "Heading 1", Heading1, (chain) => chain.toggleHeading({ level: 1 }), (editor) => editor.isActive("heading", { level: 1 })),
   action("h2", "Heading 2", Heading2, (chain) => chain.toggleHeading({ level: 2 }), (editor) => editor.isActive("heading", { level: 2 })),
+  action("h3", "Heading 3", Heading3, (chain) => chain.toggleHeading({ level: 3 }), (editor) => editor.isActive("heading", { level: 3 })),
   mark("bulletList", "Bullet list", List, (chain) => chain.toggleBulletList()),
   mark("orderedList", "Numbered list", ListOrdered, (chain) => chain.toggleOrderedList()),
   mark("taskList", "Checklist", ListChecks, (chain) => chain.toggleTaskList()),
@@ -45,7 +46,7 @@ export const actions = [
   action("redo", "Redo", Redo2, (chain) => chain.redo()),
   { id: "link", group: "Insert", label: "Link to note", icon: Link, kind: "picker", run: ({ editor, ui }) => ui?.openLinkPicker?.(editor) },
 ].map((entry) => ({ ...entry, group:
-  ["h1", "h2", "bulletList", "orderedList", "taskList", "blockquote", "hr"].includes(entry.id) ? "Lines & blocks"
+  ["h1", "h2", "h3", "bulletList", "orderedList", "taskList", "blockquote", "hr"].includes(entry.id) ? "Lines & blocks"
     : ["clearFormatting", "undo", "redo"].includes(entry.id) ? "Tools"
     : entry.id === "highlight" ? "Colours" : entry.group,
 }));
@@ -54,10 +55,21 @@ export const actions = [
 export const ACTIONS = Object.freeze(Object.assign(Object.create(null), Object.fromEntries(actions.map((entry) => [entry.id, entry]))));
 export function resolveAction(id, formatting) {
   if (typeof id !== "string") return null;
+  const namedColor = formatting?.textColors?.find((entry) => `color:${entry.color}` === id.toLowerCase());
+  if (namedColor) return colorAction(namedColor.color, namedColor.name);
   if (ACTIONS[id]) return ACTIONS[id];
   if (!/^color:#[0-9a-fA-F]{6}$/.test(id)) return null;
   const color = id.slice(6).toLowerCase();
   return colorAction(color, formatting?.textColors?.find((entry) => entry.color === color)?.name ?? color);
+}
+
+export function availableActions(formatting) {
+  return [
+    "bold", "italic", "underline", "strike", "highlight", "color:none",
+    ...(formatting?.textColors ?? []).filter((entry) => !entry.hidden).map((entry) => `color:${entry.color}`),
+    "h1", "h2", "h3", "bulletList", "orderedList", "taskList", "blockquote", "hr",
+    "link", "clearFormatting", "undo", "redo",
+  ].map((id) => resolveAction(id, formatting));
 }
 
 export const DEFAULT_TOOLBAR = [

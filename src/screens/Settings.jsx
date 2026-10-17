@@ -7,8 +7,9 @@ import { APP_VERSION, SCHEMA_VERSION } from "../version.js";
 import ScreenHeader from "../components/ScreenHeader.jsx";
 import { requestPersistence } from "../lib/persistence.js";
 import Confirm from "../components/Confirm.jsx";
+import { ChevronRight } from "lucide-react";
 
-export default function Settings({ notebook, queue, run, busy, readOnly, onBack, setMessage, updateState, error }) {
+export default function Settings({ notebook, queue, run, busy, readOnly, onBack, onOpen, setMessage, updateState, error }) {
   const [preview, setPreview] = useState(null);
   const [confirmImport, setConfirmImport] = useState(false);
   const { notes, trash, folders, prefs, persisted, refresh } = notebook;
@@ -34,6 +35,15 @@ export default function Settings({ notebook, queue, run, busy, readOnly, onBack,
   return <section>
     <ScreenHeader title="Settings" onBack={onBack} busy={busy} />
     <div className="space-y-6 px-4 pb-8">
+      <section>
+        <h2 className="mb-2 font-semibold">Formatting</h2>
+        <div className="divide-y divide-[var(--color-line)]">
+          {[["settings-toolbar", "Toolbar"], ["settings-selection", "Selection pop-up"]].map(([screen, label]) =>
+            <button key={screen} className="flex min-h-11 w-full items-center justify-between py-2 text-left" disabled={busy} onClick={() => onOpen({ screen })}>
+              {label}<ChevronRight size={18} aria-hidden="true" />
+            </button>)}
+        </div>
+      </section>
       <div className="space-y-2">
         <h2 className="font-semibold">Backup</h2>
         <button className="app-button" disabled={busy || readOnly} onClick={() => run(exportFile)}>Export backup</button>

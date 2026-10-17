@@ -13,6 +13,9 @@ import Folders from "./screens/Folders.jsx";
 import Trash from "./screens/Trash.jsx";
 import Settings from "./screens/Settings.jsx";
 import { DialogLock } from "./components/Dialog.jsx";
+import { OverlayNavigation } from "./lib/overlays.jsx";
+import ToolbarSettings from "./screens/settings/ToolbarSettings.jsx";
+import PopupSettings from "./screens/settings/PopupSettings.jsx";
 
 export default function App() {
   const [queue] = useState(() => new SaveQueue({ save: updateNote }));
@@ -156,7 +159,7 @@ export default function App() {
     return run(() => access.versionChange === "pending" ? finishDatabaseUpdate() : queue.flush());
   }
   const selected = notebook.notes.find((note) => note.id === route.noteId);
-  return <DialogLock value={access.replaced || !!access.versionChange}><main className="mx-auto flex min-h-dvh max-w-2xl flex-col">
+  return <OverlayNavigation value={nav}><DialogLock value={access.replaced || !!access.versionChange}><main className="mx-auto flex min-h-dvh max-w-2xl flex-col">
     {guardMessage && <aside role="alert" className="border-b border-[var(--color-line)] bg-amber-50 px-4 py-2 text-sm">{guardMessage}</aside>}
     {bootError !== null && <div role="alert" className="mx-4 my-3 text-red-700">
       <p>Couldn't open your notes. They have not been deleted. Reload to try again.</p>
@@ -180,7 +183,9 @@ export default function App() {
         formatting={formatting} />}
       {route.screen === "folders" && <Folders {...notebook} {...shared} />}
       {route.screen === "trash" && <Trash trash={notebook.trash} {...shared} />}
-      {route.screen === "settings" && <Settings {...shared} notebook={notebook} queue={queue} setMessage={setMessage} updateState={updateState} />}
+      {route.screen === "settings" && <Settings {...shared} notebook={notebook} queue={queue} onOpen={open} setMessage={setMessage} updateState={updateState} />}
+      {route.screen === "settings-toolbar" && <ToolbarSettings {...shared} formatting={formatting} />}
+      {route.screen === "settings-selection" && <PopupSettings {...shared} formatting={formatting} />}
     </div>}
-  </main></DialogLock>;
+  </main></DialogLock></OverlayNavigation>;
 }

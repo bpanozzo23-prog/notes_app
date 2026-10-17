@@ -1,10 +1,27 @@
-import { useEffect, useRef } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { EditorContent, useEditor } from "@tiptap/react";
 import { extensions } from "./extensions.js";
 import Toolbar from "./Toolbar.jsx";
 import SelectionMenu from "./SelectionMenu.jsx";
+import Tray, { TRAYS } from "./Tray.jsx";
+import { useVisibleViewport } from "./useToolbarSize.js";
+import { useOverlay } from "../lib/overlays.jsx";
+import { DialogLock } from "../components/Dialog.jsx";
 
 function NoteDocument({ note, onChange, toolbarIds, formatting, readOnly = false, ui, onEditor }) {
+  const [openTray, setOpenTray] = useState(null);
+  const [trayOptions, setTrayOptions] = useState({});
+  const viewport = useVisibleViewport();
+  const locked = useContext(DialogLock);
+  const closeTray = () => setOpenTray(null);
+  useOverlay(!!openTray && !locked && !readOnly, closeTray);
+  useEffect(() => { if (locked || readOnly) setOpenTray(null); }, [locked, readOnly]);
+  useEffect(() => {
+    if (!openTray) return;
+    const escape = (event) => { if (event.key === "Escape") { event.preventDefault(); setOpenTray(null); } };
+    document.addEventListener("keydown", escape);
+    return () => document.removeEventListener("keydown", escape);
+  }, [openTray]);
   const initialHtml = useRef(note.html);
   const editor = useEditor({
     extensions,
@@ -26,6 +43,18 @@ function NoteDocument({ note, onChange, toolbarIds, formatting, readOnly = false
   });
   useEffect(() => { onEditor?.(editor); return () => onEditor?.(null); }, [editor, onEditor]);
   useEffect(() => { editor?.setEditable(!readOnly, false); }, [editor, readOnly]);
+  function toggleTray(name, options = {}) {
+    if (readOnly || locked || !TRAYS[name]) return;
+    setOpenTray(openTray === name && trayOptions.source === options.source ? null : name);
+    setTrayOptions(options);
+  }
+  const editorUi = { ...ui, openTray, traySource: trayOptions.source, toggleTray,
+    runAction: (action) => {
+      if (readOnly || locked) return;
+      if (action.tray) toggleTray(action.tray);
+      else { closeTray(); action.run({ editor, ui: editorUi }); }
+    },
+  };
   if (!editor) return null;
   return <>
     <div className="flex flex-1 flex-col" data-editor-surface onClick={(event) => {
@@ -33,8 +62,12 @@ function NoteDocument({ note, onChange, toolbarIds, formatting, readOnly = false
     }}>
       <EditorContent editor={editor} className="flex-1" />
     </div>
-    <Toolbar editor={editor} ids={formatting?.toolbar ?? toolbarIds} formatting={formatting} readOnly={readOnly} ui={ui} />
-    <SelectionMenu editor={editor} ids={formatting?.selectionMenu} formatting={formatting} ui={ui} />
+    <div className="fixed inset-x-0 z-30" style={{ bottom: Math.max(0, window.innerHeight - viewport.height - viewport.top) }}>
+      {openTray && !locked && !readOnly && <Tray name={openTray} {...trayOptions} viewportHeight={viewport.height} onClose={closeTray}
+        editor={editor} formatting={formatting} ui={editorUi} />}
+      <Toolbar editor={editor} ids={formatting?.toolbar ?? toolbarIds} layout={formatting?.toolbarLayout} formatting={formatting} readOnly={readOnly} ui={editorUi} />
+    </div>
+    <SelectionMenu editor={editor} ids={formatting?.selectionMenu} formatting={formatting} ui={editorUi} />
   </>;
 }
 

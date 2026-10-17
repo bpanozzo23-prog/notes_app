@@ -53,6 +53,22 @@ it("repairs duplicate visit keys even when a key resembles the repair name", () 
   expect(new Set(clean.stack.map((entry) => entry.key)).size).toBe(3);
 });
 
+it("restores known formatting screens, drops their extra data, and repairs future sub-screens to Settings", () => {
+  const clean = sanitizeNavigation({ version: 1, stack: [
+    { screen: "list", key: "root" },
+    { screen: "settings", key: "settings", scrollY: 140 },
+    { screen: "settings-toolbar", key: "toolbar", query: "discard", noteId: "discard" },
+    { screen: "settings-selection", key: "selection" },
+    { screen: "settings-future", key: "future", html: "discard" },
+  ] });
+  expect(clean.stack.slice(1)).toEqual([
+    { screen: "settings", key: "settings", scrollY: 140 },
+    { screen: "settings-toolbar", key: "toolbar", scrollY: 0 },
+    { screen: "settings-selection", key: "selection", scrollY: 0 },
+    { screen: "settings", key: "future", scrollY: 0 },
+  ]);
+});
+
 it.each(["x".repeat(201), 42, {}, ["word"], "a\nb", "\tword", "word\u007f", "word\u0085"])("drops invalid search queries: %j", (query) => {
   const clean = sanitizeNavigation({ version: 1, stack: [{ screen: "list", key: "root", query }] });
   expect(activeEntry(clean)).not.toHaveProperty("query");
@@ -102,6 +118,68 @@ describe("browser history and popstate", () => {
     vi.restoreAllMocks();
   });
   const openNote = () => nav.open({ screen: "note", noteId: noteFixture().id });
+
+  it("closes an overlay with go(1) without flushing or changing the stack; the next Back leaves", async () => {
+    await openNote();
+    const snapshot = nav.current;
+    const flush = vi.spyOn(queue, "flush");
+    const go = vi.spyOn(window.history, "go");
+    const close = vi.fn(() => { unregister(); return true; });
+    const unregister = nav.registerOverlay(close);
+    window.history.back();
+    await waitFor(() => expect(close).toHaveBeenCalledOnce());
+    await waitFor(() => expect(busy).toHaveBeenLastCalledWith(false));
+    expect(go).toHaveBeenCalledWith(1);
+    expect(nav.current).toEqual(snapshot);
+    expect(window.history.state[NAVIGATION_KEY]).toEqual(snapshot);
+    expect(flush).not.toHaveBeenCalled();
+    expect(error).not.toHaveBeenCalled();
+    window.history.back();
+    await waitFor(() => expect(activeEntry(nav.current).screen).toBe("list"));
+    expect(flush).toHaveBeenCalledOnce();
+  });
+
+  it("recovers repeated rapid Backs to the same screen and only dismisses the top overlay", async () => {
+    await nav.open({ screen: "settings" });
+    await nav.open({ screen: "settings-toolbar" });
+    const snapshot = nav.current;
+    const lower = vi.fn(() => true);
+    const removeLower = nav.registerOverlay(lower);
+    const close = vi.fn(() => { unregister(); return true; });
+    const unregister = nav.registerOverlay(close);
+    // Hold recovery so a second Back reaches the next history entry before the return.
+    const realGo = window.history.go.bind(window.history);
+    const go = vi.spyOn(window.history, "go").mockImplementation(() => {});
+    window.history.back();
+    await waitFor(() => expect(close).toHaveBeenCalledOnce());
+    window.history.back();
+    await waitFor(() => expect(go).toHaveBeenLastCalledWith(2));
+    expect(nav.current).toEqual(snapshot);
+    realGo(2);
+    await waitFor(() => expect(busy).toHaveBeenLastCalledWith(false));
+    expect(window.history.state[NAVIGATION_KEY]).toEqual(snapshot);
+    expect(close).toHaveBeenCalledOnce();
+    expect(lower).not.toHaveBeenCalled();
+    removeLower();
+    go.mockRestore();
+    window.history.back();
+    await waitFor(() => expect(activeEntry(nav.current).screen).toBe("settings"));
+    expect(nav.current.stack).toHaveLength(2);
+  });
+
+  it("keeps the existing busy-operation Back behaviour even with an overlay registered", async () => {
+    await openNote();
+    const gate = deferred();
+    const close = vi.fn(() => true);
+    const unregister = nav.registerOverlay(close);
+    const operation = nav.run(() => gate.promise);
+    window.history.back();
+    await waitFor(() => expect(window.history.state[NAVIGATION_KEY].stack).toHaveLength(1));
+    expect(close).not.toHaveBeenCalled();
+    gate.resolve(); await operation;
+    expect(activeEntry(nav.current).screen).toBe("list");
+    unregister();
+  });
 
   it("replaces search without scrolling or adding a visit and restores it on Back", async () => {
     nav.setFilter({ type: "folder", value: "folder" });

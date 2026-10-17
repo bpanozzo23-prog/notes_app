@@ -628,3 +628,54 @@ it("uses stored selectionMenu ids for the real editor pop-up", async () => {
   const menu = await screen.findByRole("toolbar", { name: "Selection formatting" });
   expect(within(menu).getAllByRole("button").map((button) => button.getAttribute("aria-label"))).toEqual(["Strikethrough", "#123456"]);
 });
+
+it.each(["Delete", "Choose folder", "Link to note"])("Android Back closes %s without leaving the note; the next Back leaves", async (label) => {
+  await createNote({ title: "Overlay fixture" });
+  await start(); await openNote("Overlay fixture");
+  fireEvent.click(screen.getByRole("button", { name: label, exact: true }));
+  expect(screen.getByRole("dialog")).toBeTruthy();
+  const stack = window.history.state[NAVIGATION_KEY];
+  act(() => window.history.back());
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  await waitFor(() => expect(screen.getByRole("button", { name: "Back" }).disabled).toBe(false));
+  expect(screen.getByLabelText("Title").value).toBe("Overlay fixture");
+  expect(window.history.state[NAVIGATION_KEY]).toEqual(stack);
+  act(() => window.history.back());
+  await screen.findByRole("button", { name: "+ New note" });
+  expect(activeEntry(window.history.state[NAVIGATION_KEY]).screen).toBe("list");
+});
+
+it("Android Back closes the More tray and leaves the selected note at the same history position", async () => {
+  await createNote({ title: "Tray fixture", html: "<p>Selected text</p>" });
+  await setPref("toolbarLayout", "more");
+  await start(); await openNote("Tray fixture");
+  const editor = screen.getByLabelText("Note body").editor;
+  stubEditorGeometry(editor);
+  act(() => { editor.view.focus(); editor.commands.setTextSelection({ from: 1, to: 9 }); });
+  const more = within(screen.getByRole("toolbar", { name: "Formatting", exact: true })).getByRole("button", { name: "More" });
+  fireEvent.pointerDown(more); fireEvent.pointerUp(more); fireEvent.click(more);
+  expect(screen.getByRole("region", { name: "More tray" })).toBeTruthy();
+  const stack = window.history.state[NAVIGATION_KEY];
+  act(() => window.history.back());
+  await waitFor(() => expect(screen.queryByRole("region", { name: "More tray" })).toBeNull());
+  await waitFor(() => expect(screen.getByRole("button", { name: "Back" }).disabled).toBe(false));
+  expect(window.history.state[NAVIGATION_KEY]).toEqual(stack);
+  expect(editor.state.selection).toMatchObject({ from: 1, to: 9 });
+  expect(document.activeElement).toBe(editor.view.dom);
+  act(() => window.history.back());
+  await screen.findByRole("button", { name: "+ New note" });
+});
+
+it("Android Back dismisses the import confirmation without replacing the notebook or leaving Settings", async () => {
+  const note = await createNote({ title: "Keep" });
+  await start(); await settings(); await upload(backupFixture());
+  fireEvent.click(screen.getByRole("button", { name: "Replace notebook" }));
+  const stack = window.history.state[NAVIGATION_KEY];
+  act(() => window.history.back());
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  await waitFor(() => expect(screen.getByRole("button", { name: "Back" }).disabled).toBe(false));
+  expect(window.history.state[NAVIGATION_KEY]).toEqual(stack);
+  expect(screen.getByRole("heading", { name: "Settings" })).toBeTruthy();
+  expect(await db.notes.toArray()).toEqual([note]);
+  expect(downloadJson).not.toHaveBeenCalled();
+});
