@@ -36,6 +36,14 @@ features; the owner's notes are the one thing that must never be lost or leaked.
   no browser pane. The owner's machines and how they connect are documented in `~/code/devices`,
   not here.
 - `npm run dev` serves on port 5174 with `--host` (mi-cuaderno uses 5173). Node 24, npm 11.
+  It runs in the detached tmux session `notes-dev` inside a restart loop (log `/tmp/notes-dev.log`):
+  Vite has died on an unhandled `ECONNRESET` when the phone dropped a connection.
+- **Seeing the app:** `npm run shots [out-dir] [url]` renders the app in headless Chromium
+  (Playwright, browser in `~/.cache/ms-playwright`, no sudo needed) at Pixel-7 size, walks the
+  main screens with fixture text and writes PNGs (default `private-data/shots/`, gitignored;
+  default URL the dev server). Read the PNGs to check layout. Extend `scripts/screenshot.mjs`
+  when a step adds screens. It cannot show Samsung Keyboard/Gboard behaviour; the owner's phone
+  remains the final check for typing.
 - Multi-line commit messages: a bash heredoc (`git commit -F - <<'MSG' … MSG`); read the message
   back with `git log -1 --pretty=%B`.
 - **Never run `npx skills remove`** (it switched a checkout's branch mid-command once in
