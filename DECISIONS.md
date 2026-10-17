@@ -177,3 +177,14 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   replaced only in the test configuration. — Actual Android keyboard/Back gestures, the 375 px
   layout, download completion, installed offline startup and two-build update behavior still need
   owner verification. Search and internal-link navigation remain deferred to 1c.
+
+## Phase 1b deployment and verification
+
+- 2026-10-16 — The GitHub repository `bpanozzo23-prog/notes_app` was created public and Pages was
+  enabled with the Actions source through the GitHub API (`gh api -X POST
+  repos/bpanozzo23-prog/notes_app/pages -f build_type=workflow`); the first workflow run published
+  `https://bpanozzo23-prog.github.io/notes_app/`. — Public repo, notes never in it, as decided on
+  2026-10-14.
+- 2026-10-17 — The owner verified 1b on the published app (install, Back, saving across app
+  switches and process kill, Trash restore/delete, export, clear site data, import, airplane-mode
+  reopen): "Everything works so far". The update prompt gets its first real test when 1c deploys.

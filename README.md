@@ -16,9 +16,13 @@ LLM can read. The code may become public; the notes never are.
   toolbar all behave. Details under "Spike result" in `DECISIONS.md`. Tiptap is the editor.
 - **Phase 1a — committed and owner-verified on the phone.** Local storage, queued autosave,
   editor and backup export/import.
-- **Phase 1b — built, awaiting review and first deployment.** Notes, Note, Folders, Trash and
-  Settings screens; Android Back with save protection; folder/tag filters and pinning; installable
-  offline app with a guarded update prompt; GitHub Pages workflow. Search and note links wait for 1c.
+- **Phase 1b — deployed and owner-verified on the phone, 2026-10-17.** Notes, Note, Folders, Trash
+  and Settings screens; Android Back with save protection; folder/tag filters and pinning;
+  installable offline app with a guarded update prompt. Published at
+  `https://bpanozzo23-prog.github.io/notes_app/` (GitHub Pages, deployed by the workflow on every
+  push to `main`). The owner checked install, Back, saving under app switches, Trash, export/import
+  and airplane-mode reopen. The update prompt gets its first real test with the 1c deployment.
+- **Phase 1c — in progress.** Links between notes, "Linked from", search.
 
 ## Running it
 
@@ -35,8 +39,8 @@ Phone dev entry: `http://brent-dell-system-xps-l502x:5174/`; with the Pages base
 filter/scroll restoration, switching apps mid-edit, folder/tag/pin edits, Trash restore/delete,
 and backup export/import (including the before-import safety download).
 
-The reviewer creates the GitHub repository, enables Pages with GitHub Actions, and pushes after
-review. The workflow deploys pushes to `main` and can also be started manually. The planned URL is
+The GitHub repository is public and Pages is enabled with the GitHub Actions source. The workflow
+deploys pushes to `main` and can also be started manually; the live URL is
 `https://bpanozzo23-prog.github.io/notes_app/`. Installation, airplane-mode reopen and update prompts
 need that HTTPS deployment; the plain-HTTP phone dev URL cannot install a service worker. The
 published app has separate storage from the dev server: transfer notes with export/import.
