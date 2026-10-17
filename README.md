@@ -46,5 +46,8 @@ deploys pushes to `main` and can also be started manually; the live URL is
 need that HTTPS deployment; the plain-HTTP phone dev URL cannot install a service worker. The
 published app has separate storage from the dev server: transfer notes with export/import.
 
+A made-up sample notebook for trying the app without personal notes is published at
+`https://bpanozzo23-prog.github.io/notes_app/sample-notebook.json` (Settings → Import backup).
+
 Automated checks use fixtures. The agent has not seen the phone layout, Samsung Keyboard/Gboard,
 downloads, installation or a real service-worker update; those remain owner verification.
