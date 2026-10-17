@@ -246,4 +246,7 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   `rev` still records the write for sync.
 - 2026-10-17 — Tag field and its Add button wrap as one unit; folder rows put name and actions
   on one line. — Found in the headless phone-size screenshots (`npm run shots`).
+- 2026-10-17 — The owner starts the notebook fresh rather than migrating Samsung Notes. — Decided
+  after Phase 1 closed; no import tooling for Samsung's format is needed, and the Phase 2 image
+  work only has to cover new images, not screenshots carried over from old notes.
 

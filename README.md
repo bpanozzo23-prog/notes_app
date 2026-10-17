@@ -29,8 +29,9 @@ LLM can read. The code may become public; the notes never are.
 - **Phase 1d — closeout, 2026-10-17.** Codex reviewed the whole Phase 1 diff; fixes landed for
   the one data-loss gap it found (editor input still held by ProseMirror when an update reloads)
   and two backup issues. Phase 1 is complete: the app can replace Samsung Notes for text notes.
-  Next is Phase 2 (formatting layer: toolbar customisation, named styles, colour order, format
-  painter, callouts, images).
+  The owner starts the notebook fresh (no migration from Samsung Notes). Next is Phase 2
+  (formatting layer: toolbar customisation, named styles, colour order, format painter,
+  callouts, images).
 
 ## Running it
 
