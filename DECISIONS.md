@@ -326,3 +326,6 @@ Append-only. One dated line per decision: what was decided, then why, after the 
 - 2026-10-17 — Keep v1's original preference allow-list separate from the expanded export
   allow-list, and reuse its table validation for v2. — Growing the shared list would silently
   change which v1 files validate; v2 alone sanitises cosmetic settings and ignores unknown keys.
+- 2026-10-17 — The owner verified 2a on the published app: update applied, notes intact,
+  schema 2 shown, export/import round trip, the pre-update v1 backup previews as "will be
+  upgraded", selection pop-up unchanged: "Everything checks out."

@@ -42,7 +42,8 @@ LLM can read. The code may become public; the notes never are.
   other windows from saving over it; a failed start says the notes are safe instead of showing
   an empty list. Backups carry the Phase 2 settings (toolbar, layout, pop-up, colours, styles),
   and the selection pop-up now follows its setting. Nothing new to see yet except "Schema
-  version: 2" in Settings. Owner phone check pending. Next: 2b, customising the toolbar.
+  version: 2" in Settings. Owner-verified on the phone 2026-10-17 (update, notes intact, schema 2,
+  export/import round trip, v1 backup preview, selection pop-up). Next: 2b, customising the toolbar.
 
 ## Running it
 
