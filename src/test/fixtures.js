@@ -1,8 +1,8 @@
-import { db } from "../db/db.js";
+import { db, notebookAccess } from "../db/db.js";
 
 export async function resetDatabase() {
   await db.delete();
-  await db.open();
+  await notebookAccess.load();
 }
 
 export const AT = "2026-10-16T12:00:00.000Z";

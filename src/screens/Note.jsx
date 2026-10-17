@@ -8,7 +8,7 @@ import TagInput from "../components/TagInput.jsx";
 import Confirm from "../components/Confirm.jsx";
 import { noteTitle, tagsInUse, visibleNotes } from "../lib/notebookView.js";
 
-export default function Note({ initialNote, notes, folders, toolbarIds, queue, status, busy, onBack, onDelete, onOpenNote, error }) {
+export default function Note({ initialNote, notes, folders, toolbarIds, formatting, readOnly = false, queue, status, busy, onBack, onDelete, onOpenNote, error }) {
   const [note, setNote] = useState(initialNote);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [linkEditor, setLinkEditor] = useState(null);
@@ -29,6 +29,7 @@ export default function Note({ initialNote, notes, folders, toolbarIds, queue, s
   function removeLink(editor) { editor.chain().focus().extendMarkRange("link").unsetLink().run(); }
   const linkedFrom = visibleNotes(notes.filter((source) => source.deletedAt === null && source.linkedIds.includes(note.id)));
   function edit(patch) {
+    if (readOnly) return;
     queue.schedule(note.id, patch);
     setNote((current) => ({ ...current, ...patch }));
   }
@@ -37,16 +38,16 @@ export default function Note({ initialNote, notes, folders, toolbarIds, queue, s
       <span role="status" className={`pr-1 text-xs ${status === "error" ? "font-semibold text-red-700" : "text-[var(--color-muted)]"}`}>{status === "error" ? "Not saved" : status}</span>
     </ScreenHeader>
     <input className="mx-4 min-w-0 bg-transparent py-2 text-xl font-semibold outline-none" aria-label="Title" placeholder="Title (optional)"
-      value={note.title} onChange={(event) => edit({ title: event.target.value })} />
-    <div className="mx-4 mb-2 border-b border-[var(--color-line)] pb-3">
+      readOnly={readOnly} value={note.title} onChange={(event) => edit({ title: event.target.value })} />
+    <fieldset disabled={readOnly} className="mx-4 mb-2 min-w-0 border-b border-[var(--color-line)] pb-3">
       <div className="flex items-center gap-1">
         <div className="min-w-0 flex-1"><FolderPicker folders={folders} value={note.folderId} onChange={(folderId) => edit({ folderId })} /></div>
         <button className="icon-button" aria-label="Pin note" aria-pressed={note.pinned} onClick={() => edit({ pinned: !note.pinned })}><Pin size={18} aria-hidden="true" /></button>
         <button className="icon-button text-red-700" aria-label="Delete" onClick={() => setConfirmDelete(true)}><Trash2 size={18} aria-hidden="true" /></button>
       </div>
       <TagInput tags={note.tags} allTags={tagsInUse(notes)} onChange={(tags) => edit({ tags })} />
-    </div>
-    <NoteEditor note={note} onChange={(html) => edit({ html })} toolbarIds={toolbarIds} onEditor={onEditor}
+    </fieldset>
+    <NoteEditor note={note} onChange={(html) => edit({ html })} toolbarIds={toolbarIds} formatting={formatting} readOnly={readOnly} onEditor={onEditor}
       ui={{ openLinkPicker, openNote: onOpenNote, removeLink }} />
     {linkedFrom.length > 0 && <section aria-label="Linked from" className="mx-4 mt-4 border-t border-[var(--color-line)] pt-4">
       <h2 className="font-semibold">Linked from</h2>

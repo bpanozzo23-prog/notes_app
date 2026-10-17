@@ -36,7 +36,13 @@ LLM can read. The code may become public; the notes never are.
   (Codex-reviewed); plain-language lock-in review in `docs/DECISIONS-EXPLAINED.md` §20–30. Six
   steps: 2a guards and preferences (schema 2), 2b toolbar and pop-up customisation, 2c colours
   and new formatting (schema 3), 2d named styles and painter, 2e images (schema 4), 2f closeout.
-  2a in progress.
+  2a done; see below.
+- **Phase 2a — deployed 2026-10-17 (0.2.0, schema 2).** Guards that protect the notes: an
+  older app version that finds a newer notebook opens it read-only; importing a backup stops
+  other windows from saving over it; a failed start says the notes are safe instead of showing
+  an empty list. Backups carry the Phase 2 settings (toolbar, layout, pop-up, colours, styles),
+  and the selection pop-up now follows its setting. Nothing new to see yet except "Schema
+  version: 2" in Settings. Owner phone check pending. Next: 2b, customising the toolbar.
 
 ## Running it
 

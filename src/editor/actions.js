@@ -5,13 +5,25 @@ import {
 
 // Build chains inside run: each tap must see the current document.
 const action = (id, label, icon, command, active) => ({
-  id, label, icon, kind: active ? "toggle" : "command",
+  id, label, icon, group: "Text", kind: active ? "toggle" : "command",
   run: ({ editor }) => command(editor.chain().focus()).run(),
   ...(active ? { isActive: active } : {}),
 });
 const mark = (id, label, icon, command) => action(id, label, icon, command, (editor) => editor.isActive(id));
 // HTML parsing normalises saved hex colours to rgb(). Both forms mean the same swatch.
 const rgb = (hex) => `rgb(${hex.slice(1).match(/../g).map((part) => parseInt(part, 16)).join(", ")})`;
+
+function colorAction(color, label) {
+  return {
+    ...action(`color:${color ?? "none"}`, label, Circle,
+      (chain) => color ? chain.setColor(color) : chain.unsetColor(),
+      (editor) => {
+        const actual = editor.getAttributes("textStyle").color?.toLowerCase() ?? null;
+        return actual === color || (color !== null && actual === rgb(color));
+      }),
+    group: "Colours", color,
+  };
+}
 
 export const actions = [
   mark("bold", "Bold", Bold, (chain) => chain.toggleBold()),
@@ -20,15 +32,7 @@ export const actions = [
   mark("strike", "Strikethrough", Strikethrough, (chain) => chain.toggleStrike()),
   mark("highlight", "Highlight", Highlighter, (chain) => chain.toggleHighlight()),
   ...[[null, "Default colour"], ["#dc2626", "Red"], ["#15803d", "Green"], ["#2563eb", "Blue"], ["#7c3aed", "Purple"]]
-    .map(([color, label]) => ({
-      ...action(`color:${color ?? "none"}`, label, Circle,
-        (chain) => color ? chain.setColor(color) : chain.unsetColor(),
-        (editor) => {
-          const actual = editor.getAttributes("textStyle").color ?? null;
-          return actual === color || (color !== null && actual === rgb(color));
-        }),
-      color,
-    })),
+    .map(([color, label]) => colorAction(color, label)),
   action("h1", "Heading 1", Heading1, (chain) => chain.toggleHeading({ level: 1 }), (editor) => editor.isActive("heading", { level: 1 })),
   action("h2", "Heading 2", Heading2, (chain) => chain.toggleHeading({ level: 2 }), (editor) => editor.isActive("heading", { level: 2 })),
   mark("bulletList", "Bullet list", List, (chain) => chain.toggleBulletList()),
@@ -39,11 +43,23 @@ export const actions = [
   action("clearFormatting", "Clear formatting", Eraser, (chain) => chain.unsetAllMarks().clearNodes()),
   action("undo", "Undo", Undo2, (chain) => chain.undo()),
   action("redo", "Redo", Redo2, (chain) => chain.redo()),
-  { id: "link", label: "Link to note", icon: Link, kind: "picker", run: ({ editor, ui }) => ui?.openLinkPicker?.(editor) },
-];
+  { id: "link", group: "Insert", label: "Link to note", icon: Link, kind: "picker", run: ({ editor, ui }) => ui?.openLinkPicker?.(editor) },
+].map((entry) => ({ ...entry, group:
+  ["h1", "h2", "bulletList", "orderedList", "taskList", "blockquote", "hr"].includes(entry.id) ? "Lines & blocks"
+    : ["clearFormatting", "undo", "redo"].includes(entry.id) ? "Tools"
+    : entry.id === "highlight" ? "Colours" : entry.group,
+}));
 
 // Imported ids are data, including names such as "constructor"; never inherit object members.
 export const ACTIONS = Object.freeze(Object.assign(Object.create(null), Object.fromEntries(actions.map((entry) => [entry.id, entry]))));
+export function resolveAction(id, formatting) {
+  if (typeof id !== "string") return null;
+  if (ACTIONS[id]) return ACTIONS[id];
+  if (!/^color:#[0-9a-fA-F]{6}$/.test(id)) return null;
+  const color = id.slice(6).toLowerCase();
+  return colorAction(color, formatting?.textColors?.find((entry) => entry.color === color)?.name ?? color);
+}
+
 export const DEFAULT_TOOLBAR = [
   "bold", "italic", "underline", "highlight", "strike", "color:none", "color:#dc2626",
   "color:#15803d", "color:#2563eb", "color:#7c3aed", "h1", "h2", "bulletList",

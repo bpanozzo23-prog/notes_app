@@ -23,12 +23,14 @@ export class SaveQueue {
   }
 
   get status() {
+    if (this.blocked && this.entries.size) return "error";
     if ([...this.entries.values()].some((entry) => entry.error)) return "error";
     if ([...this.entries.values()].some((entry) => entry.running)) return "saving";
     return this.entries.size ? "pending" : "idle";
   }
 
   get error() {
+    if (this.blocked && this.entries.size) return this.blocked;
     return [...this.entries.values()].find((entry) => entry.error)?.error ?? null;
   }
 
@@ -43,6 +45,7 @@ export class SaveQueue {
   }
 
   schedule(noteId, patch) {
+    if (this.blocked) return;
     if (!noteId) throw new Error("A save needs a note id");
     let entry = this.entries.get(noteId);
     if (!entry) {
@@ -62,9 +65,15 @@ export class SaveQueue {
     entry.timer = null;
   }
 
+  block(error) {
+    this.blocked = error;
+    for (const entry of this.entries.values()) this.clearTimer(entry);
+    this.emit();
+  }
+
   arm(entry) {
     this.clearTimer(entry);
-    if (this.flushing) return;
+    if (this.flushing || this.blocked) return;
     const deadline = Math.min(entry.lastAt + this.quietMs, entry.firstAt + this.maxWaitMs);
     entry.timer = this.timers.setTimeout(() => {
       entry.timer = null;
@@ -75,6 +84,7 @@ export class SaveQueue {
 
   start(entry) {
     if (entry.running) return entry.running;
+    if (this.blocked) return Promise.resolve();
     if (!entry.pending) return Promise.resolve();
     this.clearTimer(entry);
     const patch = entry.pending;
@@ -108,8 +118,10 @@ export class SaveQueue {
   flush() {
     if (this.flushing) return this.flushing;
     this.flushing = Promise.resolve().then(async () => {
+      if (this.blocked) throw this.blocked;
       for (const hook of this.beforeFlushHooks) hook();
       while (this.entries.size) {
+        if (this.blocked) throw this.blocked;
         await Promise.all([...this.entries.values()].map((entry) => this.start(entry)));
         // Reject so navigation/export/import cannot claim success with unsaved data.
         // Keep the failed patch and error; only a later schedule/flush retries it.

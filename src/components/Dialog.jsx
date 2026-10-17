@@ -1,9 +1,15 @@
-import { useId, useLayoutEffect, useRef } from "react";
+import { createContext, useContext, useId, useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 
 const focusables = (node) => [...node.querySelectorAll('button:not(:disabled), input:not(:disabled), [tabindex="0"]')];
 
-export default function Dialog({ title, children, onClose, busy = false, sheet = false, descriptionId }) {
+export const DialogLock = createContext(false);
+
+export default function Dialog(props) {
+  return useContext(DialogLock) ? null : <DialogPanel {...props} />;
+}
+
+function DialogPanel({ title, children, onClose, busy = false, sheet = false, descriptionId }) {
   const titleId = useId();
   const panel = useRef(null);
   const layer = useRef(null);

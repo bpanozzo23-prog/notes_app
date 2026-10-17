@@ -295,3 +295,34 @@ Append-only. One dated line per decision: what was decided, then why, after the 
 - 2026-10-17 — Reordering uses ↑/↓ plus Move to top/bottom; no drag library. — Drag competes
   with scrolling on a phone and the maintained library is pre-1.0; Codex suggested dropping the
   drafted pick-and-place "Move…" to keep scope down.
+
+## Phase 2a implementation
+
+- 2026-10-17 — Compare `db.backendDB().version / 10` with the app schema, at boot and inside
+  the shared write guard. — Installed Dexie 4.4.6 retries a `VersionError` without a requested
+  version, but keeps `db.verno` at the declared version for an explicit schema (2 while the
+  native database is 30). A higher-version fixture reproduces this; using `verno` alone would
+  leave the newer notebook writable.
+- 2026-10-17 — The database's `versionchange` subscriber synchronously returns `false`; the
+  app locks, drains the existing save queue, and closes only after a successful flush. — Dexie's
+  `reverseStoppableEventChain` compares the immediate return value with `false`; an async handler
+  returns a Promise and allows the default handler to close. Failed flushes retain the connection
+  and Retry; dialog portals also close so they cannot leave an editing surface outside the lock.
+- 2026-10-17 — Every writer shares a transaction wrapper that includes `prefs` and checks the
+  window's remembered generation before touching rows; exports check in their read transaction
+  too. — The generation check and mutation must be indivisible with respect to an import. Import
+  adopts and broadcasts its new generation only after commit, and a stale window stops its save
+  timers without discarding its in-memory text. Guard notifications leave Dexie's transaction
+  context so React's subsequent work does not inherit a transaction that is being aborted.
+- 2026-10-17 — Explicitly empty formatting lists are kept; nonempty lists with no valid entries
+  use the defaults. Invalid palette/style entries are dropped whole, while valid neighbours,
+  safe unknown action ids and duplicate toolbar buttons survive. — Empty toolbars, hidden-all
+  palettes and deleting all styles are valid customisations; incomplete style definitions cannot
+  promise the requested formatting. Names also reject the C1 control-character range.
+- 2026-10-17 — The eight extra text colours are Black, Grey, Brown, Orange, Teal, Cyan, Indigo
+  and Pink; highlights are Yellow, Orange, Red, Pink, Purple, Blue, Green and Grey. — These give
+  a useful spread without changing the four existing text buttons; computed contrast tests
+  enforce 4.5:1 against white for text and against near-black for highlights.
+- 2026-10-17 — Keep v1's original preference allow-list separate from the expanded export
+  allow-list, and reuse its table validation for v2. — Growing the shared list would silently
+  change which v1 files validate; v2 alone sanitises cosmetic settings and ignores unknown keys.

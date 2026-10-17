@@ -1,16 +1,19 @@
-import { db, allPrefs } from "./db.js";
+import { db, allPrefs, notebookAccess, writeTransaction, announceReplacement } from "./db.js";
 import { APP_VERSION, SCHEMA_VERSION } from "../version.js";
 import { nowIso } from "../lib/dates.js";
 import { extractNoteLinks, htmlToText } from "../lib/text.js";
-import { isSafeId } from "../lib/ids.js";
+import { isSafeId, newId } from "../lib/ids.js";
+import { FORMATTING_KEYS, sanitizePreference } from "../editor/formatting.js";
 
-export const EXPORTED_PREFS = Object.freeze(["lastBackupAt", "toolbar"]);
+const V1_EXPORTED_PREFS = Object.freeze(["lastBackupAt", "toolbar"]);
+export const EXPORTED_PREFS = Object.freeze(["lastBackupAt", ...FORMATTING_KEYS]);
 // Device-local preferences that older backups contained: accepted with a warning, never restored.
 export const IGNORED_PREFS = Object.freeze(["storagePersisted"]);
 export const BACKUP_FORMAT = "notes_app-backup";
 
 export async function buildBackup() {
   return db.transaction("r", db.notes, db.folders, db.tombstones, db.prefs, async () => {
+    await notebookAccess.check();
     const [notes, folders, tombstones, prefs] = await Promise.all([
       db.notes.toArray(), db.folders.toArray(), db.tombstones.toArray(), allPrefs(),
     ]);
@@ -90,16 +93,33 @@ function validateV1(envelope, errors, warnings) {
   }
   for (const [key, value] of Object.entries(preferences)) {
     if (IGNORED_PREFS.includes(key)) warnings.push(`Preference ${key} is specific to the device it was exported from and will be ignored.`);
-    else if (!EXPORTED_PREFS.includes(key)) errors.push(`Preference ${key} is not allowed in backups.`);
+    else if (!V1_EXPORTED_PREFS.includes(key)) errors.push(`Preference ${key} is not allowed in backups.`);
     else if (key === "lastBackupAt" && !isDate(value)) errors.push("lastBackupAt must be an ISO UTC timestamp.");
     else if (key === "toolbar" && !isStrings(value)) errors.push("toolbar must be an array of action ids.");
   }
 }
 
-// No pre-v1 backup format ever existed. Add a pure N -> N+1 function and the next
-// validator together when a real schema change arrives; never invent a v0 migration.
-const UPGRADES = Object.freeze({});
-const VALIDATORS = Object.freeze({ 1: validateV1 });
+function validateV2(envelope, errors, warnings) {
+  // Run exactly the v1 table checks, then handle v2's cosmetic preferences separately.
+  validateV1({ ...envelope, preferences: isObject(envelope.preferences) ? {} : envelope.preferences }, errors, warnings);
+  if (!isObject(envelope.preferences)) return;
+  for (const [key, value] of Object.entries(envelope.preferences)) {
+    if (IGNORED_PREFS.includes(key)) {
+      warnings.push(`Preference ${key} is specific to the device it was exported from and will be ignored.`);
+      delete envelope.preferences[key];
+    } else if (key === "lastBackupAt") {
+      if (!isDate(value)) errors.push("lastBackupAt must be an ISO UTC timestamp.");
+    } else {
+      const result = sanitizePreference(key, value);
+      warnings.push(...result.warnings);
+      if (result.value === undefined) delete envelope.preferences[key];
+      else envelope.preferences[key] = result.value;
+    }
+  }
+}
+
+const UPGRADES = Object.freeze({ 1: (envelope) => ({ ...envelope, schemaVersion: 2 }) });
+const VALIDATORS = Object.freeze({ 1: validateV1, 2: validateV2 });
 
 export function upgradeEnvelope(envelope, targetVersion = SCHEMA_VERSION, upgrades = UPGRADES, validators = VALIDATORS) {
   let current = structuredClone(envelope);
@@ -153,7 +173,8 @@ export async function importBackup(envelope) {
   const clean = checked.envelope;
   const notes = clean.notes.map((note) => ({ ...note, text: htmlToText(note.html), linkedIds: extractNoteLinks(note.html) }));
   const prefs = Object.entries(clean.preferences).filter(([key]) => EXPORTED_PREFS.includes(key)).map(([key, value]) => ({ key, value }));
-  await db.transaction("rw", db.notes, db.folders, db.tombstones, db.prefs, async () => {
+  const generation = newId();
+  await writeTransaction([db.notes, db.folders, db.tombstones, db.prefs], async () => {
     // Only the exportable preferences are replaced: device-local ones such as a future API key
     // are not in any backup and must survive a restore.
     await Promise.all([db.notes.clear(), db.folders.clear(), db.tombstones.clear(), db.prefs.bulkDelete([...EXPORTED_PREFS])]);
@@ -161,6 +182,9 @@ export async function importBackup(envelope) {
     await db.folders.bulkAdd(clean.folders);
     await db.tombstones.bulkAdd(clean.tombstones);
     await db.prefs.bulkAdd(prefs);
+    await db.prefs.put({ key: "notebookGeneration", value: generation });
   });
+  notebookAccess.adopt(generation);
+  announceReplacement(generation);
   return checked.summary;
 }

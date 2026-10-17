@@ -45,7 +45,7 @@ const notes = [
 ];
 
 const envelope = {
-  format: "notes_app-backup", schemaVersion: 1, exportedAt: day(17, 8), appVersion: "sample",
+  format: "notes_app-backup", schemaVersion: 2, exportedAt: day(17, 8), appVersion: "sample",
   notes: notes.map((note) => ({
     id: id(note.n), title: note.title, html: note.html, text: htmlToText(note.html),
     folderId: note.folder ? folderId(note.folder) : null, tags: note.tags, linkedIds: extractNoteLinks(note.html),

@@ -171,3 +171,36 @@ it("runs beforeFlush hooks before any save, and a hook's schedule is saved in th
   expect(order).toEqual(["hook"]);
 });
 
+
+it("blocks a replaced window's pending text, including lifecycle flushes and later schedules", async () => {
+  const save = vi.fn();
+  const queue = new SaveQueue({ save });
+  const drain = vi.fn();
+  queue.onBeforeFlush(drain);
+  queue.schedule("a", { title: "Keep in memory" });
+  const error = new Error("Notebook replaced");
+  queue.block(error);
+  queue.schedule("a", { title: "Must not replace pending text" });
+  await vi.advanceTimersByTimeAsync(10000);
+  await expect(queue.flush()).rejects.toBe(error);
+  expect(save).not.toHaveBeenCalled();
+  expect(drain).not.toHaveBeenCalled();
+  expect(queue.entries.get("a").pending).toEqual({ title: "Keep in memory" });
+  expect(queue.status).toBe("error");
+});
+
+it("does not start a second pending save when replacement arrives during a running save", async () => {
+  const first = deferred();
+  const save = vi.fn(() => first.promise);
+  const queue = new SaveQueue({ save });
+  queue.schedule("a", { title: "Before replacement" });
+  await vi.advanceTimersByTimeAsync(400);
+  queue.schedule("a", { title: "Pending" });
+  queue.block(new Error("Notebook replaced"));
+  first.resolve();
+  await tick();
+  await vi.advanceTimersByTimeAsync(10000);
+  await expect(queue.flush()).rejects.toThrow("Notebook replaced");
+  expect(save).toHaveBeenCalledOnce();
+  expect(queue.entries.get("a").pending).toEqual({ title: "Pending" });
+});

@@ -1,6 +1,6 @@
 // Render the app in headless Chromium at phone size and save screenshots, so an agent can see
 // the layout without the owner's phone. Usage:
-//   node scripts/screenshot.mjs [out-dir] [url]
+//   node scripts/screenshot.mjs [out-dir] [url] [width] [height]
 // Defaults: out-dir private-data/shots (gitignored), url http://localhost:5174/notes_app/
 // (the dev server; pass https://bpanozzo23-prog.github.io/notes_app/ for the published app).
 // Storage is fresh on every run; the made-up public/sample-notebook.json is imported through
@@ -11,12 +11,16 @@ import { chromium, devices } from "playwright";
 
 const out = process.argv[2] ?? "private-data/shots";
 const url = process.argv[3] ?? "http://localhost:5174/notes_app/";
+const viewport = {
+  width: Number(process.argv[4] ?? devices["Pixel 7"].viewport.width),
+  height: Number(process.argv[5] ?? devices["Pixel 7"].viewport.height),
+};
 const sample = fileURLToPath(new URL("../public/sample-notebook.json", import.meta.url));
 mkdirSync(out, { recursive: true });
 
 const browser = await chromium.launch();
 // Pixel 7 is the closest built-in profile to the owner's S25 Ultra: 412 px wide, 2.6x, touch.
-const context = await browser.newContext({ ...devices["Pixel 7"], locale: "en-GB" });
+const context = await browser.newContext({ ...devices["Pixel 7"], viewport, locale: "en-GB" });
 const page = await context.newPage();
 page.on("pageerror", (error) => console.log("pageerror:", error.message));
 page.on("console", (message) => { if (["error", "warning"].includes(message.type())) console.log(`console.${message.type()}:`, message.text()); });
@@ -36,7 +40,7 @@ await shot("02-import-confirm");
 const download = page.waitForEvent("download");
 await button("Import and replace").click();
 await download;
-await page.getByText("Imported").first().waitFor().catch(() => {});
+await page.getByText(/^Backup imported\./).waitFor();
 await shot("03-settings-after-import");
 await back();
 await shot("04-list");
@@ -79,5 +83,31 @@ await shot("14-folders");
 await back();
 await button("Settings").click();
 await shot("15-settings");
+
+await back();
+await button("Vocabulario — comida").click();
+// Only this fresh browser context's fixture notebook is involved in the guard screenshots.
+await page.evaluate(() => {
+  const channel = new BroadcastChannel("notes_app");
+  channel.postMessage({ type: "notebook-replaced", generation: "screenshot-fixture" });
+  channel.close();
+});
+await page.getByText(/^The notebook was replaced in another window/).waitFor();
+await shot("16-notebook-replaced");
+await page.reload({ waitUntil: "networkidle" });
+await page.getByLabel("Note body").waitFor();
+await page.evaluate(() => new Promise((resolve, reject) => {
+  const request = indexedDB.open("notes_app", 30);
+  request.onsuccess = () => { request.result.close(); resolve(); };
+  request.onerror = () => reject(request.error);
+}));
+await page.getByText("The app was updated in another window. Reload to keep editing.").waitFor();
+await shot("17-database-updated");
+await page.reload({ waitUntil: "networkidle" });
+await page.getByText("This notebook was updated by a newer version of the app. Reload to update.").waitFor();
+await shot("18-read-only-note");
+await back();
+await button("Settings").click();
+await shot("19-read-only-settings");
 
 await browser.close();

@@ -1,8 +1,10 @@
 import { StrictMode } from "react";
+import Dexie from "dexie";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import App from "./App.jsx";
-import { db, getPref, setPref } from "./db/db.js";
+import { db, getPref, setPref, DATABASE_UPDATED } from "./db/db.js";
+import * as notesDb from "./db/notes.js";
 import { createNote, getNote, trashNote } from "./db/notes.js";
 import { backupFixture, noteFixture, resetDatabase } from "./test/fixtures.js";
 import { createFolder } from "./db/folders.js";
@@ -102,6 +104,7 @@ it("previews import and cancellation; downloads a safety copy before replacing a
   fireEvent.click(screen.getByRole("button", { name: "Replace notebook" }));
   const dialog = screen.getByRole("dialog");
   expect(dialog.textContent).toContain("Replace 1 notes and 0 folders with 1 notes and 0 folders?");
+  expect(dialog.textContent).toContain("Your toolbar, colours and styles will be replaced by the backup's.");
   fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
   expect(await db.notes.toArray()).toEqual([original]);
   expect(downloadJson).not.toHaveBeenCalled();
@@ -471,4 +474,157 @@ it("restores a sanitised list search query on boot", async () => {
   expect(screen.getByLabelText("Search notes").value).toBe("ARBOL");
   expect(within(screen.getByRole("list", { name: "Notes" })).getAllByRole("button")).toHaveLength(1);
   expect(screen.getByRole("button", { name: "Árbol" })).toBeTruthy();
+});
+
+it.each(["open", "purge", "refresh"])("shows a boot failure instead of an empty notebook when %s fails", async (step) => {
+  await createNote({ title: "Still safe" });
+  if (step === "open") vi.spyOn(db, "open").mockRejectedValueOnce(new Error("Cannot open database"));
+  if (step === "purge") vi.spyOn(notesDb, "purgeExpired").mockRejectedValueOnce(new Error("Cannot purge"));
+  if (step === "refresh") vi.spyOn(notesDb, "liveNotes").mockRejectedValueOnce(new Error("Cannot read notes"));
+  render(<App />);
+  await screen.findByText("Couldn't open your notes. They have not been deleted. Reload to try again.");
+  expect(screen.getByRole("alert").textContent).toContain("Cannot");
+  expect(screen.queryByText("No notes yet.")).toBeNull();
+  expect(screen.queryByRole("list", { name: "Notes" })).toBeNull();
+  expect(await db.notes.count()).toBe(1);
+});
+
+it("opens a newer database for reading, skips boot purge, and disables all editing and backup controls", async () => {
+  const live = await createNote({ title: "Newer notebook" });
+  await db.notes.add(noteFixture({ id: "old-trash", title: "Expired", deletedAt: "2020-01-01T00:00:00.000Z" }));
+  await createFolder("Read only folder");
+  db.close();
+  const newer = new Dexie(db.name);
+  newer.version(3).stores({ notes: "id, updatedAt, deletedAt, *tags, *linkedIds", folders: "id, position", tombstones: "id", prefs: "key" });
+  await newer.open();
+  newer.close();
+  const purge = vi.spyOn(notesDb, "purgeExpired");
+  render(<App />);
+  await screen.findByText("This notebook was updated by a newer version of the app. Reload to update.");
+  await screen.findByRole("button", { name: "Newer notebook" });
+  expect(purge).not.toHaveBeenCalled();
+  expect(await db.notes.count()).toBe(2);
+  expect(screen.getByRole("button", { name: "+ New note" }).disabled).toBe(true);
+  await openNote("Newer notebook");
+  expect(screen.getByLabelText("Title").readOnly).toBe(true);
+  expect(screen.getByLabelText("Note body").editor.isEditable).toBe(false);
+  for (const label of ["Pin note", "Choose folder", "Delete", "Bold"]) expect(screen.getByRole("button", { name: label, exact: true }).matches(":disabled")).toBe(true);
+  expect(screen.getByLabelText("Add tag").matches(":disabled")).toBe(true);
+  await back();
+  fireEvent.click(screen.getByRole("button", { name: "Folders", exact: true }));
+  await screen.findByLabelText("New folder name");
+  expect(screen.getByRole("button", { name: "Rename Read only folder" }).matches(":disabled")).toBe(true);
+  expect(screen.getByLabelText("New folder name").matches(":disabled")).toBe(true);
+  await back();
+  fireEvent.click(screen.getByRole("button", { name: "Trash (1)" }));
+  await screen.findByRole("button", { name: "Restore" });
+  expect(screen.getByRole("button", { name: "Restore" }).disabled).toBe(true);
+  expect(screen.getByRole("button", { name: "Delete now" }).disabled).toBe(true);
+  await back();
+  await settings();
+  expect(screen.getByRole("button", { name: "Export backup" }).disabled).toBe(true);
+  expect(screen.getByLabelText("Import backup").disabled).toBe(true);
+  expect(await getNote(live.id)).toEqual(live);
+  expect(await db.tombstones.count()).toBe(0);
+});
+
+it("locks immediately on versionchange, drains held editor input, then closes after saving", async () => {
+  const original = await createNote({ title: "Before upgrade", html: "<p>Original</p>" });
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  const update = notesDb.updateNote;
+  const write = vi.spyOn(notesDb, "updateNote").mockImplementationOnce(async (...args) => {
+    await gate;
+    return update(...args);
+  });
+  await start();
+  await openNote("Before upgrade");
+  const editor = screen.getByLabelText("Note body").editor;
+  // This is the delayed DOM-observer path used for Android deletions, before onUpdate runs.
+  const observer = editor.view.domObserver;
+  editor.view.dom.querySelector("p").firstChild.nodeValue = "Origina";
+  observer.flushSoon();
+  act(() => { expect(db.on("versionchange").fire({ oldVersion: 20, newVersion: 30 })).toBe(false); });
+  expect(screen.getByLabelText("Title").closest("[inert]")).toBeTruthy();
+  await waitFor(() => expect(write).toHaveBeenCalledOnce());
+  expect(db.isOpen()).toBe(true);
+  await act(async () => release());
+  await screen.findByText(DATABASE_UPDATED);
+  expect(db.isOpen()).toBe(false);
+  write.mockRestore();
+  // Reopen only in the test, after the simulated upgrade, to inspect the fixture saved before close.
+  await db.open();
+  expect((await getNote(original.id)).html).toBe("<p>Origina</p>");
+});
+
+it("keeps versionchange failures locked with Retry usable, then closes after the retry saves", async () => {
+  await createNote({ title: "Before upgrade" });
+  await start();
+  await openNote("Before upgrade");
+  const put = vi.spyOn(db.notes, "put").mockRejectedValue(new Error("Disk full"));
+  fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Keep this edit" } });
+  act(() => db.on("versionchange").fire({ oldVersion: 20, newVersion: 30 }));
+  await screen.findByText("Not saved. Disk full");
+  expect(db.isOpen()).toBe(true);
+  expect(screen.getByLabelText("Title").closest("[inert]")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Retry save" }).disabled).toBe(false);
+  expect(screen.queryByText(DATABASE_UPDATED)).toBeNull();
+  expect(put).toHaveBeenCalledOnce();
+  put.mockRestore();
+  fireEvent.click(screen.getByRole("button", { name: "Retry save" }));
+  await screen.findByText(DATABASE_UPDATED);
+  expect(db.isOpen()).toBe(false);
+  expect(screen.queryByText("Not saved. Disk full")).toBeNull();
+});
+
+it("a replacement broadcast locks the receiving window, closes its dialog, and never writes pending text", async () => {
+  let receiver;
+  const close = vi.fn();
+  vi.stubGlobal("BroadcastChannel", class {
+    constructor(name) { expect(name).toBe("notes_app"); receiver = this; }
+    close = close;
+  });
+  const original = await createNote({ title: "Before replacement" });
+  await start();
+  await openNote("Before replacement");
+  fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Pending in old window" } });
+  fireEvent.click(screen.getByRole("button", { name: "Choose folder" }));
+  expect(screen.getByRole("dialog")).toBeTruthy();
+  const put = vi.spyOn(db.notes, "put");
+  act(() => receiver.onmessage({ data: { type: "notebook-replaced", generation: "other-window" } }));
+  await screen.findByText("The notebook was replaced in another window. Reload. Changes made here since then were not saved.");
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(screen.getByLabelText("Title").closest("[inert]")).toBeTruthy();
+  fireEvent(window, new Event("pagehide"));
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 450)); });
+  expect(put).not.toHaveBeenCalled();
+  expect(await getNote(original.id)).toEqual(original);
+  expect(screen.getByLabelText("Title").value).toBe("Pending in old window");
+  cleanup();
+  expect(close).toHaveBeenCalled();
+});
+
+it("a stale write without BroadcastChannel also locks the app and preserves the replacement", async () => {
+  vi.stubGlobal("BroadcastChannel", undefined);
+  const original = await createNote({ title: "Before replacement" });
+  await start();
+  await openNote("Before replacement");
+  await db.prefs.put({ key: "notebookGeneration", value: "other-window-import" });
+  fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Stale edit" } });
+  fireEvent.blur(screen.getByLabelText("Title"));
+  await screen.findByText("The notebook was replaced in another window. Reload. Changes made here since then were not saved.");
+  expect(screen.getByLabelText("Title").closest("[inert]")).toBeTruthy();
+  expect((await getNote(original.id)).title).toBe(original.title);
+});
+
+it("uses stored selectionMenu ids for the real editor pop-up", async () => {
+  await createNote({ title: "Custom pop-up", html: "<p>Select these words</p>" });
+  await setPref("selectionMenu", ["strike", "color:#123456", "unknown"]);
+  await start();
+  await openNote("Custom pop-up");
+  const editor = screen.getByLabelText("Note body").editor;
+  stubEditorGeometry(editor);
+  act(() => { editor.view.focus(); editor.commands.setTextSelection({ from: 1, to: 7 }); });
+  const menu = await screen.findByRole("toolbar", { name: "Selection formatting" });
+  expect(within(menu).getAllByRole("button").map((button) => button.getAttribute("aria-label"))).toEqual(["Strikethrough", "#123456"]);
 });

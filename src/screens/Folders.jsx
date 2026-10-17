@@ -4,7 +4,7 @@ import { createFolder, renameFolder, reorderFolders, deleteFolder } from "../db/
 import ScreenHeader from "../components/ScreenHeader.jsx";
 import Confirm from "../components/Confirm.jsx";
 
-export default function Folders({ folders, notes, trash, refresh, run, busy, onBack, error }) {
+export default function Folders({ folders, notes, trash, refresh, run, busy, readOnly, onBack, error }) {
   const [name, setName] = useState("");
   const [renaming, setRenaming] = useState(null);
   const [rename, setRename] = useState("");
@@ -18,7 +18,7 @@ export default function Folders({ folders, notes, trash, refresh, run, busy, onB
   }
   return <section>
     <ScreenHeader title="Folders" onBack={onBack} busy={busy} />
-    <div className="px-4 pb-8">
+    <fieldset disabled={busy || readOnly} className="min-w-0 px-4 pb-8">
       <form className="my-3 flex gap-2" onSubmit={async (event) => {
         event.preventDefault();
         if (await change(() => createFolder(name))) setName("");
@@ -46,7 +46,7 @@ export default function Folders({ folders, notes, trash, refresh, run, busy, onB
           </div>}
         </li>)}
       </ul>
-    </div>
+    </fieldset>
     {deleting && <Confirm title={`Delete folder “${deleting.name}”?`} confirmLabel="Delete folder" busy={busy} error={error} onCancel={() => setDeleting(null)} onConfirm={async () => {
       if (await change(() => deleteFolder(deleting.id))) setDeleting(null);
     }}>{count} {count === 1 ? "note" : "notes"} (including any in Trash) will move to no folder. The notes will be kept.</Confirm>}

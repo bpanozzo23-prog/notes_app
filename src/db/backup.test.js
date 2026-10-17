@@ -3,6 +3,7 @@ import { db, allPrefs, setPref } from "./db.js";
 import { buildBackup, validateBackup, importBackup, backupFilename, upgradeEnvelope, EXPORTED_PREFS } from "./backup.js";
 import { createFolder } from "./folders.js";
 import { createNote, updateNote, trashNote } from "./notes.js";
+import { DEFAULT_FORMATTING } from "../editor/formatting.js";
 import { AT, backupFixture, noteFixture, resetDatabase } from "../test/fixtures.js";
 
 beforeEach(resetDatabase);
@@ -16,6 +17,7 @@ it("exports, validates and imports identical rows including trash, tombstones an
   await trashNote(target.id);
   await db.tombstones.add({ id: "purged", purgedAt: AT });
   await setPref("lastBackupAt", AT);
+  for (const [key, value] of Object.entries(DEFAULT_FORMATTING)) await setPref(key, value);
   await setPref("toolbar", ["bold", "italic"]);
   await setPref("storagePersisted", true);
   await setPref("futureApiKey", "fixture-only-secret");
@@ -31,14 +33,14 @@ it("exports, validates and imports identical rows including trash, tombstones an
   for (const key of ["notes", "folders", "tombstones", "preferences"]) expect(after[key]).toEqual(before[key]);
   // Device-local preferences are not in the file and must survive a restore (a Phase 3 API key,
   // this device's storagePersisted answer).
-  expect(await allPrefs()).toEqual({ ...before.preferences, futureApiKey: "fixture-only-secret", storagePersisted: true });
+  expect(await allPrefs()).toEqual({ ...before.preferences, futureApiKey: "fixture-only-secret", storagePersisted: true, notebookGeneration: expect.any(String) });
 });
 it("ignores storagePersisted from older backups with a warning instead of restoring it", async () => {
   const checked = validateBackup(backupFixture({ preferences: { storagePersisted: true } }));
   expect(checked.ok).toBe(true);
   expect(checked.warnings.join(" ")).toContain("storagePersisted");
   await importBackup(checked.envelope);
-  expect(await allPrefs()).toEqual({});
+  expect(await allPrefs()).toEqual({ notebookGeneration: expect.any(String) });
 });
 it.each(["a\nb", "x".repeat(513), " ", "bad\u007fid"])("rejects ids the app could not open later: %j", (id) => {
   expect(validateBackup(backupFixture({ notes: [noteFixture({ id })] })).ok).toBe(false);
@@ -86,7 +88,7 @@ describe("validation failures", () => {
     expect(result.errors.length).toBeGreaterThan(0);
   });
   it.each([
-    ["format", "wrong"], ["schemaVersion", undefined], ["schemaVersion", 0], ["schemaVersion", 2],
+    ["format", "wrong"], ["schemaVersion", undefined], ["schemaVersion", 0], ["schemaVersion", 3],
     ["schemaVersion", 1.5], ["schemaVersion", "1"], ["schemaVersion", NaN],
     ["exportedAt", "yesterday"], ["appVersion", ""],
     ["notes", {}], ["folders", null], ["tombstones", "x"], ["preferences", []], ["preferences", null],
@@ -135,20 +137,83 @@ describe("validation failures", () => {
   });
 });
 
-it("runs pure upgrades one version at a time and validates each resulting schema", () => {
-  const raw = { schemaVersion: 1, rows: ["original"] };
+it("runs synthetic future upgrades one version at a time and validates each resulting schema", () => {
+  const raw = { schemaVersion: 10, rows: ["original"] };
   const seen = [];
-  const validators = Object.fromEntries([1, 2, 3].map((version) => [version, (envelope) => seen.push(envelope.schemaVersion)]));
+  const validators = Object.fromEntries([10, 11, 12].map((version) => [version, (envelope) => seen.push(envelope.schemaVersion)]));
   const upgrades = {
-    1: (envelope) => ({ ...envelope, schemaVersion: 2, rows: [...envelope.rows, "v2"] }),
-    2: (envelope) => ({ ...envelope, schemaVersion: 3, rows: [...envelope.rows, "v3"] }),
+    10: (envelope) => ({ ...envelope, schemaVersion: 11, rows: [...envelope.rows, "v11"] }),
+    11: (envelope) => ({ ...envelope, schemaVersion: 12, rows: [...envelope.rows, "v12"] }),
   };
-  expect(upgradeEnvelope(raw, 3, upgrades, validators).envelope).toEqual({ schemaVersion: 3, rows: ["original", "v2", "v3"] });
-  expect(seen).toEqual([1, 2, 3]);
-  expect(raw).toEqual({ schemaVersion: 1, rows: ["original"] });
-  expect(() => upgradeEnvelope(raw, 3, {}, validators)).toThrow("No upgrade");
-  expect(() => upgradeEnvelope(raw, 3, { 1: () => ({ schemaVersion: 3 }) }, validators)).toThrow("one schema version");
-  const failValidation = { ...validators, 2: (_raw, errors) => errors.push("Bad v2") };
-  expect(upgradeEnvelope(raw, 3, upgrades, failValidation).errors).toEqual(["Bad v2"]);
+  expect(upgradeEnvelope(raw, 12, upgrades, validators).envelope).toEqual({ schemaVersion: 12, rows: ["original", "v11", "v12"] });
+  expect(seen).toEqual([10, 11, 12]);
+  expect(raw).toEqual({ schemaVersion: 10, rows: ["original"] });
+  expect(() => upgradeEnvelope(raw, 12, {}, validators)).toThrow("No upgrade");
+  expect(() => upgradeEnvelope(raw, 12, { 10: () => ({ schemaVersion: 12 }) }, validators)).toThrow("one schema version");
+  const failValidation = { ...validators, 11: (_raw, errors) => errors.push("Bad v11") };
+  expect(upgradeEnvelope(raw, 12, upgrades, failValidation).errors).toEqual(["Bad v11"]);
   expect(() => upgradeEnvelope({ schemaVersion: 0 })).toThrow("not supported");
+});
+
+it("keeps v1 validation unchanged, including the original preference allow-list and unlimited safe toolbar", () => {
+  const toolbar = [...Array(101).fill("bold"), "x".repeat(512)];
+  const raw = backupFixture({ preferences: { toolbar, storagePersisted: true } });
+  const v1 = upgradeEnvelope(raw, 1);
+  expect(v1.envelope).toEqual(raw);
+  expect(v1.errors).toEqual([]);
+  expect(v1.warnings).toEqual(["Preference storagePersisted is specific to the device it was exported from and will be ignored."]);
+  for (const key of ["toolbarLayout", "selectionMenu", "textColors", "highlightColors", "namedStyles", "secret"]) {
+    expect(upgradeEnvelope(backupFixture({ preferences: { [key]: [] } }), 1).errors).toEqual([`Preference ${key} is not allowed in backups.`]);
+  }
+  expect(upgradeEnvelope(backupFixture({ preferences: { toolbar: [2] } }), 1).errors).toEqual(["toolbar must be an array of action ids."]);
+  const v2 = validateBackup(raw);
+  expect(v2.ok).toBe(true);
+  expect(v2.envelope.preferences.toolbar).toHaveLength(100);
+  expect(v2.warnings.join(" ")).toContain("first 100");
+  expect(v2.summary.willUpgrade).toBe(true);
+  expect(raw.preferences.toolbar).toHaveLength(102);
+});
+
+it("the real 1-to-2 upgrade changes only the version, before v2 sanitisation", () => {
+  const raw = backupFixture({ preferences: { toolbar: ["bold", "future"] } });
+  const copy = structuredClone(raw);
+  expect(upgradeEnvelope(raw).envelope).toEqual({ ...raw, schemaVersion: 2 });
+  expect(raw).toEqual(copy);
+});
+
+it("v2 warns and sanitises cosmetic preferences and unknown keys without blocking restoration", async () => {
+  const raw = backupFixture({ schemaVersion: 2, preferences: {
+    toolbar: ["bold", null, "future"], toolbarLayout: "sideways", selectionMenu: ["italic"],
+    textColors: [{ color: "#ABCDEF", name: "  Sky ", hidden: false, custom: true }, { color: "red" }],
+    highlightColors: "yellow", namedStyles: [null, DEFAULT_FORMATTING.namedStyles[0]],
+    unknown: "ignored", notebookGeneration: "must-not-adopt", storagePersisted: false,
+  } });
+  const copy = structuredClone(raw);
+  const result = validateBackup(raw);
+  expect(result.ok).toBe(true);
+  expect(result.errors).toEqual([]);
+  expect(result.envelope.preferences).toEqual({
+    toolbar: ["bold", "future"], selectionMenu: ["italic"], namedStyles: DEFAULT_FORMATTING.namedStyles,
+    textColors: [{ color: "#abcdef", name: "Sky", hidden: false, custom: true }],
+  });
+  expect(result.warnings).toContain("Preference unknown is not recognised and will be ignored.");
+  expect(raw).toEqual(copy);
+  await setPref("toolbarLayout", "rows");
+  await setPref("highlightColors", DEFAULT_FORMATTING.highlightColors);
+  await setPref("storagePersisted", true);
+  await importBackup(raw);
+  expect(await allPrefs()).toEqual({ ...result.envelope.preferences, storagePersisted: true, notebookGeneration: expect.any(String) });
+  expect((await allPrefs()).notebookGeneration).not.toBe("must-not-adopt");
+  const backup = await buildBackup();
+  expect(backup.schemaVersion).toBe(2);
+  expect(backup.preferences).not.toHaveProperty("notebookGeneration");
+});
+
+it.each([
+  { preferences: { lastBackupAt: false } }, { notes: [noteFixture({ rev: 0 })] },
+  { notes: null }, { folders: null }, { tombstones: null }, { preferences: null },
+])("v2 retains blocking v1 table and lastBackupAt errors: %j", (patch) => {
+  const errors = validateBackup(backupFixture(patch)).errors;
+  expect(errors.length).toBeGreaterThan(0);
+  expect(validateBackup(backupFixture({ ...patch, schemaVersion: 2 })).errors).toEqual(errors);
 });

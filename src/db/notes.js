@@ -1,4 +1,4 @@
-import { db } from "./db.js";
+import { db, writeTransaction } from "./db.js";
 import { newId } from "../lib/ids.js";
 import { nowIso } from "../lib/dates.js";
 import { extractNoteLinks, htmlToText, neutralizeNoteLinks } from "../lib/text.js";
@@ -46,7 +46,7 @@ export async function createNote({ folderId = null, title = "", html = "<p></p>"
     id: newId(), ...cleanPatch({ title, html, folderId }), tags: [], pinned: false, rev: 1,
     createdAt: at, updatedAt: at, deletedAt: null,
   };
-  await db.transaction("rw", db.notes, db.folders, async () => {
+  await writeTransaction([db.notes, db.folders], async () => {
     await checkFolder(folderId);
     await db.notes.add(note);
   });
@@ -55,7 +55,7 @@ export async function createNote({ folderId = null, title = "", html = "<p></p>"
 
 export async function updateNote(id, patch) {
   const clean = cleanPatch(patch);
-  return db.transaction("rw", db.notes, db.folders, async () => {
+  return writeTransaction([db.notes, db.folders], async () => {
     const note = await db.notes.get(id);
     if (!note) throw new Error("Note does not exist");
     if (Object.hasOwn(clean, "folderId")) await checkFolder(clean.folderId);
@@ -71,7 +71,7 @@ export const setPinned = (id, pinned) => updateNote(id, { pinned });
 export const trashNote = (id) => updateNote(id, { deletedAt: nowIso() });
 
 export async function restoreNote(id) {
-  return db.transaction("rw", db.notes, db.tombstones, async () => {
+  return writeTransaction([db.notes, db.tombstones], async () => {
     const note = await db.notes.get(id);
     if (!note) throw new Error("Note does not exist");
     // A target might have been purged while this source note was also in Trash.
@@ -86,7 +86,7 @@ export async function restoreNote(id) {
 export async function purgeExpired(now = new Date()) {
   const at = new Date(now).toISOString();
   const cutoff = new Date(new Date(now).getTime() - TRASH_RETENTION_MS).toISOString();
-  return db.transaction("rw", db.notes, db.tombstones, async () => {
+  return writeTransaction([db.notes, db.tombstones], async () => {
     const expired = await db.notes.where("deletedAt").below(cutoff).toArray();
     return purgeRows(expired, at);
   });
@@ -110,7 +110,7 @@ async function purgeRows(rows, at) {
 }
 
 export async function purgeNow(id) {
-  return db.transaction("rw", db.notes, db.tombstones, async () => {
+  return writeTransaction([db.notes, db.tombstones], async () => {
     const note = await db.notes.get(id);
     if (!note) throw new Error("Note does not exist");
     if (note.deletedAt === null) throw new Error("Move the note to Trash before deleting it permanently");

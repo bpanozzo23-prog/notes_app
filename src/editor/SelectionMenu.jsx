@@ -3,7 +3,7 @@ import { useEditorState } from "@tiptap/react";
 import { DEFAULT_SELECTION_MENU } from "./actions.js";
 import { ActionButtons } from "./Toolbar.jsx";
 
-export default function SelectionMenu({ editor, ids = DEFAULT_SELECTION_MENU, ui }) {
+export default function SelectionMenu({ editor, ids = DEFAULT_SELECTION_MENU, formatting, ui }) {
   const href = useEditorState({ editor, selector: ({ editor }) =>
     editor.state.selection.empty && editor.isActive("link") ? editor.getAttributes("link").href : null,
   });
@@ -21,6 +21,6 @@ export default function SelectionMenu({ editor, ids = DEFAULT_SELECTION_MENU, ui
       <button type="button" className="min-h-11 rounded px-2 text-sm" onPointerDown={(event) => event.preventDefault()}
         onClick={() => ui?.removeLink?.(editor)}>Remove link</button>
     </>}
-    <ActionButtons editor={editor} ids={ids} ui={ui} size={18} />
+    <ActionButtons editor={editor} ids={ids} formatting={formatting} ui={ui} size={18} />
   </BubbleMenu>;
 }

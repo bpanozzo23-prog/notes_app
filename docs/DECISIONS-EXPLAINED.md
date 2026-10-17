@@ -5,7 +5,7 @@ this one is for the owner: what was chosen, why, what it means for the app, what
 and how hard it would be to reverse ("lock-in"). Ordered by lock-in, hardest first. Updated whenever
 `DECISIONS.md` gains an entry with consequences for how the app behaves.
 
-Last updated 2026-10-17, when the Phase 2 plan was approved (§20–30).
+Last updated 2026-10-17, with step 2a (§31).
 
 ---
 
@@ -430,3 +430,19 @@ improve.
   (a token is roughly three-quarters of a word). One shrunk screenshot is about 4,000 tokens,
   about 1.6 cents per question on Opus 5.5; the text of 40 notes is about 25,000 tokens, about
   10 cents. Decided in Phase 3.
+
+### 31. Step 2a: what changed and what you'll notice
+
+**Chosen:** the first Phase 2 step adds safety rules, not features. Your stored notes move to
+schema version 2 (nothing in them changes). If an older copy of the app ever opens a notebook a
+newer copy has upgraded, it shows "This notebook was updated by a newer version of the app.
+Reload to update." and refuses to edit, import or export until reloaded. After you import a
+backup, any other open tab of the app shows "The notebook was replaced in another window.
+Reload." and saves nothing more. If the app can't open your notes at start, it says they have
+not been deleted, instead of showing an empty list. Backups now include the settings Phase 2
+will let you change; a backup's broken setting only produces a warning, never a refused import.
+The colour lists exist already (12 text colours, 8 highlights) but have no screen yet.
+**What you'll notice:** Settings shows "Schema version: 2" and app version 0.2.0. The import
+confirmation adds "Your toolbar, colours and styles will be replaced by the backup's."
+**Lock-in: none** beyond §22.
+

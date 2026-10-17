@@ -1,17 +1,17 @@
 import { useEditorState } from "@tiptap/react";
-import { ACTIONS, DEFAULT_TOOLBAR } from "./actions.js";
+import { resolveAction, DEFAULT_TOOLBAR } from "./actions.js";
 
-export function ActionButtons({ editor, ids, ui = {}, size = 20 }) {
+export function ActionButtons({ editor, ids, formatting, ui = {}, size = 20, readOnly = false }) {
   const active = useEditorState({
     editor,
-    selector: ({ editor }) => Object.fromEntries(ids.map((id) => [id, editor ? ACTIONS[id]?.isActive?.(editor) ?? false : false])),
+    selector: ({ editor }) => Object.fromEntries(ids.map((id) => [id, editor ? resolveAction(id, formatting)?.isActive?.(editor) ?? false : false])),
   });
   return ids.map((id, index) => {
-    const action = ACTIONS[id];
+    const action = resolveAction(id, formatting);
     if (!action) return null;
     const Icon = action.icon;
     return (
-      <button key={`${id}:${index}`} type="button" aria-label={action.label}
+      <button key={`${id}:${index}`} type="button" disabled={readOnly} aria-label={action.label}
         aria-pressed={action.kind === "toggle" ? active?.[id] : undefined}
         onPointerDown={(event) => event.preventDefault()}
         onClick={() => action.run({ editor, ui })}
@@ -23,10 +23,10 @@ export function ActionButtons({ editor, ids, ui = {}, size = 20 }) {
   });
 }
 
-export default function Toolbar({ editor, ids = DEFAULT_TOOLBAR, ui }) {
+export default function Toolbar({ editor, ids = DEFAULT_TOOLBAR, formatting, ui, readOnly }) {
   return <div role="toolbar" aria-label="Formatting" className="fixed inset-x-0 bottom-0 border-t border-gray-200 bg-white/95 backdrop-blur">
     <div className="mx-auto flex max-w-2xl gap-0.5 overflow-x-auto px-2 py-1 pb-[max(0.25rem,env(safe-area-inset-bottom))]">
-      <ActionButtons editor={editor} ids={ids} ui={ui} />
+      <ActionButtons editor={editor} ids={ids} formatting={formatting} ui={ui} readOnly={readOnly} />
     </div>
   </div>;
 }

@@ -8,7 +8,7 @@ import ScreenHeader from "../components/ScreenHeader.jsx";
 import { requestPersistence } from "../lib/persistence.js";
 import Confirm from "../components/Confirm.jsx";
 
-export default function Settings({ notebook, queue, run, busy, onBack, setMessage, updateState, error }) {
+export default function Settings({ notebook, queue, run, busy, readOnly, onBack, setMessage, updateState, error }) {
   const [preview, setPreview] = useState(null);
   const [confirmImport, setConfirmImport] = useState(false);
   const { notes, trash, folders, prefs, persisted, refresh } = notebook;
@@ -36,12 +36,12 @@ export default function Settings({ notebook, queue, run, busy, onBack, setMessag
     <div className="space-y-6 px-4 pb-8">
       <div className="space-y-2">
         <h2 className="font-semibold">Backup</h2>
-        <button className="app-button" disabled={busy} onClick={() => run(exportFile)}>Export backup</button>
+        <button className="app-button" disabled={busy || readOnly} onClick={() => run(exportFile)}>Export backup</button>
         <p className="text-sm text-[var(--color-muted)]">Last backup: {prefs.lastBackupAt ? new Date(prefs.lastBackupAt).toLocaleString() : "Not yet exported"}</p>
       </div>
       <div className="space-y-3">
         <label className="block font-semibold" htmlFor="backup-file">Import backup</label>
-        <input id="backup-file" type="file" accept=".json,application/json" disabled={busy} className="block w-full text-sm"
+        <input id="backup-file" type="file" accept=".json,application/json" disabled={busy || readOnly} className="block w-full text-sm"
           onChange={(event) => {
             const file = event.target.files?.[0];
             event.target.value = "";
@@ -58,7 +58,7 @@ export default function Settings({ notebook, queue, run, busy, onBack, setMessag
           {preview.result.summary.willUpgrade && <p>This file will be upgraded to the current format.</p>}
           {preview.result.errors.map((error, index) => <p role="alert" className="text-red-700" key={index}>{error}</p>)}
           {preview.result.warnings.map((warning, index) => <p className="text-amber-800" key={index}>{warning}</p>)}
-          {preview.result.ok && <button className="app-button" disabled={busy} onClick={() => setConfirmImport(true)}>Replace notebook</button>}
+          {preview.result.ok && <button className="app-button" disabled={busy || readOnly} onClick={() => setConfirmImport(true)}>Replace notebook</button>}
         </div>}
       </div>
       <div className="space-y-2 text-sm">
@@ -70,7 +70,7 @@ export default function Settings({ notebook, queue, run, busy, onBack, setMessag
       </div>
     </div>
     {confirmImport && <Confirm title="Replace notebook?" confirmLabel="Import and replace" busy={busy} error={error} onCancel={() => setConfirmImport(false)} onConfirm={() => run(replaceFromPreview)}>
-      Replace {notes.length + trash.length} notes and {folders.length} folders with {preview.result.envelope.notes.length} notes and {preview.result.envelope.folders.length} folders? A safety backup of the current notebook will download first.
+      Replace {notes.length + trash.length} notes and {folders.length} folders with {preview.result.envelope.notes.length} notes and {preview.result.envelope.folders.length} folders? A safety backup of the current notebook will download first. Your toolbar, colours and styles will be replaced by the backup's.
     </Confirm>}
   </section>;
 }

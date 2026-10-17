@@ -4,11 +4,12 @@ import { extensions } from "./extensions.js";
 import Toolbar from "./Toolbar.jsx";
 import SelectionMenu from "./SelectionMenu.jsx";
 
-function NoteDocument({ note, onChange, toolbarIds, ui, onEditor }) {
+function NoteDocument({ note, onChange, toolbarIds, formatting, readOnly = false, ui, onEditor }) {
   const initialHtml = useRef(note.html);
   const editor = useEditor({
     extensions,
     content: initialHtml.current,
+    editable: !readOnly,
     editorProps: {
       attributes: {
         class: "px-4 pb-4 pt-2", "aria-label": "Note body",
@@ -24,6 +25,7 @@ function NoteDocument({ note, onChange, toolbarIds, ui, onEditor }) {
     onUpdate: ({ editor }) => onChange(editor.getHTML()),
   });
   useEffect(() => { onEditor?.(editor); return () => onEditor?.(null); }, [editor, onEditor]);
+  useEffect(() => { editor?.setEditable(!readOnly, false); }, [editor, readOnly]);
   if (!editor) return null;
   return <>
     <div className="flex flex-1 flex-col" data-editor-surface onClick={(event) => {
@@ -31,8 +33,8 @@ function NoteDocument({ note, onChange, toolbarIds, ui, onEditor }) {
     }}>
       <EditorContent editor={editor} className="flex-1" />
     </div>
-    <Toolbar editor={editor} ids={toolbarIds} ui={ui} />
-    <SelectionMenu editor={editor} ui={ui} />
+    <Toolbar editor={editor} ids={formatting?.toolbar ?? toolbarIds} formatting={formatting} readOnly={readOnly} ui={ui} />
+    <SelectionMenu editor={editor} ids={formatting?.selectionMenu} formatting={formatting} ui={ui} />
   </>;
 }
 

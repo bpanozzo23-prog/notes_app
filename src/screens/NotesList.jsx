@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Folder, Settings, Search, Plus, Pin, Trash2, X } from "lucide-react";
 import { noteTitle, searchNotes, tagsInUse, visibleNotes } from "../lib/notebookView.js";
 
-export default function NotesList({ notes, folders, trashCount, filter, query = "", onQuery, onFilter, onOpen, onNew, busy }) {
+export default function NotesList({ notes, folders, trashCount, filter, query = "", onQuery, onFilter, onOpen, onNew, busy, readOnly }) {
   // History stores trimmed queries; keep a trailing space while typing the next word.
   const [draftQuery, setDraftQuery] = useState(query);
   useEffect(() => { setDraftQuery((current) => current.trim() === query ? current : query); }, [query]);
@@ -50,7 +50,7 @@ export default function NotesList({ notes, folders, trashCount, filter, query = 
     </button>
     <div className="pointer-events-none fixed inset-x-0 bottom-6 mx-auto flex max-w-2xl justify-end px-5 pb-[env(safe-area-inset-bottom)]">
       <button className="pointer-events-auto flex h-14 w-14 items-center justify-center rounded-full bg-[var(--color-ink)] text-[var(--color-paper)] shadow-lg"
-        aria-label="+ New note" disabled={busy} onClick={onNew}><Plus size={27} aria-hidden="true" /></button>
+        aria-label="+ New note" disabled={busy || readOnly} onClick={onNew}><Plus size={27} aria-hidden="true" /></button>
     </div>
   </section>;
 }

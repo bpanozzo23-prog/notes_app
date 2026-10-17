@@ -4,7 +4,7 @@ import { noteTitle } from "../lib/notebookView.js";
 import ScreenHeader from "../components/ScreenHeader.jsx";
 import Confirm from "../components/Confirm.jsx";
 
-export default function Trash({ trash, refresh, run, busy, onBack, error }) {
+export default function Trash({ trash, refresh, run, busy, readOnly, onBack, error }) {
   const [deleting, setDeleting] = useState(null);
   async function change(task) { return run(async () => { await task(); await refresh(); }); }
   return <section>
@@ -17,8 +17,8 @@ export default function Trash({ trash, refresh, run, busy, onBack, error }) {
           <h2 className="truncate font-medium">{noteTitle(note)}</h2>
           <p className="mt-1 text-xs text-[var(--color-muted)]">Deleted {new Date(note.deletedAt).toLocaleDateString()} · expires in {Math.max(0, Math.ceil((Date.parse(note.deletedAt) + TRASH_RETENTION_MS - Date.now()) / 86400000))} days</p>
           <div className="mt-3 flex gap-2">
-            <button className="app-button" disabled={busy} onClick={() => change(() => restoreNote(note.id))}>Restore</button>
-            <button className="app-button text-red-700" disabled={busy} onClick={() => setDeleting(note)}>Delete now</button>
+            <button className="app-button" disabled={busy || readOnly} onClick={() => change(() => restoreNote(note.id))}>Restore</button>
+            <button className="app-button text-red-700" disabled={busy || readOnly} onClick={() => setDeleting(note)}>Delete now</button>
           </div>
         </li>)}
       </ul>
