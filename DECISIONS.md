@@ -250,3 +250,48 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   after Phase 1 closed; no import tooling for Samsung's format is needed, and the Phase 2 image
   work only has to cover new images, not screenshots carried over from old notes.
 
+
+## Phase 2 (planned, Codex-reviewed and approved 2026-10-17)
+
+- 2026-10-17 — Owner answers before planning: toolbar layout chosen in Settings (one swiping
+  row, two rows, or one row + More); starter text/highlight palettes the owner reorders and
+  hides, plus custom colours; named styles also set typeface, line spacing and optionally a
+  heading level, and style the whole line when nothing is selected; the painter applies once;
+  four fixed callout types; "page-break line" means divider styles; images are shrunk. — The
+  formatting layer is the owner's own design; these were the choices the repo could not answer.
+- 2026-10-17 — The schema version covers the HTML vocabulary: v2 in 2a (preferences), v3 in 2c
+  (highlight colours, line spacing, callouts, divider styles), v4 in 2e (images). — Codex
+  reproduced an editor without a node dropping that content on its next save; one version for
+  the whole phase would have let intermediate builds erase later content.
+- 2026-10-17 — A build that opens a newer database goes read-only (no edits, import or export);
+  a synchronous `versionchange` handler flushes before closing; a device-local
+  `notebookGeneration` changed by import makes every other window's writes fail and lock. —
+  Codex showed Dexie silently reopens a newer database for old code, and that an import does
+  not stop another window's queued save from overwriting the restored notebook. Web Locks need
+  HTTPS, which the phone's dev URL lacks.
+- 2026-10-17 — Unused image files are marked at app start and deleted after 30 days unused, not
+  one day after creation. — Codex: creation age does not protect Undo or cut-and-paste across
+  windows; the unused clock does, and matches Trash's 30 days.
+- 2026-10-17 — Image insertion is a pending operation the save queue waits for, inserted
+  through a mapped placeholder. — Codex reproduced `flush()` returning before an asynchronous
+  hook's edit; Back, reload or export could otherwise finish before the image is in the note.
+- 2026-10-17 — File references are derived from HTML wherever needed and never stored. — One
+  source of truth; Codex flagged stale stored references causing valid images to be skipped.
+- 2026-10-17 — Images: a `files` table of `ArrayBuffer` rows referenced by `<img data-file>` with
+  no `src`; shrunk to ≤ 2,560 px WebP (JPEG if WebP encoding is unavailable); backups carry
+  referenced files as base64 in the same JSON file, assembled from Blob parts; the practical
+  size ceiling is measured on the phone in 2e. — Keeps autosave small and the one-file backup
+  flow; BRIEF §9 rules out `blob:` URLs in notes.
+- 2026-10-17 — Callouts live only at the top level (`Document` content `(block | callout)+`);
+  line spacing is a block attribute with its own commands; highlight colours use multicolour
+  `<mark data-color>` with plain `<mark>` still meaning yellow; divider styles are
+  `<hr data-style>` with plain `<hr>` meaning thin. — Schema-enforced, no nesting to manage, and
+  Phase 1 notes need no conversion.
+- 2026-10-17 — Named styles and the painter replace the formatting in their range (links kept,
+  code skipped); styles are snapshots. — The result always looks like the style; BRIEF §9.
+- 2026-10-17 — Cosmetic preferences in a backup never block a restore: invalid values and
+  unknown keys in v2+ are warnings. The v1 validator is unchanged. — Notes matter more than
+  toolbar settings.
+- 2026-10-17 — Reordering uses ↑/↓ plus Move to top/bottom; no drag library. — Drag competes
+  with scrolling on a phone and the maintained library is pre-1.0; Codex suggested dropping the
+  drafted pick-and-place "Move…" to keep scope down.

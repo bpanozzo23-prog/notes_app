@@ -17,8 +17,8 @@ be exactly what that person wants, and the notes are stored in a form Claude can
 
 From the owner's existing notes: Spanish vocabulary, grammar and phrases; notes on books,
 audiobooks and podcasts; reflections; things to remember or reuse (comments posted somewhere,
-prompts); lists. Some notes carry pasted screenshots or images. Roughly 20–40 notes exist today; the
-owner may migrate them or start fresh.
+prompts); lists. Some notes carry pasted screenshots or images. Roughly 20–40 notes exist today; ~~the
+owner may migrate them or start fresh~~ the owner starts fresh, with no migration (2026-10-17).
 
 Structured Spanish vocabulary belongs in mi-cuaderno (`~/code/mi-cuaderno`), which is built for it.
 Free-form Spanish notes are welcome here.
@@ -44,7 +44,8 @@ Free-form Spanish notes are welcome here.
   an LLM reads HTML fine. A Markdown projection may be derived for display or search but is never
   the source of truth.
 - **Everything about the toolbar is data**, so the owner can add, remove and reorder entries, and
-  the colour menu is a list the owner orders (recent-first is the default).
+  the colour menu is a list the owner orders (~~recent-first is the default~~ manual order only,
+  chosen by the owner 2026-10-17).
 
 ## 5. Features, by tier
 
@@ -54,11 +55,13 @@ backup); local-first in IndexedDB, works offline.
 
 **Tier 2 — the formatting layer the owner asked for.**
 - Customisable toolbar (add, remove, reorder).
-- Customisable colour menu (order, recent colours first).
+- Customisable colour menu (~~order, recent colours first~~ manual order, hide, add custom colours;
+  2026-10-17).
 - Named styles: a preset such as "Heading = 17 pt, bold, underline, green" applied in one tap.
 - Format painter: copy the formatting of one selection, apply to the next.
 - Selection pop-up with common formatting.
-- Typing shortcuts (`## `, `- `, `[] `, `---`) and a divider block; callout blocks.
+- Typing shortcuts (`## `, `- `, `[] `, `---`) and a divider block; callout blocks; divider styles
+  (thin, thick, dashed, dotted: the owner's "page-break line", 2026-10-17).
 - Pasted screenshots and images, stored with the note and included in the backup.
 
 **Tier 3 — Claude.**
@@ -104,7 +107,12 @@ it safe.
   by id from the HTML, included in backups), never temporary `blob:` URLs in note content. Named
   styles apply a snapshot of formatting rather than staying linked to an editable definition. A
   manually ordered colour palette takes precedence over recent-first. Callouts are a custom node
-  added to the supported HTML vocabulary.
+  added to the supported HTML vocabulary. The schema version covers the HTML vocabulary
+  (2026-10-17, Codex): it moves whenever notes can contain something new, older builds refuse
+  newer backups, and a build never writes to a newer database.
 - **Phase 3:** before applying a Claude-proposed edit, check the note's `rev` still matches the one
-  Claude was shown. Images break the assumption that the whole notebook fits one request.
+  Claude was shown. Images break the assumption that the whole notebook fits one request. Numbers (2026-10-17): a
+  shrunk screenshot is about 4,000 input tokens, the text of 40 notes about 25,000; recommendation:
+  whole-notebook questions send text with `[image]` markers, images only for one note on request
+  (`docs/PHASE-2-DIRECTION.md`).
 - **Phase 4:** `tombstones` and `rev` are what sync uses for deletion tracking and conflicts.

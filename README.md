@@ -32,6 +32,11 @@ LLM can read. The code may become public; the notes never are.
   The owner starts the notebook fresh (no migration from Samsung Notes). Next is Phase 2
   (formatting layer: toolbar customisation, named styles, colour order, format painter,
   callouts, images).
+- **Phase 2 — planned and approved, 2026-10-17.** Contract: `docs/PHASE-2-DIRECTION.md`
+  (Codex-reviewed); plain-language lock-in review in `docs/DECISIONS-EXPLAINED.md` §20–30. Six
+  steps: 2a guards and preferences (schema 2), 2b toolbar and pop-up customisation, 2c colours
+  and new formatting (schema 3), 2d named styles and painter, 2e images (schema 4), 2f closeout.
+  2a in progress.
 
 ## Running it
 

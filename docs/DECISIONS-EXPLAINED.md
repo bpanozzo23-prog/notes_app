@@ -5,7 +5,7 @@ this one is for the owner: what was chosen, why, what it means for the app, what
 and how hard it would be to reverse ("lock-in"). Ordered by lock-in, hardest first. Updated whenever
 `DECISIONS.md` gains an entry with consequences for how the app behaves.
 
-Last updated 2026-10-16, during the Phase 1a implementation.
+Last updated 2026-10-17, when the Phase 2 plan was approved (§20–30).
 
 ---
 
@@ -265,3 +265,168 @@ the top of the list, because you did not edit those notes.
 Codex usage.
 **Lock-in: none.**
 
+---
+
+## Phase 2: the formatting layer (planned and approved 2026-10-17)
+
+The decisions in `docs/PHASE-2-DIRECTION.md` that could lock the app in, hardest to undo first.
+Three terms: an **attribute** is a label inside an HTML tag, such as `data-callout="tip"`; the
+**schema version** is the number saying which layout the stored data and backup files use;
+**base64** is a standard way of writing binary data (such as a picture) as letters and digits.
+
+### 20. Images are stored apart from the note text and pointed to by an id
+
+**Chosen:** each image is stored once in its own table in the phone's storage. The note holds
+only a placeholder tag with the image's id (`<img data-file="…">`), never the picture itself and
+never a web address.
+**Why:** autosave rewrites the whole note every couple of seconds while you type; a note with
+3 MB of picture inside would be rewritten each time. The same image can appear in two notes. And
+the brief rules out the browser's temporary picture addresses, which stop working after a reload.
+**What it leads to:** a note's HTML on its own doesn't contain the picture. Anything that reads
+notes (Claude in Phase 3, files on the XPS in Phase 4) needs the image table too. Backups carry
+both.
+**Not chosen:** the picture written into the note's HTML as text (each note self-contained, but
+every autosave and search handles megabytes).
+**Lock-in: high.** Every note with an image relies on it; changing later means converting them.
+
+### 21. Images are shrunk when added; the original is not kept
+
+**Chosen (your answer):** long side at most 2,560 pixels, saved as WebP (a compressed image
+format, smaller than JPEG at the same quality); GIFs become still images.
+**Why:** a phone screenshot drops from 1–3 MB to roughly 200–500 KB with its text still
+readable, and 2,560 is about the largest size Claude reads in full.
+**What it leads to:** backups stay manageable. Detail beyond 2,560 px is gone for good for that
+image. A later "keep originals" setting would help new images only.
+**Not chosen:** keeping originals (backups grow about five times faster).
+**Lock-in: high for each image** (it can't be un-shrunk), low for the rule.
+
+### 22. The schema version also covers what notes can contain
+
+**Chosen** (from Codex's review): the version number moves not only when storage changes but
+whenever notes can hold something new: version 2 in step 2a (new settings), 3 in 2c (highlight
+colours, line spacing, callouts, divider styles), 4 in 2e (images). An app that finds newer data
+than it understands opens it read-only instead of editing it, and refuses a newer backup.
+**Why:** Codex showed that an editor which doesn't know a kind of content silently deletes it the
+next time it saves that note: an older copy of the app (another window, or an old installation on
+another device fed a new backup) would erase images or callouts.
+**What it leads to:** three small upgrades of your stored data instead of one. Two of them change
+nothing but the number. You export a backup before each (2a, 2c, 2e). A backup from a newer
+version can't go into an older app until that app updates.
+**Not chosen:** one version for the whole phase (the first draft: fewer upgrades, but builds in
+the middle of the phase could damage later content); building every new kind of content into
+step 2a (safe too, but delays the toolbar work you care most about).
+**Lock-in: low**, and it is the rule for every later phase too.
+
+### 23. Images go inside the same single backup file, written as text
+
+**Chosen:** the backup stays one `.json` file. Each image's bytes are written in **base64**, a
+standard way of spelling binary data with letters and digits, which makes them about a third
+bigger. Only images that notes actually use are included.
+**Why:** export, the safety download before import, the preview and the confirmation all keep
+working as now. One file to keep or move.
+**What it leads to:** backups grow with images: 100 shrunk screenshots is about 30–65 MB. How
+large a backup the phone handles comfortably will be measured in step 2e and written down;
+beyond that, a zip-style backup would be the next step.
+**Not chosen:** a zip with image files beside the notes (smaller, but a new format, a library,
+and two kinds of backup); leaving images out of backups (they'd be lost with the phone).
+**Lock-in: medium.** Today's backups stay readable forever; a zip format would be added, not
+swapped in.
+
+### 24. New kinds of formatting are written into the notes' HTML
+
+**Chosen:** highlight colours as `<mark data-color="#fde68a">`; sizes in points
+(`font-size: 17pt`); typeface as one of three families every device has (serif, sans-serif,
+monospace); line spacing on whole lines (`<p style="line-height: 1.5">`); callouts as
+`<div data-callout="tip">`, allowed only at the top level of a note (not inside lists, quotes or
+other callouts); divider styles as `<hr data-style="dashed">`.
+**Why:** standard, readable HTML that Claude and other apps understand. Phase 1 notes need no
+conversion: a plain highlight stays yellow and a plain divider stays thin.
+**What it leads to:** once notes contain these, any future editor or converter must understand
+them. Changing how one is written later (say, callouts) means converting stored notes.
+**Not chosen:** sizes in pixels (your words were points); spacing on individual words (it can't
+make lines tighter); callout icons stored as emoji in the text (search and Claude would treat
+them as words); callouts inside lists (harder to edit on a phone and to keep consistent).
+**Lock-in: medium.**
+
+### 25. Named styles are snapshots
+
+**Chosen:** tapping a style writes ordinary formatting into the text. The text does not remember
+which style it came from.
+**Why:** the brief's choice: simple and predictable, and notes stay plain HTML.
+**What it leads to:** if you change "Heading" to blue later, old headings stay green; restyle
+them by tapping the style again or with the painter. Deleting a style never changes a note.
+**Not chosen:** linked styles like Word's, where editing a style updates every use. That needs
+the style's name stored in every styled piece of text, and an edited or deleted style can
+silently change old notes.
+**Lock-in: medium.** Switching to linked styles later couldn't find text styled before the
+switch.
+
+### 26. Unused images are deleted after 30 days
+
+**Chosen** (changed after Codex's review): when the app starts, an image no note uses (including
+notes in Trash) is marked "unused since today". If it is still unused 30 days later, it is
+deleted. If it is used again (Undo, or pasted into another note), the mark is cleared.
+**Why:** otherwise every deleted or replaced picture takes space forever. The first draft deleted
+after one day, which could remove a picture that Undo in another window still needed.
+**What it leads to:** deleted pictures take space for a month, the same as notes in Trash. After
+that only a backup has them.
+**Not chosen:** never deleting (storage grows without limit); deleting quickly (breaks Undo).
+**Lock-in: low**, but it deletes data, which is why it is slow and tested.
+
+### 27. Replacing the notebook stops other windows from saving over it
+
+**Chosen** (from Codex's review): importing a backup gives the notebook a new internal marker.
+Any other open window of the app notices before its next save, refuses to save, and asks you to
+reload.
+**Why:** without it, a note still waiting to save in a second tab could overwrite the notebook
+you just restored.
+**What it leads to:** after an import, other tabs show "The notebook was replaced in another
+window. Reload." Two windows editing the same note normally is still "last save wins", as now;
+on the phone you'll almost always have one window.
+**Lock-in: none.**
+
+### 28. Applying a style or the painter replaces the previous look
+
+**Chosen:** within the text being styled, earlier bold, italics, colours and sizes are cleared,
+then the style's are applied. Links are kept; inline code is left alone.
+**Why:** the result always looks like the style, whatever was there before.
+**Not chosen:** adding on top (an italic word stays italic inside a non-italic heading style).
+**Lock-in: low.** It only decides what one tap does.
+
+### 29. Everything you customise is a setting that travels in backups
+
+**Chosen:** the toolbar, its layout, the pop-up, both colour lists and the named styles are
+settings, each named in the backup's allow-list and checked on import. A broken or unknown
+setting in a backup is skipped with a warning; it never stops your notes being restored.
+**Why:** a restore brings your editor back exactly, and the explicit list keeps the Phase 3 API
+key out.
+**What it leads to:** importing a backup that predates these settings resets them to the
+defaults (the confirmation says so). Settings you never touch follow the app's defaults as they
+improve.
+**Not chosen:** settings kept per device (you'd rebuild the toolbar after every restore).
+**Lock-in: low.**
+
+### 30. Smaller choices, all easy to change
+
+- **Four fixed callout types** (Note, Tip, Warning, Important), your choice. Adding a type later
+  is easy; renaming or removing one means mapping existing callouts. Lock-in: low to medium.
+- **Colour order is yours; no "recent colours first".** Colours are snapshots too: editing a
+  palette colour doesn't change old text. A "recent" row could be added later.
+- **Toolbar layouts split by screen width:** the order decides what fits; the rest goes behind
+  ⋯ More. Not chosen: placing each button in a chosen row (more control, fiddlier settings).
+- **Pickers open as a tray above the toolbar**, not a window, so the keyboard stays open and the
+  selection survives. Android Back closes a tray (and, newly, any dialog) before leaving the
+  screen. The link picker stays a window because it has a search box.
+- **Reordering with arrows, plus Move to top / bottom**, as in Folders today. Dragging on a phone
+  fights with scrolling and needs a long-press, and the good library for it isn't finished; it
+  can be added later if you miss it.
+- **The S Pen is a precise finger:** no separate behaviour, all buttons finger-sized. If Chrome
+  reports pen hover, a button's name appears while the pen hovers over it; long-press shows it
+  with either.
+- **The painter copies the look of words** (bold, colour, size, typeface, highlight), not
+  heading level or line spacing, which styles cover. It applies when you tap Apply, once.
+- **Phase 3 consequence:** whole-notebook questions should send text only, with a marker where
+  each image is, and images only for questions about one note. Claude counts input in *tokens*
+  (a token is roughly three-quarters of a word). One shrunk screenshot is about 4,000 tokens,
+  about 1.6 cents per question on Opus 5.5; the text of 40 notes is about 25,000 tokens, about
+  10 cents. Decided in Phase 3.
