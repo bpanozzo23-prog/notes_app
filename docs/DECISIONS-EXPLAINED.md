@@ -237,3 +237,16 @@ are waiting to save or a save has failed. Once saving succeeds, Reload checks ag
 the update. A brief **Ready to work offline** message marks the first offline installation. The
 published app and the phone's dev URL have separate storage, so use a backup to move notes between
 them. These phone and installation behaviors still need the owner's check after deployment.
+
+### 18. Links between notes and search
+
+**Chosen:** Link to note opens a searchable list of other notes. Selected words become the link;
+without a selection, the app inserts the target's title and a space. That wording stays as written
+even if the target is renamed. Tapping a note link saves first and opens it; Back returns to the
+previous note. A cursor inside a link offers Open and Remove link in the formatting pop-up. A
+trashed target explains how to restore it, and a missing target says it no longer exists. “Linked
+from” shows the live notes that point here. Search ignores case and accents, requires all typed
+words, works together with folder/tag filters, and is remembered on Back. Trash is not searched.
+**Why:** Notes can connect without copying their contents, and finding them should be forgiving
+about Spanish accents. Existing save protection also applies when following a link.
+**Lock-in: low.** Links are ordinary HTML with a note id; search scans the notebook in memory.

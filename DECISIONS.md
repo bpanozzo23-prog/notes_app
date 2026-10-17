@@ -188,3 +188,34 @@ Append-only. One dated line per decision: what was decided, then why, after the 
 - 2026-10-17 — The owner verified 1b on the published app (install, Back, saving across app
   switches and process kill, Trash restore/delete, export, clear site data, import, airplane-mode
   reopen): "Everything works so far". The update prompt gets its first real test when 1c deploys.
+
+## Phase 1c implementation
+
+- 2026-10-17 — The link sheet searches live notes other than the current note, most recently
+  edited first. A selection keeps its text and gains a `note:<id>` link; an empty selection gets
+  the target's displayed title followed by an unmarked space. The editor receives focus before
+  opening the sheet so the dialog restores it on selection or cancellation. — Links use the
+  existing HTML/save projection and need no new storage fields.
+- 2026-10-17 — Link text is a snapshot when inserted; renaming the target does not rewrite it.
+  — The owner may deliberately label a link differently, and title edits should not modify other
+  notes. The destination still resolves by id; picker and backlink rows use its current title.
+- 2026-10-17 — One selection bubble also appears for a cursor inside a link, with Open note or
+  Open link and Remove link before the formatting actions. Remove link covers the whole link
+  mark; web/mail links open only from that explicit button, in a separate browsing context with
+  `noopener`. Bubble taps do not trigger the blank-body focus-at-end handler. — Editing a web
+  link must remain possible, and a second bubble would compete for the same selection.
+- 2026-10-17 — Tapping an internal link uses the existing save-protected navigation. A trashed
+  target says "That note is in the Trash. Restore it from the Trash to open it."; an absent target
+  says "That note no longer exists." Both leave the current note open. — This refines the plan's
+  generic deleted message so recoverable targets are distinguishable from missing imports or
+  purged notes. Linked from uses the live notes already in memory, pinned first then recent.
+- 2026-10-17 — Search requires every normalised word somewhere in title or body, combines with
+  folder/tag chips, and excludes Trash. A trimmed, control-free query of at most 200 characters
+  lives in the list's history entry; invalid queries are dropped. Query changes replace that
+  entry without scrolling, and Back restores it. The input keeps unfinished trailing spaces
+  locally while typing. — No search index or extra history visit per keystroke is needed.
+- 2026-10-17 — Step 1c passes 201 fixture-based tests and the production build (Vite reports its
+  large-chunk warning). No requested implementation is deferred; no commit, installation or
+  deployment was performed. — Automated checks exercise the real editor and save queue, with
+  browser geometry substituted in jsdom. The agent has not seen the phone: picker focus, bubble
+  placement, keyboard composition, long-note scrolling and Android Back still need owner review.

@@ -1,20 +1,29 @@
 import { useState } from "react";
 import { Pin, Trash2 } from "lucide-react";
 import NoteEditor from "../editor/NoteEditor.jsx";
+import LinkPicker from "../editor/LinkPicker.jsx";
 import ScreenHeader from "../components/ScreenHeader.jsx";
 import FolderPicker from "../components/FolderPicker.jsx";
 import TagInput from "../components/TagInput.jsx";
 import Confirm from "../components/Confirm.jsx";
-import { tagsInUse } from "../lib/notebookView.js";
+import { noteTitle, tagsInUse, visibleNotes } from "../lib/notebookView.js";
 
-export default function Note({ initialNote, notes, folders, toolbarIds, queue, status, busy, onBack, onDelete, error }) {
+export default function Note({ initialNote, notes, folders, toolbarIds, queue, status, busy, onBack, onDelete, onOpenNote, error }) {
   const [note, setNote] = useState(initialNote);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [linkEditor, setLinkEditor] = useState(null);
+  function openLinkPicker(editor) {
+    // Synchronous focus lets Dialog remember the editor even for keyboard-activated buttons.
+    editor.view.focus();
+    setLinkEditor(editor);
+  }
+  function removeLink(editor) { editor.chain().focus().extendMarkRange("link").unsetLink().run(); }
+  const linkedFrom = visibleNotes(notes.filter((source) => source.deletedAt === null && source.linkedIds.includes(note.id)));
   function edit(patch) {
     queue.schedule(note.id, patch);
     setNote((current) => ({ ...current, ...patch }));
   }
-  return <section className="flex flex-1 flex-col" onBlur={() => { queue.flush().catch(() => {}); }}>
+  return <section className="flex flex-1 flex-col pb-24" onBlur={() => { queue.flush().catch(() => {}); }}>
     <ScreenHeader title="Note" onBack={onBack} busy={busy}>
       <span role="status" className={`pr-1 text-xs ${status === "error" ? "font-semibold text-red-700" : "text-[var(--color-muted)]"}`}>{status === "error" ? "Not saved" : status}</span>
     </ScreenHeader>
@@ -28,7 +37,20 @@ export default function Note({ initialNote, notes, folders, toolbarIds, queue, s
       </div>
       <TagInput tags={note.tags} allTags={tagsInUse(notes)} onChange={(tags) => edit({ tags })} />
     </div>
-    <NoteEditor note={note} onChange={(html) => edit({ html })} toolbarIds={toolbarIds} />
+    <NoteEditor note={note} onChange={(html) => edit({ html })} toolbarIds={toolbarIds}
+      ui={{ openLinkPicker, openNote: onOpenNote, removeLink }} />
+    {linkedFrom.length > 0 && <section aria-label="Linked from" className="mx-4 mt-4 border-t border-[var(--color-line)] pt-4">
+      <h2 className="font-semibold">Linked from</h2>
+      <ul className="divide-y divide-[var(--color-line)]">
+        {linkedFrom.map((source) => <li key={source.id}>
+          <button className="min-h-11 w-full py-3 text-left" aria-label={noteTitle(source)} disabled={busy} onClick={() => onOpenNote(source.id)}>
+            <span className="block break-words font-medium">{noteTitle(source)}</span>
+            <span className="block break-words text-sm text-[var(--color-muted)]">{folders.find((folder) => folder.id === source.folderId)?.name ?? "No folder"}</span>
+          </button>
+        </li>)}
+      </ul>
+    </section>}
+    {linkEditor && <LinkPicker editor={linkEditor} noteId={note.id} notes={notes} folders={folders} onClose={() => setLinkEditor(null)} />}
     {confirmDelete && <Confirm title="Move note to Trash?" confirmLabel="Move to Trash" busy={busy} error={error} onCancel={() => setConfirmDelete(false)} onConfirm={() => onDelete(note.id)}>
       You can restore this note for 30 days. After that, it is permanently deleted.
     </Confirm>}

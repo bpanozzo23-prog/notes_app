@@ -1,6 +1,15 @@
-import { firstLine } from "./text.js";
+import { firstLine, normalize } from "./text.js";
 
 export const noteTitle = (note) => note.title.trim() || firstLine(note.text) || "Untitled note";
+
+export function searchNotes(notes, query = "") {
+  const words = normalize(query).trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return notes;
+  return notes.filter((note) => {
+    const text = normalize(`${note.title}\n${note.text}`);
+    return words.every((word) => text.includes(word));
+  });
+}
 
 export function tagsInUse(notes) {
   const counts = new Map();

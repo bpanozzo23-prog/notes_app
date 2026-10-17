@@ -12,6 +12,12 @@ export function sanitizeFilter(filter) {
     ? { type: filter.type, value: filter.value } : { type: "all" };
 }
 
+export function sanitizeQuery(query) {
+  if (typeof query !== "string" || /[\u0000-\u001f\u007f-\u009f]/.test(query)) return undefined;
+  const trimmed = query.trim();
+  return trimmed.length > 0 && trimmed.length <= 200 ? trimmed : undefined;
+}
+
 /** Read only our versioned, allowlisted shape; never restore note content from history. */
 export function sanitizeNavigation(raw) {
   if (raw?.version !== 1 || !Array.isArray(raw.stack) || !raw.stack.length || raw.stack.length > 1000) return initialNavigation();
@@ -26,9 +32,12 @@ export function sanitizeNavigation(raw) {
         (entry.screen === "note" && !safeString(entry.noteId))) {
       return { ...base, screen: "list", filter: { type: "all" } };
     }
+    const query = sanitizeQuery(entry.query);
     return { ...base, screen: entry.screen,
       ...(entry.screen === "note" ? { noteId: entry.noteId } : {}),
-      ...(entry.screen === "list" ? { filter: sanitizeFilter(entry.filter) } : {}),
+      ...(entry.screen === "list" ? { filter: sanitizeFilter(entry.filter),
+        ...(query ? { query } : {}),
+      } : {}),
     };
   });
   return { version: 1, stack };
@@ -39,7 +48,11 @@ export function navigationReducer(navigation, action) {
   switch (action.type) {
     case "push": return sanitizeNavigation({ version: 1, stack: [...stack, { ...action.entry, key: action.key, scrollY: 0 }] });
     case "replace": return sanitizeNavigation({ version: 1, stack: [...stack.slice(0, -1), { ...action.entry, key: activeEntry(navigation).key, scrollY: action.entry.scrollY ?? 0 }] });
-    case "filter": return navigationReducer(navigation, { type: "replace", entry: { screen: "list", filter: action.filter } });
+    case "filter": return navigationReducer(navigation, { type: "replace", entry: {
+      screen: "list", filter: action.filter,
+      query: Object.hasOwn(action, "query") ? action.query : activeEntry(navigation).query,
+      scrollY: action.scrollY ?? 0,
+    } });
     case "scroll": return { ...navigation, stack: stack.map((entry, i) => i === stack.length - 1 ? { ...entry, scrollY: safeScroll(action.y) } : entry) };
     default: return navigation;
   }
@@ -190,6 +203,12 @@ export function createNavigationController({ win = window, prepare, onChange, on
       if (busy) return;
       commit(navigationReducer(navigation, { type: "filter", filter }));
       win.scrollTo(0, 0);
+    },
+    setQuery(query) {
+      if (busy || stopped || activeEntry(navigation).screen !== "list") return;
+      captureScroll();
+      const route = activeEntry(navigation);
+      commit(navigationReducer(navigation, { type: "filter", filter: route.filter, query, scrollY: route.scrollY }));
     },
     back() {
       if (busy) return;

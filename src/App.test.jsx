@@ -8,6 +8,8 @@ import { backupFixture, noteFixture, resetDatabase } from "./test/fixtures.js";
 import { createFolder } from "./db/folders.js";
 import { NAVIGATION_KEY, activeEntry } from "./lib/navigation.js";
 import { downloadJson } from "./lib/file.js";
+import { stubEditorGeometry, tapEditorLink } from "./test/editor.js";
+import { extractNoteLinks } from "./lib/text.js";
 
 vi.mock("./lib/file.js", async (importOriginal) => ({ ...await importOriginal(), downloadJson: vi.fn() }));
 const pwa = vi.hoisted(() => ({ needRefresh: false, offlineReady: false, update: vi.fn(), options: null, setOfflineReady: null }));
@@ -50,6 +52,7 @@ async function openNote(title) {
   await waitFor(() => expect(screen.getByRole("button", { name: "Back" }).disabled).toBe(false));
 }
 async function back() {
+  await waitFor(() => expect(screen.getByRole("button", { name: "Back" }).disabled).toBe(false));
   fireEvent.click(screen.getByRole("button", { name: "Back" }));
   await screen.findByRole("button", { name: "+ New note" });
 }
@@ -351,4 +354,121 @@ it("restores a root list's scroll after boot has loaded its rows", async () => {
   ] } }, "");
   await start();
   expect(window.scrollTo).toHaveBeenLastCalledWith(0, 180);
+});
+
+it.each(["trash", "missing"])("stays on the current note and explains a %s link target", async (kind) => {
+  const target = noteFixture({ id: "target", title: "Target", deletedAt: new Date().toISOString() });
+  const source = noteFixture({ title: "Source", html: '<p><a href="note:target">Target link</a></p>', text: "Target link", linkedIds: [target.id] });
+  await db.notes.bulkAdd(kind === "trash" ? [source, target] : [source]);
+  await start();
+  await openNote("Source");
+  const body = screen.getByLabelText("Note body");
+  const route = activeEntry(window.history.state[NAVIGATION_KEY]);
+  const url = window.location.href;
+  expect(tapEditorLink(body.querySelector("a"))).toBe(false);
+  expect(screen.getByText(kind === "trash" ? "That note is in the Trash. Restore it from the Trash to open it." : "That note no longer exists.")).toBeTruthy();
+  expect(activeEntry(window.history.state[NAVIGATION_KEY])).toEqual(route);
+  expect(screen.getByLabelText("Note body")).toBe(body);
+  expect(screen.getByLabelText("Title").value).toBe("Source");
+  expect(window.location.href).toBe(url);
+});
+
+it("flushes pending text on following a live link and Back returns to that text intact", async () => {
+  const target = noteFixture({ id: "target", title: "Target", html: "<p>Target body</p>", text: "Target body" });
+  const source = noteFixture({ title: "Source", html: '<p><a href="note:target">Target link</a></p>', text: "Target link", linkedIds: [target.id] });
+  await db.notes.bulkAdd([source, target]);
+  await start();
+  await openNote("Source");
+  const body = screen.getByLabelText("Note body");
+  act(() => body.editor.chain().setTextSelection(body.editor.state.doc.content.size - 1).insertContent(" Pending text").run());
+  const text = body.editor.getText();
+  const url = window.location.href;
+  tapEditorLink(body.querySelector("a"));
+  await waitFor(() => expect(screen.getByLabelText("Title").value).toBe("Target"));
+  expect((await getNote(source.id)).text).toBe(text);
+  expect(screen.getByLabelText("Note body").textContent).toBe("Target body");
+  expect(within(screen.getByRole("region", { name: "Linked from" })).getByRole("button", { name: "Source" })).toBeTruthy();
+  act(() => window.history.back());
+  await waitFor(() => expect(screen.getByLabelText("Title").value).toBe("Source"));
+  expect(screen.getByLabelText("Note body").textContent).toBe(text);
+  expect(window.location.href).toBe(url);
+});
+
+it("keeps unsaved text in the editor if following a link cannot flush, then allows retry", async () => {
+  const source = noteFixture({ title: "Source", html: '<p><a href="note:target">Target link</a></p>', linkedIds: ["target"] });
+  await db.notes.bulkAdd([source, noteFixture({ id: "target", title: "Target" })]);
+  await start();
+  await openNote("Source");
+  const body = screen.getByLabelText("Note body");
+  const put = vi.spyOn(db.notes, "put").mockRejectedValue(new Error("Disk full"));
+  act(() => body.editor.commands.insertContent("Keep this "));
+  tapEditorLink(body.querySelector("a"));
+  await screen.findByText("Not saved");
+  await waitFor(() => expect(screen.getByRole("button", { name: "Back" }).disabled).toBe(false));
+  expect(screen.getByLabelText("Note body")).toBe(body);
+  expect(body.textContent).toContain("Keep this");
+  expect(activeEntry(window.history.state[NAVIGATION_KEY]).noteId).toBe(source.id);
+  put.mockRestore();
+  stubEditorGeometry(body.editor);
+  act(() => { body.editor.view.focus(); body.editor.commands.setTextSelection(body.editor.view.posAtDOM(body.querySelector("a"), 0) + 2); });
+  fireEvent.click(await screen.findByRole("button", { name: "Open note" }));
+  await waitFor(() => expect(screen.getByLabelText("Title").value).toBe("Target"));
+  expect((await getNote(source.id)).text).toContain("Keep this");
+});
+
+it("saves a picker-created href and derived linkedIds, then lists its backlink", async () => {
+  const source = noteFixture({ title: "Source", html: "<p></p>", text: "" });
+  const target = noteFixture({ id: "target", title: "Destino" });
+  await db.notes.bulkAdd([source, target]);
+  await start();
+  await openNote("Source");
+  stubEditorGeometry(screen.getByLabelText("Note body").editor);
+  fireEvent.click(within(screen.getByRole("toolbar", { name: "Formatting", exact: true })).getByRole("button", { name: "Link to note" }));
+  fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Destino" }));
+  expect(document.activeElement).toBe(screen.getByLabelText("Note body"));
+  await back();
+  const saved = await getNote(source.id);
+  expect(saved.html).toContain('href="note:target"');
+  expect(saved.text).toBe("Destino");
+  expect(saved.linkedIds).toEqual(extractNoteLinks(saved.html));
+  expect(saved.linkedIds).toEqual([target.id]);
+  await openNote("Destino");
+  fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Renamed destination" } });
+  fireEvent.click(within(screen.getByRole("region", { name: "Linked from" })).getByRole("button", { name: "Source" }));
+  await waitFor(() => expect(screen.getByLabelText("Title").value).toBe("Source"));
+  expect(screen.getByLabelText("Note body").querySelector("a").textContent).toBe("Destino");
+  expect((await getNote(target.id)).title).toBe("Renamed destination");
+});
+
+it("searches live notes with chips and restores the query and results on Back", async () => {
+  await db.folders.add({ id: "f", name: "Reading", position: 0 });
+  await db.notes.bulkAdd([
+    noteFixture({ title: "Árbol", html: "<p>Un niño</p>", text: "Un niño", folderId: "f" }),
+    noteFixture({ id: "other", title: "Otro árbol", text: "Niño" }),
+    noteFixture({ id: "trash", title: "Trashed árbol", text: "Niño", folderId: "f", deletedAt: new Date().toISOString() }),
+  ]);
+  await start();
+  const rows = () => within(screen.getByRole("list", { name: "Notes" })).queryAllByRole("button").map((button) => button.getAttribute("aria-label"));
+  fireEvent.change(screen.getByLabelText("Search notes"), { target: { value: "ARBOL nino" } });
+  expect(rows()).toEqual(["Árbol", "Otro árbol"]);
+  fireEvent.click(screen.getByRole("button", { name: "Reading" }));
+  expect(rows()).toEqual(["Árbol"]);
+  await openNote("Árbol");
+  await back();
+  expect(screen.getByLabelText("Search notes").value).toBe("ARBOL nino");
+  expect(screen.getByRole("button", { name: "Reading" }).getAttribute("aria-pressed")).toBe("true");
+  expect(rows()).toEqual(["Árbol"]);
+  fireEvent.click(screen.getByRole("button", { name: "Clear search" }));
+  expect(activeEntry(window.history.state[NAVIGATION_KEY])).not.toHaveProperty("query");
+});
+
+it("restores a sanitised list search query on boot", async () => {
+  await db.notes.bulkAdd([noteFixture({ title: "Árbol" }), noteFixture({ id: "other", title: "Unrelated" })]);
+  window.history.replaceState({ [NAVIGATION_KEY]: { version: 1, stack: [
+    { screen: "list", key: "root", filter: { type: "all" }, query: "  ARBOL  ", scrollY: 0 },
+  ] } }, "");
+  await start();
+  expect(screen.getByLabelText("Search notes").value).toBe("ARBOL");
+  expect(within(screen.getByRole("list", { name: "Notes" })).getAllByRole("button")).toHaveLength(1);
+  expect(screen.getByRole("button", { name: "Árbol" })).toBeTruthy();
 });

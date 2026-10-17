@@ -3,8 +3,9 @@ import { afterEach, expect, it, vi } from "vitest";
 import NoteEditor from "./NoteEditor.jsx";
 import { ACTIONS, DEFAULT_TOOLBAR, DEFAULT_SELECTION_MENU } from "./actions.js";
 import { noteFixture } from "../test/fixtures.js";
+import { stubEditorGeometry, tapEditorLink } from "../test/editor.js";
 
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 const currentEditor = () => screen.getByLabelText("Note body").editor;
 
 it("keeps current content on same-id renders and resets content and history on note switch", async () => {
@@ -76,4 +77,37 @@ it("a tap on the empty body surface focuses the editor at the end", async () => 
   await waitFor(() => expect(currentEditor().isFocused).toBe(true));
   expect(currentEditor().state.selection.from).toBe(currentEditor().state.doc.content.size - 1);
   scroll.mockRestore();
+});
+
+it("routes a note-link tap through the latest UI hook without changing the browser URL", () => {
+  const html = '<p><a href="note:target"><strong>Target</strong></a></p>';
+  const oldOpen = vi.fn(), openNote = vi.fn();
+  const view = render(<NoteEditor note={noteFixture({ html })} onChange={() => {}} ui={{ openNote: oldOpen }} />);
+  view.rerender(<NoteEditor note={noteFixture({ html })} onChange={() => {}} ui={{ openNote }} />);
+  const url = window.location.href;
+  const open = vi.spyOn(window, "open").mockImplementation(() => {});
+  expect(tapEditorLink(screen.getByLabelText("Note body").querySelector("strong"))).toBe(false);
+  expect(openNote).toHaveBeenCalledExactlyOnceWith("target");
+  expect(oldOpen).not.toHaveBeenCalled();
+  expect(open).not.toHaveBeenCalled();
+  expect(window.location.href).toBe(url);
+});
+
+it.each(["https://example.com", "mailto:fixture@example.com"])("keeps %s taps for editing and opens only from the link bubble", async (href) => {
+  const openNote = vi.fn();
+  const open = vi.spyOn(window, "open").mockImplementation(() => {});
+  render(<NoteEditor note={noteFixture({ html: `<p><a href="${href}">Linked text</a> after</p>` })} onChange={() => {}} ui={{ openNote }} />);
+  const editor = currentEditor();
+  stubEditorGeometry(editor);
+  tapEditorLink(editor.view.dom.querySelector("a"));
+  expect(openNote).not.toHaveBeenCalled();
+  expect(open).not.toHaveBeenCalled();
+  // jsdom cannot position a caret with a pointer. Set it as a browser would after that tap.
+  act(() => { editor.view.focus(); editor.commands.setTextSelection(4); });
+  const button = await screen.findByRole("button", { name: "Open link" });
+  expect(editor.state.selection.empty).toBe(true);
+  expect(fireEvent.pointerDown(button)).toBe(false);
+  fireEvent.click(button);
+  expect(open).toHaveBeenCalledExactlyOnceWith(href, "_blank", "noopener");
+  expect(editor.state.selection.from).toBe(4); // Bubble clicks must not focus the end of the note.
 });

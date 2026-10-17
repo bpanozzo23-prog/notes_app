@@ -26,8 +26,43 @@ it("filters folders/tags, orders pinned first then recent, and sorts live tag ch
   fireEvent.click(screen.getByRole("button", { name: "All", exact: true }));
   expect(titles()).toHaveLength(3);
   expect(screen.getByRole("button", { name: "Trash (2)" })).toBeTruthy();
-  expect(screen.getByRole("textbox", { name: "Search notes" }).disabled).toBe(true);
-  expect(screen.getByRole("textbox", { name: "Search notes" }).title).toBe("search arrives in 1c");
+  expect(screen.getByRole("textbox", { name: "Search notes" }).disabled).toBe(false);
+  expect(screen.getByRole("textbox", { name: "Search notes" }).title).toBe("");
+});
+
+it("combines all search words with chips, keeps spaces while typing, clears, and closes the keyboard on Enter", () => {
+  const notes = [
+    noteFixture({ id: "a", title: "ÁRBOL", text: "Un niño lee", folderId: "f", tags: ["Spanish"] }),
+    noteFixture({ id: "b", title: "Otro árbol", text: "Niño", tags: ["Spanish"] }),
+    noteFixture({ id: "c", title: "Árbol solo", text: "No match", folderId: "f" }),
+  ];
+  function Harness() {
+    const [filter, setFilter] = useState({ type: "all" });
+    const [query, setQuery] = useState("");
+    return <NotesList notes={notes} folders={[{ id: "f", name: "Reading" }]} filter={filter} onFilter={setFilter}
+      query={query} onQuery={(value) => setQuery(value.trim())} />;
+  }
+  render(<Harness />);
+  const titles = () => within(screen.getByRole("list", { name: "Notes" })).queryAllByRole("button").map((button) => button.getAttribute("aria-label"));
+  const input = screen.getByRole("textbox", { name: "Search notes" });
+  fireEvent.change(input, { target: { value: "arbol" } });
+  fireEvent.change(input, { target: { value: "arbol " } });
+  expect(input.value).toBe("arbol ");
+  fireEvent.change(input, { target: { value: "arbol NINO" } });
+  expect(titles()).toEqual(["ÁRBOL", "Otro árbol"]);
+  fireEvent.click(screen.getByRole("button", { name: "Reading" }));
+  expect(titles()).toEqual(["ÁRBOL"]);
+  fireEvent.click(screen.getByRole("button", { name: "#Spanish" }));
+  expect(titles()).toEqual(["ÁRBOL", "Otro árbol"]);
+  fireEvent.change(input, { target: { value: "missing" } });
+  expect(screen.getByText("No notes match.")).toBeTruthy();
+  input.focus();
+  fireEvent.keyDown(input, { key: "Enter" });
+  expect(document.activeElement).not.toBe(input);
+  fireEvent.click(screen.getByRole("button", { name: "Clear search" }));
+  expect(input.value).toBe("");
+  expect(titles()).toEqual(["ÁRBOL", "Otro árbol"]); // Tag chip is still applied.
+  expect(screen.queryByRole("button", { name: "Clear search" })).toBeNull();
 });
 it("shows first-line and untitled fallbacks, and opens the selected note", () => {
   const open = vi.fn();

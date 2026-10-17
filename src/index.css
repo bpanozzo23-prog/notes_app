@@ -84,6 +84,11 @@ body {
   color: var(--color-accent);
   text-decoration: underline;
 }
+.ProseMirror a[href^="note:" i] {
+  color: var(--color-accent);
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+}
 
 /* Task list: checkbox beside the text rather than above it. */
 .ProseMirror ul[data-type="taskList"] {

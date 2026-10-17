@@ -77,6 +77,12 @@ export default function App() {
     return nav.run(task);
   }
   function open(entry) { setMessage(""); setError(""); void nav.open(entry); }
+  function openNote(noteId) {
+    if (notebook.notes.some((note) => note.id === noteId)) open({ screen: "note", noteId });
+    else setMessage(notebook.trash.some((note) => note.id === noteId)
+      ? "That note is in the Trash. Restore it from the Trash to open it."
+      : "That note no longer exists.");
+  }
   function back() { setMessage(""); setError(""); nav.back(); }
   async function newNote() {
     await queue.flush();
@@ -127,8 +133,8 @@ export default function App() {
     </div>}
     {message && <p role="status" className="mx-4 my-3 text-sm">{message}</p>}
     <div className="flex flex-1 flex-col" inert={locked} aria-busy={locked}>
-      {route.screen === "list" && <NotesList {...notebook} busy={locked} trashCount={notebook.trash.length} filter={route.filter} onFilter={nav.setFilter} onOpen={open} onNew={() => run(newNote)} />}
-      {route.screen === "note" && selected && <Note key={route.key} {...shared} initialNote={selected} notes={notebook.notes} folders={notebook.folders} queue={queue} status={status} onDelete={deleteNote}
+      {route.screen === "list" && <NotesList key={route.key} {...notebook} busy={locked} trashCount={notebook.trash.length} filter={route.filter} query={route.query} onQuery={nav.setQuery} onFilter={nav.setFilter} onOpen={open} onNew={() => run(newNote)} />}
+      {route.screen === "note" && selected && <Note key={route.key} {...shared} initialNote={selected} notes={notebook.notes} folders={notebook.folders} queue={queue} status={status} onDelete={deleteNote} onOpenNote={openNote}
         toolbarIds={Array.isArray(notebook.prefs.toolbar) ? notebook.prefs.toolbar : DEFAULT_TOOLBAR} />}
       {route.screen === "folders" && <Folders {...notebook} {...shared} />}
       {route.screen === "trash" && <Trash trash={notebook.trash} {...shared} />}

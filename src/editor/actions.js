@@ -47,6 +47,6 @@ export const ACTIONS = Object.freeze(Object.assign(Object.create(null), Object.f
 export const DEFAULT_TOOLBAR = [
   "bold", "italic", "underline", "highlight", "strike", "color:none", "color:#dc2626",
   "color:#15803d", "color:#2563eb", "color:#7c3aed", "h1", "h2", "bulletList",
-  "orderedList", "taskList", "blockquote", "hr", "clearFormatting", "undo", "redo",
+  "orderedList", "taskList", "blockquote", "link", "hr", "clearFormatting", "undo", "redo",
 ];
-export const DEFAULT_SELECTION_MENU = ["bold", "italic", "underline", "highlight", "color:#dc2626", "color:#15803d", "color:#2563eb"];
+export const DEFAULT_SELECTION_MENU = ["bold", "italic", "underline", "highlight", "color:#dc2626", "color:#15803d", "color:#2563eb", "link"];

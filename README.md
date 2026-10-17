@@ -22,7 +22,8 @@ LLM can read. The code may become public; the notes never are.
   `https://bpanozzo23-prog.github.io/notes_app/` (GitHub Pages, deployed by the workflow on every
   push to `main`). The owner checked install, Back, saving under app switches, Trash, export/import
   and airplane-mode reopen. The update prompt gets its first real test with the 1c deployment.
-- **Phase 1c — in progress.** Links between notes, "Linked from", search.
+- **Phase 1c — built, awaiting review and deployment.** Link picker and note navigation,
+  "Linked from", and accent-insensitive search combined with filters and remembered on Back.
 
 ## Running it
 

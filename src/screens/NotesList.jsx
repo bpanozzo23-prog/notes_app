@@ -1,11 +1,16 @@
-import { Folder, Settings, Search, Plus, Pin, Trash2 } from "lucide-react";
-import { noteTitle, tagsInUse, visibleNotes } from "../lib/notebookView.js";
+import { useEffect, useState } from "react";
+import { Folder, Settings, Search, Plus, Pin, Trash2, X } from "lucide-react";
+import { noteTitle, searchNotes, tagsInUse, visibleNotes } from "../lib/notebookView.js";
 
-export default function NotesList({ notes, folders, trashCount, filter, onFilter, onOpen, onNew, busy }) {
+export default function NotesList({ notes, folders, trashCount, filter, query = "", onQuery, onFilter, onOpen, onNew, busy }) {
+  // History stores trimmed queries; keep a trailing space while typing the next word.
+  const [draftQuery, setDraftQuery] = useState(query);
+  useEffect(() => { setDraftQuery((current) => current.trim() === query ? current : query); }, [query]);
+  function search(value) { setDraftQuery(value); onQuery(value); }
   const chips = [{ label: "All", filter: { type: "all" } },
     ...folders.map((folder) => ({ label: folder.name, filter: { type: "folder", value: folder.id } })),
     ...tagsInUse(notes).map((tag) => ({ label: `#${tag}`, filter: { type: "tag", value: tag } }))];
-  const visible = visibleNotes(notes, filter);
+  const visible = visibleNotes(searchNotes(notes, query), filter);
   return <section className="pb-24">
     <header className="px-4 pt-3">
       <div className="flex items-center justify-between">
@@ -15,8 +20,11 @@ export default function NotesList({ notes, folders, trashCount, filter, onFilter
           <button className="icon-button" aria-label="Settings" disabled={busy} onClick={() => onOpen({ screen: "settings" })}><Settings size={21} aria-hidden="true" /></button>
         </div>
       </div>
-      <div className="my-3 flex items-center gap-2 rounded-lg border border-[var(--color-line)] px-3 text-[var(--color-muted)]" title="search arrives in 1c">
-        <Search size={18} aria-hidden="true" /><input aria-label="Search notes" title="search arrives in 1c" disabled placeholder="Search notes" className="min-h-11 min-w-0 w-full bg-transparent text-sm" />
+      <div className="my-3 flex items-center gap-2 rounded-lg border border-[var(--color-line)] px-3 text-[var(--color-muted)]">
+        <Search size={18} className="shrink-0" aria-hidden="true" /><input aria-label="Search notes" disabled={busy} placeholder="Search notes" className="min-h-11 min-w-0 w-full bg-transparent text-sm"
+          value={draftQuery} maxLength={200} enterKeyHint="search" onChange={(event) => search(event.target.value)}
+          onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }} />
+        {draftQuery && <button className="icon-button" aria-label="Clear search" disabled={busy} onClick={() => search("")}><X size={18} aria-hidden="true" /></button>}
       </div>
     </header>
     <div role="group" aria-label="Filter notes" className="flex gap-2 overflow-x-auto px-4 pb-3">
@@ -36,7 +44,7 @@ export default function NotesList({ notes, folders, trashCount, filter, onFilter
         </button>
       </li>)}
     </ul>
-    {!busy && !visible.length && <p className="px-4 py-10 text-center text-[var(--color-muted)]">{notes.length ? "No notes in this filter." : "No notes yet."}</p>}
+    {!busy && !visible.length && <p className="px-4 py-10 text-center text-[var(--color-muted)]">{query ? "No notes match." : notes.length ? "No notes in this filter." : "No notes yet."}</p>}
     <button className="mx-4 mt-4 flex min-h-11 items-center gap-2 text-sm text-[var(--color-muted)]" disabled={busy} onClick={() => onOpen({ screen: "trash" })}>
       <Trash2 size={16} aria-hidden="true" />Trash{trashCount > 0 ? ` (${trashCount})` : ""}
     </button>

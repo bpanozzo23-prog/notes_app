@@ -53,6 +53,25 @@ it("repairs duplicate visit keys even when a key resembles the repair name", () 
   expect(new Set(clean.stack.map((entry) => entry.key)).size).toBe(3);
 });
 
+it.each(["x".repeat(201), 42, {}, ["word"], "a\nb", "\tword", "word\u007f", "word\u0085"])("drops invalid search queries: %j", (query) => {
+  const clean = sanitizeNavigation({ version: 1, stack: [{ screen: "list", key: "root", query }] });
+  expect(activeEntry(clean)).not.toHaveProperty("query");
+});
+
+it("trims and preserves list queries, strips queries from other screens, and carries queries through filter changes", () => {
+  let nav = sanitizeNavigation({ version: 1, stack: [{ screen: "list", key: "root", query: "  Árbol niño  " }] });
+  expect(activeEntry(nav).query).toBe("Árbol niño");
+  nav = navigationReducer(nav, { type: "filter", filter: { type: "tag", value: "Spanish" } });
+  expect(activeEntry(nav).query).toBe("Árbol niño");
+  const noteNav = push(nav, "note", "visit", { noteId: "missing", query: "discard" });
+  expect(activeEntry(noteNav)).not.toHaveProperty("query");
+  expect(activeEntry(resolveDestination(noteNav, { notes: [], folders: [] })).query).toBe("Árbol niño");
+  expect(activeEntry(navigationReducer(nav, { type: "filter", filter: { type: "folder", value: "gone" } })).query).toBe("Árbol niño");
+  const longest = navigationReducer(nav, { type: "filter", filter: { type: "all" }, query: "x".repeat(200) });
+  expect(activeEntry(longest).query).toHaveLength(200);
+  expect(activeEntry(navigationReducer(nav, { type: "filter", filter: { type: "all" }, query: "  " }))).not.toHaveProperty("query");
+});
+
 it("falls back to the last list for missing or trashed notes, and clears a deleted folder filter", () => {
   let nav = navigationReducer(initialNavigation(), { type: "filter", filter: { type: "folder", value: "gone" } });
   nav = push(nav, "note", "visit", { noteId: "gone" });
@@ -83,6 +102,26 @@ describe("browser history and popstate", () => {
     vi.restoreAllMocks();
   });
   const openNote = () => nav.open({ screen: "note", noteId: noteFixture().id });
+
+  it("replaces search without scrolling or adding a visit and restores it on Back", async () => {
+    nav.setFilter({ type: "folder", value: "folder" });
+    scroll(230);
+    window.scrollTo.mockClear();
+    const pushState = vi.spyOn(window.history, "pushState");
+    nav.setQuery("  nino árbol ");
+    expect(window.scrollTo).not.toHaveBeenCalled();
+    expect(pushState).not.toHaveBeenCalled();
+    expect(activeEntry(nav.current)).toMatchObject({ query: "nino árbol", scrollY: 230, filter: { type: "folder", value: "folder" } });
+    expect(activeEntry(sanitizeNavigation(window.history.state[NAVIGATION_KEY])).query).toBe("nino árbol");
+    await openNote();
+    window.history.back();
+    await waitFor(() => expect(activeEntry(nav.current).screen).toBe("list"));
+    expect(activeEntry(nav.current)).toMatchObject({ query: "nino árbol", scrollY: 230 });
+    nav.setFilter({ type: "all" });
+    expect(activeEntry(nav.current).query).toBe("nino árbol");
+    nav.setQuery("");
+    expect(activeEntry(nav.current)).not.toHaveProperty("query");
+  });
 
   it("keeps the URL and foreign state, restores filter/scroll, and flushes before applying Back", async () => {
     const url = window.location.href;
