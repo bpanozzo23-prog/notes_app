@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Pin, Trash2 } from "lucide-react";
 import NoteEditor from "../editor/NoteEditor.jsx";
 import LinkPicker from "../editor/LinkPicker.jsx";
@@ -12,6 +12,15 @@ export default function Note({ initialNote, notes, folders, toolbarIds, queue, s
   const [note, setNote] = useState(initialNote);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [linkEditor, setLinkEditor] = useState(null);
+  const editorRef = useRef(null);
+  const onEditor = useCallback((editor) => { editorRef.current = editor; }, []);
+  useEffect(() => queue.onBeforeFlush(() => {
+    // Hand over input ProseMirror is still holding before the queue saves (Android deletions
+    // wait 20 ms in its DOM observer; a reload or Back inside that window would drop them).
+    const observer = editorRef.current?.view?.domObserver;
+    observer?.forceFlush?.();
+    observer?.flush?.();
+  }), [queue]);
   function openLinkPicker(editor) {
     // Synchronous focus lets Dialog remember the editor even for keyboard-activated buttons.
     editor.view.focus();
@@ -37,7 +46,7 @@ export default function Note({ initialNote, notes, folders, toolbarIds, queue, s
       </div>
       <TagInput tags={note.tags} allTags={tagsInUse(notes)} onChange={(tags) => edit({ tags })} />
     </div>
-    <NoteEditor note={note} onChange={(html) => edit({ html })} toolbarIds={toolbarIds}
+    <NoteEditor note={note} onChange={(html) => edit({ html })} toolbarIds={toolbarIds} onEditor={onEditor}
       ui={{ openLinkPicker, openNote: onOpenNote, removeLink }} />
     {linkedFrom.length > 0 && <section aria-label="Linked from" className="mx-4 mt-4 border-t border-[var(--color-line)] pt-4">
       <h2 className="font-semibold">Linked from</h2>

@@ -35,15 +35,15 @@ export default function Folders({ folders, notes, trash, refresh, run, busy, onB
           }}>
             <input autoFocus className="app-input w-full" aria-label="Folder name" value={rename} onChange={(event) => setRename(event.target.value)} />
             <div className="flex gap-2"><button className="app-button" disabled={busy || !rename.trim()}>Save name</button><button type="button" className="app-button" onClick={() => setRenaming(null)}>Cancel</button></div>
-          </form> : <>
-            <p className="break-words font-medium">{folder.name}</p>
-            <div className="mt-1 flex justify-end">
+          </form> : <div className="flex items-center gap-1">
+            <p className="min-w-0 flex-1 break-words font-medium">{folder.name}</p>
+            <div className="flex shrink-0">
               <button className="icon-button" aria-label={`Move ${folder.name} up`} disabled={busy || index === 0} onClick={() => move(index, -1)}><ArrowUp size={18} aria-hidden="true" /></button>
               <button className="icon-button" aria-label={`Move ${folder.name} down`} disabled={busy || index === folders.length - 1} onClick={() => move(index, 1)}><ArrowDown size={18} aria-hidden="true" /></button>
               <button className="icon-button" aria-label={`Rename ${folder.name}`} onClick={() => { setRenaming(folder.id); setRename(folder.name); }}><Pencil size={18} aria-hidden="true" /></button>
               <button className="icon-button text-red-700" aria-label={`Delete ${folder.name}`} onClick={() => setDeleting(folder)}><Trash2 size={18} aria-hidden="true" /></button>
             </div>
-          </>}
+          </div>}
         </li>)}
       </ul>
     </div>

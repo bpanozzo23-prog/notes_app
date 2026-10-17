@@ -5,6 +5,7 @@ import { downloadJson, readFileAsText } from "../lib/file.js";
 import { nowIso } from "../lib/dates.js";
 import { APP_VERSION, SCHEMA_VERSION } from "../version.js";
 import ScreenHeader from "../components/ScreenHeader.jsx";
+import { requestPersistence } from "../lib/persistence.js";
 import Confirm from "../components/Confirm.jsx";
 
 export default function Settings({ notebook, queue, run, busy, onBack, setMessage, updateState, error }) {
@@ -23,6 +24,8 @@ export default function Settings({ notebook, queue, run, busy, onBack, setMessag
     const before = await buildBackup();
     downloadJson(before, `before-import-${backupFilename()}`);
     await importBackup(preview.result.envelope);
+    // A restored notebook deserves the same eviction protection as a typed one.
+    await requestPersistence();
     setPreview(null);
     setConfirmImport(false);
     await refresh();

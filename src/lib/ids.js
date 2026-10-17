@@ -1,3 +1,9 @@
+// The one rule for ids and names that cross a trust boundary (backup files, history.state):
+// a nonblank string without control characters, at most 512 characters. Backups and
+// navigation share it so an imported note can always be opened.
+export const SAFE_STRING = /^[^\u0000-\u001f\u007f]{1,512}$/;
+export const isSafeId = (value) => typeof value === "string" && SAFE_STRING.test(value) && value.trim().length > 0;
+
 // getRandomValues also works on the phone's plain-HTTP development origin.
 export function newId() {
   const bytes = crypto.getRandomValues(new Uint8Array(16));

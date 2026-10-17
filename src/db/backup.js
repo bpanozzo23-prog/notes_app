@@ -2,8 +2,11 @@ import { db, allPrefs } from "./db.js";
 import { APP_VERSION, SCHEMA_VERSION } from "../version.js";
 import { nowIso } from "../lib/dates.js";
 import { extractNoteLinks, htmlToText } from "../lib/text.js";
+import { isSafeId } from "../lib/ids.js";
 
-export const EXPORTED_PREFS = Object.freeze(["lastBackupAt", "toolbar", "storagePersisted"]);
+export const EXPORTED_PREFS = Object.freeze(["lastBackupAt", "toolbar"]);
+// Device-local preferences that older backups contained: accepted with a warning, never restored.
+export const IGNORED_PREFS = Object.freeze(["storagePersisted"]);
 export const BACKUP_FORMAT = "notes_app-backup";
 
 export async function buildBackup() {
@@ -28,7 +31,7 @@ export function backupFilename() {
 
 const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 const isString = (value) => typeof value === "string";
-const isId = (value) => isString(value) && value.trim().length > 0;
+const isId = isSafeId;
 // Canonical UTC timestamps keep the database's string indexes chronologically ordered.
 const isDate = (value) => isString(value) && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(value) &&
   Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value;
@@ -86,9 +89,9 @@ function validateV1(envelope, errors, warnings) {
     }
   }
   for (const [key, value] of Object.entries(preferences)) {
-    if (!EXPORTED_PREFS.includes(key)) errors.push(`Preference ${key} is not allowed in backups.`);
+    if (IGNORED_PREFS.includes(key)) warnings.push(`Preference ${key} is specific to the device it was exported from and will be ignored.`);
+    else if (!EXPORTED_PREFS.includes(key)) errors.push(`Preference ${key} is not allowed in backups.`);
     else if (key === "lastBackupAt" && !isDate(value)) errors.push("lastBackupAt must be an ISO UTC timestamp.");
-    else if (key === "storagePersisted" && typeof value !== "boolean") errors.push("storagePersisted must be a boolean.");
     else if (key === "toolbar" && !isStrings(value)) errors.push("toolbar must be an array of action ids.");
   }
 }
@@ -149,7 +152,7 @@ export async function importBackup(envelope) {
   if (!checked.ok) throw new Error(`Refusing to import: ${checked.errors.join(" ")}`);
   const clean = checked.envelope;
   const notes = clean.notes.map((note) => ({ ...note, text: htmlToText(note.html), linkedIds: extractNoteLinks(note.html) }));
-  const prefs = Object.entries(clean.preferences).map(([key, value]) => ({ key, value }));
+  const prefs = Object.entries(clean.preferences).filter(([key]) => EXPORTED_PREFS.includes(key)).map(([key, value]) => ({ key, value }));
   await db.transaction("rw", db.notes, db.folders, db.tombstones, db.prefs, async () => {
     // Only the exportable preferences are replaced: device-local ones such as a future API key
     // are not in any backup and must survive a restore.

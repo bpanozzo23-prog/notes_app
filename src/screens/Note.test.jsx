@@ -5,7 +5,7 @@ import { noteFixture } from "../test/fixtures.js";
 import { stubEditorGeometry } from "../test/editor.js";
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
-const queue = () => ({ schedule: vi.fn(), flush: vi.fn().mockResolvedValue(undefined) });
+const queue = () => ({ schedule: vi.fn(), flush: vi.fn().mockResolvedValue(undefined), onBeforeFlush: vi.fn(() => () => {}) });
 
 it("lists only live backlinks in pinned/recent order, includes folders, and opens outside the editor surface", () => {
   const target = noteFixture();
@@ -56,4 +56,23 @@ it("uses one bubble for cursor links and selections; opens notes and removes the
   expect(within(selection).getByRole("button", { name: "Link to note" })).toBeTruthy();
   fireEvent.click(within(selection).getByRole("button", { name: "Link to note" }));
   expect(screen.getByRole("dialog", { name: "Link to note" })).toBeTruthy();
+});
+
+it("hands the editor's held input to the queue before every flush, so a reload or Back cannot drop it", async () => {
+  const note = noteFixture({ html: "<p>Original</p>" });
+  const real = new (await import("../lib/saveQueue.js")).SaveQueue({ save: vi.fn().mockResolvedValue(undefined) });
+  render(<Note initialNote={note} notes={[note]} folders={[]} queue={real} onOpenNote={vi.fn()} />);
+  const editor = screen.getByLabelText("Note body").editor;
+  const observer = editor.view.domObserver;
+  const force = vi.spyOn(observer, "forceFlush");
+  const flush = vi.spyOn(observer, "flush");
+  await act(() => real.flush());
+  expect(force).toHaveBeenCalledTimes(1);
+  expect(flush).toHaveBeenCalledTimes(1);
+  // The 20 ms Android deletion path: a change ProseMirror is still holding reaches the save.
+  act(() => { editor.view.dom.querySelector("p").textContent = "Origina"; });
+  observer.flushSoon();
+  await act(() => real.flush());
+  expect(real.save).toHaveBeenLastCalledWith(note.id, { html: "<p>Origina</p>" });
+  expect(observer.flushingSoon).toBe(-1);
 });

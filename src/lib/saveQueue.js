@@ -11,7 +11,15 @@ export class SaveQueue {
     };
     this.entries = new Map();
     this.listeners = new Set();
+    this.beforeFlushHooks = new Set();
     this.flushing = null;
+  }
+
+  /** Run fn at the start of every flush, before any save starts. The editor uses this to hand
+   * over input it is still holding (Android deletions wait 20 ms inside ProseMirror). */
+  onBeforeFlush(fn) {
+    this.beforeFlushHooks.add(fn);
+    return () => this.beforeFlushHooks.delete(fn);
   }
 
   get status() {
@@ -100,6 +108,7 @@ export class SaveQueue {
   flush() {
     if (this.flushing) return this.flushing;
     this.flushing = Promise.resolve().then(async () => {
+      for (const hook of this.beforeFlushHooks) hook();
       while (this.entries.size) {
         await Promise.all([...this.entries.values()].map((entry) => this.start(entry)));
         // Reject so navigation/export/import cannot claim success with unsaved data.

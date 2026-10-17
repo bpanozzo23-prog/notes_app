@@ -29,8 +29,20 @@ it("exports, validates and imports identical rows including trash, tombstones an
   await importBackup(checked.envelope);
   const after = await buildBackup();
   for (const key of ["notes", "folders", "tombstones", "preferences"]) expect(after[key]).toEqual(before[key]);
-  // Device-local preferences are not in the file and must survive a restore (a Phase 3 API key).
-  expect(await allPrefs()).toEqual({ ...before.preferences, futureApiKey: "fixture-only-secret" });
+  // Device-local preferences are not in the file and must survive a restore (a Phase 3 API key,
+  // this device's storagePersisted answer).
+  expect(await allPrefs()).toEqual({ ...before.preferences, futureApiKey: "fixture-only-secret", storagePersisted: true });
+});
+it("ignores storagePersisted from older backups with a warning instead of restoring it", async () => {
+  const checked = validateBackup(backupFixture({ preferences: { storagePersisted: true } }));
+  expect(checked.ok).toBe(true);
+  expect(checked.warnings.join(" ")).toContain("storagePersisted");
+  await importBackup(checked.envelope);
+  expect(await allPrefs()).toEqual({});
+});
+it.each(["a\nb", "x".repeat(513), " ", "bad\u007fid"])("rejects ids the app could not open later: %j", (id) => {
+  expect(validateBackup(backupFixture({ notes: [noteFixture({ id })] })).ok).toBe(false);
+  expect(validateBackup(backupFixture({ folders: [{ id, name: "F", position: 0 }] })).ok).toBe(false);
 });
 it("recomputes derived fields from HTML, warns on dangling links, and does not mutate input", async () => {
   const raw = backupFixture({ notes: [noteFixture({ text: "Wrong", linkedIds: ["stale"], html: '<h1>Real</h1><p><a href="note:missing">Target</a></p>' })] });
@@ -105,7 +117,7 @@ describe("validation failures", () => {
     expect(validateBackup(backupFixture({ tombstones: [{ id: noteFixture().id, purgedAt: AT }] })).ok).toBe(false);
     expect(validateBackup(backupFixture({ notes: [noteFixture({ folderId: "missing" })] })).errors.join(" ")).toContain("dangling folderId");
   });
-  it.each([{ secret: "x" }, { lastBackupAt: false }, { storagePersisted: "yes" }, { toolbar: "bold" }, { toolbar: [2] }])("rejects unknown or malformed preferences %j", (preferences) => {
+  it.each([{ secret: "x" }, { lastBackupAt: false }, { toolbar: "bold" }, { toolbar: [2] }])("rejects unknown or malformed preferences %j", (preferences) => {
     expect(validateBackup(backupFixture({ preferences })).ok).toBe(false);
   });
   it("rejects prototype-like preference names too", () => {

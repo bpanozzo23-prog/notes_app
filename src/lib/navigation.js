@@ -1,8 +1,8 @@
-import { newId } from "./ids.js";
+import { newId, SAFE_STRING } from "./ids.js";
 
 export const NAVIGATION_KEY = "notesNavigation";
 const SCREENS = ["list", "note", "folders", "trash", "settings"];
-const safeString = (value) => typeof value === "string" && /^[^\u0000-\u001f\u007f]{1,512}$/.test(value);
+const safeString = (value) => typeof value === "string" && SAFE_STRING.test(value);
 const safeScroll = (value) => Number.isFinite(value) && value >= 0 ? value : 0;
 export const activeEntry = (navigation) => navigation.stack.at(-1);
 export const initialNavigation = () => ({ version: 1, stack: [{ screen: "list", key: "root", filter: { type: "all" }, scrollY: 0 }] });

@@ -250,3 +250,18 @@ words, works together with folder/tag filters, and is remembered on Back. Trash 
 **Why:** Notes can connect without copying their contents, and finding them should be forgiving
 about Spanish accents. Existing save protection also applies when following a link.
 **Lock-in: low.** Links are ordinary HTML with a note id; search scans the notebook in memory.
+
+### 19. Phase 1 closeout: what the review changed
+
+**Chosen:** Before Phase 1 was called done, Codex read the whole diff against the plan. Its one
+serious finding was fixed: on Android, the editor sometimes holds a deletion for a fraction of a
+second, and an app update reloading in exactly that moment would have saved the text from before
+the deletion. Every save now asks the editor to hand over anything it is still holding. Two
+backup details also changed: the "keep my storage" answer is no longer copied between devices
+through backups, and a backup cannot contain ids the app would refuse to open. One finding was
+kept as it was and written down: deleting a folder does not move the notes that were in it to
+the top of the list, because you did not edit those notes.
+**Why:** A second reader finds what the author no longer sees. The review cost nothing but
+Codex usage.
+**Lock-in: none.**
+

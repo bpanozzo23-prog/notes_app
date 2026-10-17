@@ -1,10 +1,10 @@
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { EditorContent, useEditor } from "@tiptap/react";
 import { extensions } from "./extensions.js";
 import Toolbar from "./Toolbar.jsx";
 import SelectionMenu from "./SelectionMenu.jsx";
 
-function NoteDocument({ note, onChange, toolbarIds, ui }) {
+function NoteDocument({ note, onChange, toolbarIds, ui, onEditor }) {
   const initialHtml = useRef(note.html);
   const editor = useEditor({
     extensions,
@@ -23,6 +23,7 @@ function NoteDocument({ note, onChange, toolbarIds, ui }) {
     },
     onUpdate: ({ editor }) => onChange(editor.getHTML()),
   });
+  useEffect(() => { onEditor?.(editor); return () => onEditor?.(null); }, [editor, onEditor]);
   if (!editor) return null;
   return <>
     <div className="flex flex-1 flex-col" data-editor-surface onClick={(event) => {

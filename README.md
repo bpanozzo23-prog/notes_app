@@ -22,8 +22,15 @@ LLM can read. The code may become public; the notes never are.
   `https://bpanozzo23-prog.github.io/notes_app/` (GitHub Pages, deployed by the workflow on every
   push to `main`). The owner checked install, Back, saving under app switches, Trash, export/import
   and airplane-mode reopen. The update prompt gets its first real test with the 1c deployment.
-- **Phase 1c — built, awaiting review and deployment.** Link picker and note navigation,
-  "Linked from", and accent-insensitive search combined with filters and remembered on Back.
+- **Phase 1c — deployed 2026-10-17.** Link picker and note navigation, "Linked from", and
+  accent-insensitive search combined with filters and remembered on Back. Owner phone check of
+  the Android edge cases (accents, undo after autocorrect, selection pop-up after a picker,
+  nested lists, long-note scrolling, rotation) still pending.
+- **Phase 1d — closeout, 2026-10-17.** Codex reviewed the whole Phase 1 diff; fixes landed for
+  the one data-loss gap it found (editor input still held by ProseMirror when an update reloads)
+  and two backup issues. Phase 1 is complete: the app can replace Samsung Notes for text notes.
+  Next is Phase 2 (formatting layer: toolbar customisation, named styles, colour order, format
+  painter, callouts, images).
 
 ## Running it
 

@@ -1,8 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRegisterSW } from "virtual:pwa-register/react";
-import { getPref, setPref } from "./db/db.js";
 import { createNote, purgeExpired, trashNote, updateNote } from "./db/notes.js";
 import { SaveQueue } from "./lib/saveQueue.js";
+import { requestPersistence } from "./lib/persistence.js";
 import useNotebook from "./lib/useNotebook.js";
 import { activeEntry, createNavigationController, initialNavigation } from "./lib/navigation.js";
 import { DEFAULT_TOOLBAR } from "./editor/actions.js";
@@ -88,12 +88,7 @@ export default function App() {
     await queue.flush();
     const currentFilter = activeEntry(nav.current).filter;
     const created = await createNote({ folderId: currentFilter?.type === "folder" ? currentFilter.value : null });
-    if (await getPref("storagePersisted") === undefined) {
-      let granted = false;
-      try { granted = await navigator.storage?.persist?.() ?? false; }
-      catch { /* The saved note is usable even if persistence is denied. */ }
-      await setPref("storagePersisted", granted);
-    }
+    await requestPersistence();
     await refresh();
     nav.openCreated(created.id);
   }

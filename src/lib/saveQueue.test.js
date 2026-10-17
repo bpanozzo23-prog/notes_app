@@ -155,3 +155,19 @@ it("keeps saving a healthy note's newer edits after another note makes flush rej
   expect(save).toHaveBeenCalledWith("good", { title: "Second" });
   expect(queue.status).toBe("error");
 });
+
+it("runs beforeFlush hooks before any save, and a hook's schedule is saved in the same flush", async () => {
+  const saved = [];
+  const queue = new SaveQueue({ save: async (id, patch) => { saved.push([id, patch]); } });
+  const order = [];
+  const off = queue.onBeforeFlush(() => { order.push("hook"); queue.schedule("n", { html: "<p>late</p>" }); });
+  queue.schedule("n", { title: "T" });
+  await queue.flush();
+  expect(order).toEqual(["hook"]);
+  expect(saved).toEqual([["n", { title: "T", html: "<p>late</p>" }]]);
+  off();
+  queue.schedule("n", { title: "U" });
+  await queue.flush();
+  expect(order).toEqual(["hook"]);
+});
+

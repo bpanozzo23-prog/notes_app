@@ -19,7 +19,9 @@ export default function TagInput({ tags, allTags, onChange }) {
           <X size={14} aria-hidden="true" />
         </button>
       </span>)}
-      <input aria-label="Add tag" placeholder="Add tag" className="min-h-11 w-28 rounded border border-[var(--color-line)] bg-transparent px-2"
+      {/* The field and its Add button wrap together, so Add never lands alone on a new line. */}
+      <span className="flex min-w-40 flex-1 items-center gap-1">
+      <input aria-label="Add tag" placeholder="Add tag" className="min-h-11 min-w-0 flex-1 rounded border border-[var(--color-line)] bg-transparent px-2"
         value={draft} onChange={(event) => {
           const value = event.target.value;
           // Some phone keyboards insert a comma without a keydown event.
@@ -28,7 +30,8 @@ export default function TagInput({ tags, allTags, onChange }) {
           if (event.nativeEvent.isComposing) return;
           if (event.key === "Enter" || event.key === ",") { event.preventDefault(); add(draft); }
         }} />
-      <button className="min-h-11 px-2 text-[var(--color-accent)]" disabled={!draft.trim()} onClick={() => add(draft)}>Add</button>
+      <button className="min-h-11 shrink-0 px-2 text-[var(--color-accent)]" disabled={!draft.trim()} onClick={() => add(draft)}>Add</button>
+      </span>
     </div>
     {!!suggestions.length && <div className="mt-1">
       <button className="min-h-11 text-xs text-[var(--color-muted)]" aria-expanded={!!draft.trim() || showSuggestions}

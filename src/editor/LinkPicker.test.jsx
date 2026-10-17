@@ -9,7 +9,7 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 const source = noteFixture({ title: "Source", html: "<p>Before chosen after</p>", text: "Before chosen after" });
 
 function setup(notes) {
-  const queue = { schedule: vi.fn(), flush: vi.fn().mockResolvedValue(undefined) };
+  const queue = { schedule: vi.fn(), flush: vi.fn().mockResolvedValue(undefined), onBeforeFlush: vi.fn(() => () => {}) };
   const view = render(<Note initialNote={source} notes={[source, ...notes]} folders={[{ id: "reading", name: "Reading" }]}
     queue={queue} status="idle" />);
   const editor = screen.getByLabelText("Note body").editor;

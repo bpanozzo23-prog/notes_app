@@ -219,3 +219,31 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   deployment was performed. — Automated checks exercise the real editor and save queue, with
   browser geometry substituted in jsdom. The agent has not seen the phone: picker focus, bubble
   placement, keyboard composition, long-note scrolling and Android Back still need owner review.
+
+## Phase 1d closeout
+
+- 2026-10-17 — Codex reviewed `git diff phase-1-base...HEAD` (read-only `codex exec`, xhigh)
+  against the plan. It found one P1 and three smaller issues; all are addressed below. —
+  Independent review before declaring Phase 1 done, as the plan required.
+- 2026-10-17 — The save queue runs "before flush" hooks, and the Note screen registers one that
+  forces ProseMirror's DOM observer to hand over input it is still holding
+  (`forceFlush()` then `flush()`). — Codex reproduced a lost deletion: on Android, ProseMirror
+  delays some deletions by 20 ms inside its observer, and an update reload (or any flush) inside
+  that window saved the old text. Every flush now drains the editor first; a test drives the
+  delayed path.
+- 2026-10-17 — `storagePersisted` is no longer exported; backups that contain it are accepted
+  with a warning and the value is dropped on import. Import requests persistence afterwards,
+  through the same helper as the first note. — The flag is this device's answer, not the
+  notebook's: restoring it suppressed the persistence request on a fresh browser.
+- 2026-10-17 — Backup validation uses the same id rule as navigation (`SAFE_STRING` in
+  `src/lib/ids.js`: nonblank, no control characters, at most 512 characters) for note, folder and
+  tombstone ids, folder names and tags. — A backup could previously import notes that history
+  state then refused to open.
+- 2026-10-17 — Deleting a folder bumps affected notes' `rev` but not `updatedAt`; the test
+  asserts this on purpose. — Codex flagged it as a plan deviation ("folder edits bump
+  `updatedAt`"). Decision: that rule is for the owner changing one note's folder; a folder
+  deletion is housekeeping that should not push every affected note to the top of the list.
+  `rev` still records the write for sync.
+- 2026-10-17 — Tag field and its Add button wrap as one unit; folder rows put name and actions
+  on one line. — Found in the headless phone-size screenshots (`npm run shots`).
+
