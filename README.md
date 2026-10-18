@@ -75,8 +75,8 @@ LLM can read. The code may become public; the notes never are.
   heading panel inside callouts and lists, line spacing on an empty line, a Reset for Named
   styles). **Phase 2 is complete** apart from one owner measurement: export/import of the
   generated 100- and 300-image backups on the phone's dev address, which sets the
-  "backup is getting large" warning (provisionally 150 MB). Next is Phase 3 (Claude: questions
-  across the notebook, tidy with approval).
+  "backup is getting large" warning (provisionally 150 MB). Owner-verified on the phone
+  2026-10-18. Next is Phase 3 (Claude: questions across the notebook, tidy with approval).
 
 ## Running it
 
