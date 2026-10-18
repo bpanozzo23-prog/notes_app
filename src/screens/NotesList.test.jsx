@@ -72,3 +72,10 @@ it("shows first-line and untitled fallbacks, and opens the selected note", () =>
   expect(open).toHaveBeenCalledWith({ screen: "note", noteId: noteFixture().id });
   expect(screen.getByRole("button", { name: "Untitled note" })).toBeTruthy();
 });
+
+it("shows each note's last edit date beside its folder", () => {
+  const edited = new Date(2025, 2, 9, 10, 0).toISOString();
+  render(<NotesList notes={[noteFixture({ id: "dated", title: "Dated", updatedAt: edited, folderId: "f" })]} folders={[{ id: "f", name: "Reading" }]}
+    filter={{ type: "all" }} onFilter={() => {}} onOpen={() => {}} onNew={() => {}} trashCount={0} />);
+  expect(within(screen.getByRole("button", { name: "Dated" })).getByText("Reading · 9 Mar 2025")).toBeTruthy();
+});

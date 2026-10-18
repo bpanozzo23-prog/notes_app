@@ -90,8 +90,11 @@ LLM can read. The code may become public; the notes never are.
 - **Phase 3b — committed 2026-10-18 (0.3.1).** Ask Claude across the notebook (notes list) or
   about one note (note screen, pictures optional): a disclosure of what goes and the estimated
   cost before sending, streamed answers with numbered, tappable sources, follow-ups using the
-  cached notes, Cancel and Try again, the cost per answer and a monthly total. Owner phone check
-  pending.
+  cached notes, Cancel and Try again, the cost per answer and a monthly total. Owner-verified on
+  the phone 2026-10-18.
+- **Note dates — committed 2026-10-18 (0.3.2, owner's request).** Each note ends with "Created …
+  · Edited …"; the notes list shows each note's last edit beside its folder. The remaining Phase 3
+  steps are each one version later than the direction file lists (3c is 0.3.3).
 
 ## Running it
 

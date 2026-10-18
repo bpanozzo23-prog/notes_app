@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Sparkles, Folder, Settings, Search, Plus, Pin, Trash2, X } from "lucide-react";
 import { claudeSession } from "../claude/session.js";
 import { noteTitle, searchNotes, tagsInUse, visibleNotes } from "../lib/notebookView.js";
+import { shortDate } from "../lib/dates.js";
 
 export default function NotesList({ notes, folders, trashCount, filter, query = "", onQuery, onFilter, onOpen, onNew, busy, readOnly, claudeReady }) {
   // History stores trimmed queries; keep a trailing space while typing the next word.
@@ -40,7 +41,7 @@ export default function NotesList({ notes, folders, trashCount, filter, query = 
           <span className="flex items-center gap-2"><span className="min-w-0 flex-1 truncate font-medium">{noteTitle(note)}</span>{note.pinned && <Pin size={16} aria-label="Pinned" className="shrink-0 text-[var(--color-accent)]" />}</span>
           <span className="mt-1 block truncate text-sm text-[var(--color-muted)]">{note.text.replace(/\s+/g, " ") || "Empty note"}</span>
           <span className="mt-2 flex flex-wrap items-center gap-1 text-xs text-[var(--color-muted)]">
-            <span className="mr-1 max-w-full truncate">{folders.find((folder) => folder.id === note.folderId)?.name ?? "No folder"}</span>
+            <span className="mr-1 max-w-full truncate">{folders.find((folder) => folder.id === note.folderId)?.name ?? "No folder"}{shortDate(note.updatedAt) && ` · ${shortDate(note.updatedAt)}`}</span>
             {note.tags.map((tag) => <span key={tag} className="tag-chip max-w-full break-all px-2 py-0.5">#{tag}</span>)}
           </span>
         </button>

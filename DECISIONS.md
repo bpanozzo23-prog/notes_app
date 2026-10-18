@@ -584,3 +584,24 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   again and keeps the key, a backup round trip keeps Claude on (airplane mode was optional). This was
   the project's first real request to Anthropic: the browser call with the direct-access header
   works from GitHub Pages. "Checks passed."
+- 2026-10-18 — The owner verified 3b on the published app with their own key, through the
+  checklist (first question and its disclosure, sources and Back, the console's cost against the
+  app's, a cheaper follow-up, the edited-source label, Cancel, airplane mode, switching apps, a
+  one-note question with a picture): "the phone check passes".
+
+## Note dates (0.3.2, the owner's request, 2026-10-18)
+
+- 2026-10-18 — Show the dates the app already stores: the end of every note says "Created 3 Oct
+  2026 · Edited today, 14:02" (only "Created …" for a note never edited), and each notes-list row
+  adds the last edit beside the folder ("Español · 16 Oct": a time today, day and month this
+  year, the year before that). "Edited" is `updatedAt`, which moves only on content changes. —
+  The owner asked where creation and edit dates would show. The note's end keeps the top of the
+  screen free under the keyboard; the list is already ordered by last edit, so its date explains
+  the order. No stored data changes.
+- 2026-10-18 — The note screen moves its displayed edit time on each content edit at once
+  (display only; the save still writes the stored `updatedAt`); dates use en-GB on every device.
+  — Otherwise the line would show the time before the edit until the note was reopened. The
+  app's wording is English.
+- 2026-10-18 — This ships as 0.3.2, before 3c, so the remaining Phase 3 steps are each one
+  version later than `docs/PHASE-3-DIRECTION.md` lists: 3c 0.3.3, 3d 0.3.4, 3e 0.3.5, 3f 0.3.6,
+  3g 0.3.7. — The owner wanted it before the tidy steps; the direction file is left as approved.

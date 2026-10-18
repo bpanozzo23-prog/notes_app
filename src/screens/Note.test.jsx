@@ -76,3 +76,11 @@ it("hands the editor's held input to the queue before every flush, so a reload o
   expect(real.save).toHaveBeenLastCalledWith(note.id, { html: "<p>Origina</p>" });
   expect(observer.flushingSoon).toBe(-1);
 });
+
+it("ends with the creation and last edit dates, and an edit updates them at once", () => {
+  const createdAt = new Date(2025, 0, 5, 9, 0).toISOString(), updatedAt = new Date(2025, 1, 6, 9, 0).toISOString();
+  render(<Note initialNote={noteFixture({ createdAt, updatedAt })} notes={[]} folders={[]} queue={queue()} />);
+  expect(screen.getByText("Created 5 Jan 2025 · Edited 6 Feb 2025")).toBeTruthy();
+  fireEvent.change(screen.getByRole("textbox", { name: "Title" }), { target: { value: "A new title" } });
+  expect(screen.getByText(/^Created 5 Jan 2025 · Edited today, \d\d:\d\d$/)).toBeTruthy();
+});

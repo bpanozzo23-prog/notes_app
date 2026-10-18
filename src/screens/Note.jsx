@@ -9,6 +9,10 @@ import Dialog from "../components/Dialog.jsx";
 import { claudeSession } from "../claude/session.js";
 import Confirm from "../components/Confirm.jsx";
 import { noteTitle, tagsInUse, visibleNotes } from "../lib/notebookView.js";
+import { noteDates, nowIso } from "../lib/dates.js";
+
+// The fields whose change counts as an edit, as in src/db/notes.js.
+const CONTENT_FIELDS = ["title", "html", "folderId", "tags"];
 
 export default function Note({ initialNote, notes, folders, toolbarIds, formatting, readOnly = false, queue, status, busy, onBack, onDelete, onOpenNote, error, run, refresh, onImageError, claudeReady, onOpen }) {
   const [note, setNote] = useState(initialNote);
@@ -42,7 +46,9 @@ export default function Note({ initialNote, notes, folders, toolbarIds, formatti
   function edit(patch) {
     if (readOnly) return;
     queue.schedule(note.id, patch);
-    setNote((current) => ({ ...current, ...patch }));
+    // Show the edit time at once; the save writes the stored updatedAt moments later.
+    setNote((current) => ({ ...current, ...patch,
+      ...(CONTENT_FIELDS.some((key) => Object.hasOwn(patch, key) && JSON.stringify(patch[key]) !== JSON.stringify(current[key])) ? { updatedAt: nowIso() } : {}) }));
   }
   return <section className="flex flex-1 flex-col pb-24" onBlur={() => { queue.flush().catch(() => {}); }}>
     <ScreenHeader title="Note" onBack={onBack} busy={busy}>
@@ -74,6 +80,7 @@ export default function Note({ initialNote, notes, folders, toolbarIds, formatti
     </section>}
     {claudeSheet && <Dialog title="Claude" sheet onClose={() => setClaudeSheet(false)}><button className="app-button w-full" onClick={() => askNote()}>Ask about this note</button></Dialog>}
     {confirmAsk && <Confirm title="Clear the current conversation and ask about this note?" confirmLabel="Clear and ask" onCancel={() => setConfirmAsk(false)} onConfirm={() => askNote(true)}>The current answers will be cleared.</Confirm>}
+    <p className="mx-4 mt-6 text-xs text-[var(--color-muted)]">{noteDates(note)}</p>
     {linkEditor && <LinkPicker editor={linkEditor} noteId={note.id} notes={notes} folders={folders} onClose={() => setLinkEditor(null)} />}
     {confirmDelete && <Confirm title="Move note to Trash?" confirmLabel="Move to Trash" busy={busy} error={error} onCancel={() => setConfirmDelete(false)} onConfirm={() => onDelete(note.id)}>
       You can restore this note for 30 days. After that, it is permanently deleted.

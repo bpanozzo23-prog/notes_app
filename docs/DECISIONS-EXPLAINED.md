@@ -5,7 +5,7 @@ this one is for the owner: what was chosen, why, what it means for the app, what
 and how hard it would be to reverse ("lock-in"). Ordered by lock-in, hardest first. Updated whenever
 `DECISIONS.md` gains an entry with consequences for how the app behaves.
 
-Last updated 2026-10-18, at step 3b (§52).
+Last updated 2026-10-18, with note dates (§53).
 
 ---
 
@@ -822,3 +822,17 @@ stay until you tap New question or close the app.
 with the Anthropic console's usage page. The sample notebook gained five made-up notes (spelling
 mistakes, near-duplicates, unlinked mentions, an untagged note) for the tidy steps.
 **Lock-in: none** beyond §39–43.
+
+### 53. Creation and edit dates (your request)
+
+**Chosen:** every note ends with a small grey line, "Created 3 Oct 2026 · Edited today, 14:02"
+(a note you never changed shows only when it was created). In the notes list, each note's grey
+line now includes when it was last edited: "Español · 16 Oct" (a time for today, day and month
+for this year, the year too for older notes).
+**Why:** the app has recorded both dates since Phase 1 but never showed them. The end of the
+note keeps the top free for typing; in the list, the date explains the order, which is already
+most recently edited first.
+**What "edited" means:** changing the note's text, title, folder or tags. Pinning, and
+housekeeping such as a deleted folder, don't change it. From step 3c, applying a change Claude
+proposed counts as an edit.
+**Lock-in: none.** Nothing new is stored.
