@@ -71,6 +71,11 @@ backup); local-first in IndexedDB, works offline.
   without approval.
 - Same policy as mi-cuaderno Phase 6: the owner's own Anthropic key, stored on-device, never
   exported, behind an acknowledged spend cap; off by default.
+- Owner's choices (2026-10-18, `docs/PHASE-3-DIRECTION.md`): answers name their sources through
+  citations and are kept until the app closes, with follow-up questions; every live note is sent
+  with a whole-notebook question, Trash never; tidy covers one note's wording and formatting,
+  titles, tags and folders across the notebook, links between notes, and merging or splitting
+  notes, built in that order.
 
 **Tier 4 — later and optional.**
 - Sync to the XPS over Tailscale so Claude Code can work on the notes as files, and so the XPS is
@@ -89,7 +94,8 @@ owner's own XPS; feature parity with Samsung Notes for its own sake.
 
 Notes are personal data. They live in the browser's IndexedDB and in backups the owner keeps; the
 repo never contains a note, a backup, or a key. If the repo becomes public, that rule is what makes
-it safe.
+it safe. Notes leave the device only when the owner sends a Claude request, and then only to
+Anthropic (2026-10-18).
 
 ## 8. Phases
 
@@ -114,5 +120,7 @@ it safe.
   Claude was shown. Images break the assumption that the whole notebook fits one request. Numbers (2026-10-17): a
   shrunk screenshot is about 4,000 input tokens, the text of 40 notes about 25,000; recommendation:
   whole-notebook questions send text with `[image]` markers, images only for one note on request
-  (`docs/PHASE-2-DIRECTION.md`).
+  (`docs/PHASE-2-DIRECTION.md`). Current image formula (2026-10-18, Anthropic's docs):
+  ⌈width/28⌉ × ⌈height/28⌉ tokens, at most 4,784 per image; above 20 images in one request every
+  image must be within 2,000 px. The 2026-10-17 numbers hold.
 - **Phase 4:** `tombstones` and `rev` are what sync uses for deletion tracking and conflicts.

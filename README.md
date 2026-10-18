@@ -77,6 +77,12 @@ LLM can read. The code may become public; the notes never are.
   generated 100- and 300-image backups on the phone's dev address, which sets the
   "backup is getting large" warning (provisionally 150 MB). Owner-verified on the phone
   2026-10-18. Next is Phase 3 (Claude: questions across the notebook, tidy with approval).
+- **Phase 3 — planned and approved, 2026-10-18.** Contract: `docs/PHASE-3-DIRECTION.md`
+  (Codex-reviewed); plain-language lock-in review in `docs/DECISIONS-EXPLAINED.md` §38–50. Claude
+  Opus 5.5 with the owner's own key on this device, off by default. Seven steps: 3a settings and
+  the request layer, 3b questions across the notebook with cited sources, 3c clean up one note,
+  3d titles/tags/folders, 3e links between notes, 3f merge and split, 3g closeout. No schema
+  change. 3a next.
 
 ## Running it
 

@@ -483,3 +483,66 @@ Append-only. One dated line per decision: what was decided, then why, after the 
 - 2026-10-18 — Line spacing captures stored typing marks before changing blocks and restores them with only inline spacing removed. — Review finding 5: changing spacing, including Default, must retain bold, colour and size prepared for typing.
 - 2026-10-18 — Named styles gains a confirmed Reset that deletes its preference and removes nondefault style references from toolbar and selection pop-up in one guarded transaction. — Review's Named styles Reset finding (7 in the report, task item 6): restore defaults without leaving dangling buttons or partially saved preferences.
 - 2026-10-18 — The owner verified 0.2.5 on the published app (version shown, the heading panel inside a callout, deleting a style from its edit screen): "The phone checklist checks out."
+
+## Phase 3 (planned, Codex-reviewed and approved 2026-10-18)
+
+- 2026-10-18 — Owner answers before planning: tidy covers all four kinds (one note; titles, tags
+  and folders; links; merge or split), built in that order; answers are kept in memory until the
+  app closes; every live note is sent with a whole-notebook question (no private folders), Trash
+  never. — The choices the repo could not answer; contract in `docs/PHASE-3-DIRECTION.md`.
+- 2026-10-18 — Model `claude-opus-5-5` (Opus 5.5, $4/$20 per million tokens), effort `medium` for
+  questions and `high` for proposals, streaming, no `thinking`/`temperature`/`top_p`. — Current
+  Opus, cheaper than mi-cuaderno's `claude-opus-5`, and noted by Anthropic as better at citing the
+  right source. About 17¢ for a first question over 40 notes, 5¢ a follow-up. One constant.
+- 2026-10-18 — Questions send one citations-enabled document per live note (a structured plain-
+  text projection, `[image]` markers), cached at the last document; proposals use structured
+  output without citations. — Anthropic rejects citations combined with `output_config.format`;
+  citations make "names the notes it drew from" verifiable rather than a guess at titles.
+- 2026-10-18 — Nothing, not even a token count, is sent before the owner taps Send; the disclosure
+  is built from an immutable payload captured in one read transaction after a protected flush,
+  and exactly that payload is sent. — Anthropic's free counter would itself transmit the notes;
+  Codex showed a later save could otherwise make the sent data differ from the disclosed data.
+- 2026-10-18 — A conversation freezes its snapshot (cache hits, consistent answers); only
+  completed turns are sent back, unchanged; a follow-up is refused if a snapshot note was trashed
+  or deleted, or the generation changed. — Codex: a frozen snapshot otherwise resends notes the
+  owner has since moved to Trash.
+- 2026-10-18 — `@anthropic-ai/sdk` (0.135.0) with `dangerouslyAllowBrowser`, an injected `fetch`,
+  loaded on demand; refusal fallback `fallbacks: "default"`. — Streaming, citations, typed errors
+  and `retry-after` handling; mi-cuaderno's raw `fetch` covered one non-streaming call.
+- 2026-10-18 — The key is a device-local preference entered through an uncontrolled field; React
+  state holds only its presence; errors shown are the app's own sentences; `validateBackup` refuses
+  `claudeApiKey` before version upgrades. — Codex: v2+ sanitising would otherwise discard the
+  evidence, and mi-cuaderno's card kept the typed key in React state.
+- 2026-10-18 — Claude's HTML is parsed through the editor schema, validated against handles the
+  app issued (`I1`, `N12`; raw ids and unknown handles removed, link attributes replaced), then
+  serialised; the block diff and review show that result. — Codex: the schema alone accepts any
+  syntactic id and preserves link `class`/`target`/`rel`.
+- 2026-10-18 — Approval is per top-level block (effects on images and links inside a block share
+  its tick, counted per occurrence), ticked by default; merges and splits are all-or-nothing. —
+  Codex: independent ticks for nested images or links contradict whole-block replacement.
+- 2026-10-18 — One approval is one guarded transaction inside `nav.run`, checking the generation,
+  every recorded `rev` (including notes whose links a merge rewrites) and folder ids and names. —
+  Codex: writing beneath a mounted editor lets its next save overwrite the result.
+- 2026-10-18 — Undo stores complete before-copies of every affected note, keeps their images from
+  cleanup while it exists, moves split-created notes to Trash, restores through tombstone link
+  cleanup, never moves `rev` backwards, and offers copies when a note changed since. Import
+  deletes it. — Codex: changed fields alone cannot restore after an edit or purge, and an
+  unbounded undo would outlive its images' 30-day clock.
+- 2026-10-18 — One request at a time; conversations, proposals and requests carry an identity
+  token and generation, invalidated by New question, Cancel and imports (a local post-commit
+  notification plus the existing broadcast). — Codex: late stream callbacks could otherwise
+  repopulate a cleared session.
+- 2026-10-18 — With a conversation or proposal in memory an update never reloads automatically
+  (including activation from another tab); Reload is disabled during a request and says it clears
+  the conversation. New requests are disabled in read-only, upgrade and replaced states. — Codex:
+  waiting for the request alone still discards the answer on reload.
+- 2026-10-18 — Test key uses the free token-counting endpoint: success means verified, 401/403
+  rejected, anything else inconclusive. — Costs nothing and sends no notes; Codex: a 403 or an
+  outage is not a working key.
+- 2026-10-18 — No schema change: no new tables or note vocabulary; new state is device-local
+  preferences (`claudeEnabled`, `claudeApiKey`, `claudeSpend`, `claudeLastChange`). — The schema
+  version tracks stored data and note vocabulary (Phase 2 rule 1); neither changes.
+- 2026-10-18 — Tests feed chunked `ReadableStream` fixtures through the injected `fetch`; shots
+  block service workers, route Anthropic's address fail-closed before navigation, and wrap `fetch`
+  in an init script to release fixture chunks step by step. — Codex: a fulfilled route body cannot
+  show a mid-stream state or test Cancel.

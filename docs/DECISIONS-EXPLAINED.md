@@ -5,7 +5,7 @@ this one is for the owner: what was chosen, why, what it means for the app, what
 and how hard it would be to reverse ("lock-in"). Ordered by lock-in, hardest first. Updated whenever
 `DECISIONS.md` gains an entry with consequences for how the app behaves.
 
-Last updated 2026-10-18, at the Phase 2 closeout (§37).
+Last updated 2026-10-18, when Phase 3 was planned and approved (§38–50).
 
 ---
 
@@ -180,6 +180,9 @@ app enforces; the cap in the console is the real safety.
 hundred notes). Running Claude Code against the notes on the XPS instead (that is Phase 4, and
 additional).
 **Lock-in: low.**
+**Refined in Phase 3 (2026-10-18):** the app now shows an estimate before sending and the
+reported cost after each answer, with a monthly total for this phone; the console's spend limit
+is still the real cap. See §38–50.
 
 ### 13. Who builds it: Codex implements, Claude directs and reviews
 
@@ -545,3 +548,239 @@ a Reset button like the other formatting screens.
 backup is getting large.
 **Lock-in: none.**
 
+---
+
+## Phase 3: Claude (planned and approved 2026-10-18)
+
+The decisions in `docs/PHASE-3-DIRECTION.md` that could lock the app in, in the order the plan
+raises them. Terms used: an **API key** is the password-like
+code that lets the app use your Anthropic account and bills it; a **token** is the unit Anthropic
+counts and charges (about three-quarters of an English word); a **cache** here is Anthropic
+keeping the start of a request for a few minutes so a repeat costs less; a **citation** is Claude
+pointing at the exact passage it used; **structured output** means Claude must answer in a fixed
+form of fields the app reads; **streaming** means the answer arrives word by word instead of all at
+once; a **diff** is the list of differences between two versions of a text; **`rev`** is the
+counter every note carries that goes up on every save; **prompt injection** is text inside a note
+(say, pasted from a web page) that tries to give Claude instructions.
+
+### 38. Your API key lives in this browser on the phone
+
+**Chosen:** the key you paste in Settings is stored in the app's storage on this phone and sent
+only to Anthropic, in the request's header. It never goes into a backup (a backup that contains
+one is refused), and it is never shown back, logged, or kept anywhere else in the app. You tick "I
+have set a spend limit" each time you turn Claude on.
+**Why:** no server, no account, nothing else to run. mi-cuaderno has lived with the same
+arrangement since August.
+**What it leads to:** anything running inside this web page could read the key. The app runs only
+its own code, but if that were ever compromised, the spend limit in the Anthropic console is what
+caps the damage, so set one. After restoring a backup on a new phone, you paste the key again.
+**Not chosen:** a small relay server on the XPS that holds the key (the key never on the phone,
+but Claude stops working whenever the XPS or Tailscale is down, and the work machine can't reach
+it); typing the key each time (safe, tiresome).
+**Lock-in: low.** Moving to a relay later changes one file.
+
+### 39. Your notes go to Anthropic when you ask, the whole notebook each time
+
+**Chosen:** a whole-notebook question sends every note outside Trash: titles, text, folders, tags
+and dates, with `[image]` where pictures are. A question about one note sends that note, and its
+pictures only if you tick "include images". You see what goes and the estimated cost and tap Send
+first; what is sent is exactly what you were shown. Claude reads; it can't change anything by
+answering.
+**Why:** with 20–40 notes, sending everything is simpler and gives better answers than a search
+that picks a few notes (BRIEF, 2026-10-14). You chose not to have private folders.
+**What it leads to:** each question costs more as the notebook grows: about half a cent more per
+extra 1,000 tokens (roughly one long note) on a first question, almost nothing on a follow-up.
+Your notes are on Anthropic's servers for that request; what Anthropic keeps and for how long is
+set by its API terms, worth a read once. A private-folder setting can be added later without
+changing anything stored.
+**Not chosen:** a search index that sends only matching notes (worth it at thousands of notes,
+not 40); private folders (your choice).
+**Lock-in: low.**
+
+### 40. Claude Opus 5.5 is the model
+
+**Chosen:** Claude Opus 5.5, Anthropic's current Opus model. It thinks before answering (you
+don't see the thinking, but it is billed), at medium depth for questions and high depth for
+tidying.
+**Why:** it is the strongest model at its price and, in Anthropic's own notes, much less likely
+to cite a source that doesn't support what it says, which is exactly the job. mi-cuaderno uses the
+older Opus 5, which costs more ($5/$25 against $4/$20 per million tokens); it is not copied.
+**What it leads to:** about 17¢ for a first question over 40 notes, about 5¢ for a follow-up,
+10–25¢ for a tidy; roughly $15–20 a month at three questions a day. Set your spend limit with that
+in mind.
+**Not chosen** (same notebook, first question / follow-up):
+
+| Model | Price in/out per million | First question | Follow-up | Trade-off |
+|---|---|---|---|---|
+| Opus 5.5 (chosen) | $4 / $20 | ≈ 17¢ | ≈ 5¢ | best answers and citations |
+| Sonnet 5.5 | $2 / $10 | ≈ 8¢ | ≈ 2–3¢ | good, a step weaker at pulling scattered notes together |
+| Haiku 5.5 | $0.10 / $0.50 | ≈ 0.4¢ | ≈ 0.1¢ | very cheap, noticeably weaker reasoning |
+| Fable 5.1 | $10 / $50 | ≈ 41¢ | ≈ 10¢ | most capable; overkill for notes |
+
+**Lock-in: none.** It is one line; the price table already holds the others. Say if you'd rather
+start cheaper.
+
+### 41. Answers cite the passages they used, and you tap through to the note
+
+**Chosen:** each note goes to Claude as a separate "document" with Anthropic's citations switched
+on. Claude's answer comes back with pointers to the exact sentences it used; the app numbers them
+and lists the notes under the answer with the quoted passages. Tap one to open the note; Back
+returns to the answer. A note deleted, trashed or edited since is labelled.
+**Why:** Anthropic checks that the quoted text really is in that note, so the sources are not
+Claude's guess at a title. That is the brief's "names the notes it drew from", made reliable.
+**What it leads to:** answers are plain text (no tables or headings), and questions and tidying
+are two different kinds of request, because Anthropic doesn't allow citations together with the
+fixed-form replies that proposals need.
+**Not chosen:** asking Claude to list note titles at the end of its answer (simpler, but it can
+name a note it didn't really use, or a title that matches two notes).
+**Lock-in: low.**
+
+### 42. A conversation keeps a snapshot of your notes, and lasts until the app closes
+
+**Chosen (your answer):** the first question takes a copy of your notes' text; follow-ups use the
+same copy, so Claude stays consistent and Anthropic's cache makes each follow-up about 5¢ instead
+of about 14¢. The screen says when the copy was taken. If you move one of those notes to Trash,
+the conversation ends rather than sending it again. New question, or closing the app, clears the
+conversation. Nothing is stored or backed up.
+**Why:** edits you make between follow-ups would otherwise change what Claude sees mid-
+conversation and cancel the discount. Keeping answers only in memory means copies of your notes'
+contents don't pile up on the phone.
+**What it leads to:** follow-ups send the notes as they were when you asked, so to include a note
+you just edited (or to stop sending text you just deleted from one), start a new question. An
+answer you want to keep has to be copied out by hand (a "Save answer as a note" button is easy to
+add later). Caching adds about 3¢ to a question that gets no follow-up. An app update waits for
+you to tap Reload while a conversation is open, and says it will clear the conversation.
+**Not chosen:** re-reading the notes for each follow-up (always current, full price every time);
+a stored history (your choice).
+**Lock-in: none.**
+
+### 43. You see an estimate before sending, and the reported cost after
+
+**Chosen:** the confirmation shows "about 17¢", worked out on the phone from the length of what
+is being sent and a typical length for Claude's reply. Each answer then shows what it cost,
+priced from the token counts Anthropic reports for that answer, and Settings → Claude shows a
+running total for the month on this phone.
+**Why:** Anthropic's exact token counter is free, but it works by sending the notes, which would
+break the rule that nothing leaves before you tap Send. The counts reported with each answer are
+Anthropic's own.
+**What it leads to:** the estimate is rounded up, and the real cost depends mostly on how long
+Claude thinks, which varies. If an answer is interrupted before Anthropic reports its counts, the
+app says "cost unknown". The monthly total is only this phone's view; the Anthropic console is
+the real record and the real limit.
+**Not chosen:** an exact count before sending (sends your notes first); no cost display (the app
+couldn't tell you what a question cost).
+**Lock-in: none.**
+
+### 44. Claude proposes a whole new version; the app works out and checks the differences
+
+**Chosen:** to tidy a note, Claude sends back the complete tidied note. The app runs it through
+the editor's own rules (anything the editor doesn't support is unwrapped to plain text or
+dropped), then checks it again on its own: pictures and links are referred to by short labels
+(`I1`, `N12`) that the app handed out, so Claude can't invent a picture or point a link at a note
+that doesn't exist, and anything else is removed. Then it compares the result with your note
+paragraph by paragraph and shows each difference as a numbered change, listing any picture or
+link that change removes or redirects.
+**Why:** what you approve is exactly what gets saved, and the app, not Claude, decides what
+counts as a change: Claude can't slip in an edit the review doesn't show.
+**What it leads to:** the reply repeats the whole note, so a tidy costs about 10–15¢ (most of it
+Claude's writing). Very long notes cost proportionally more.
+**Not chosen:** Claude listing edit instructions ("replace paragraph 3 with…"): shorter replies,
+but numbering mistakes would apply edits in the wrong place, and the review would show Claude's
+description of a change rather than the change itself.
+**Lock-in: low.**
+
+### 45. You approve change by change; every change starts ticked
+
+**Chosen:** the review stacks Before above After for each change, at phone width, with a line
+listing changed words ("tu → tú") or what formatting changed ("now a bulleted list"). Each
+change, and each title, tag or folder suggestion, has its own tick. A change covers one whole
+paragraph, list or callout: if a list gains a fixed word and loses a picture, both are listed on
+that one change and go together. All start ticked; you untick what you don't want; the button
+says how many changes will be applied. You can edit a suggested title before applying. Merges and
+splits are approved as a whole.
+**Why:** "approve all except these two" is the common case, and the count on the button means
+nothing is applied without you seeing how much.
+**What it leads to:** tapping Apply without reading applies everything ticked; the review is the
+safeguard, so it has to be read. Undo covers mistakes (§47).
+**Not chosen:** all unticked (forces a tap per change; tedious for a note with ten accent
+fixes); a tick for every word or picture inside a paragraph (finer control, much fiddlier at
+phone width); side-by-side Before | After (too narrow on a phone).
+**Lock-in: none.**
+
+### 46. A change is applied only if nothing changed since Claude read it, and all at once
+
+**Chosen:** when you tap Apply, the app checks, inside a single save, that every note involved
+still has the `rev` Claude saw (for a merge, also the notes whose links it updates). If any of
+them changed, nothing is saved and you're asked to ask again. Otherwise all the ticked changes
+are saved together: if anything fails partway, none of them are.
+**Why:** this is what `rev` was added for in Phase 1. Without the check, a suggestion based on an
+old version would overwrite what you wrote since.
+**What it leads to:** editing a note while a proposal waits makes that proposal unusable; ask
+again (about 10¢). Pinning a note also counts as a change for this check. If you leave the review
+while Claude works, nothing jumps screens when the proposal arrives; a bar offers Review.
+**Not chosen:** merging Claude's suggestion into your newer text (clever, and a source of
+surprising results).
+**Lock-in: none.**
+
+### 47. Undo for Claude's last change, even after closing the app
+
+**Chosen:** before applying, the app saves a full copy of each note it changes. **Undo Claude's
+last change** puts them back. If you edited one of those notes after Claude's change, Undo doesn't
+overwrite your edit: it offers to restore the earlier versions as new notes marked "(before
+Claude)". Notes a split created go to Trash rather than being deleted. Pictures the copies
+contain are kept for as long as Undo is possible. Only the most recent Claude change can be undone
+this way, and importing a backup clears it.
+**Why:** the editor's own Undo doesn't reach changes made from another screen, and a mistaken
+Apply should be cheap to reverse.
+**What it leads to:** one level of undo. For older changes, a backup or the Trash (merged notes
+stay there 30 days) is the way back. Export a backup before the first tidy.
+**Not chosen:** a full version history for every note (a new table and a schema change, and
+copies of every version kept forever).
+**Lock-in: low.**
+
+### 48. Merging keeps the first note and puts the others in Trash
+
+**Chosen:** a merge writes the combined text into the first note of the group (so links to it
+keep working) and moves the other notes to Trash (you have 30 days to restore them). Notes that
+linked to a trashed one are listed in the review and updated to point at the merged note.
+Splitting creates the new notes and leaves a "Split into:" line of links in the original.
+**Why:** nothing is permanently deleted, and links don't break.
+**What it leads to:** the merged note keeps the first note's creation date and identity; the
+others' history stays in Trash until it empties itself. Updating those links doesn't move the
+linking notes to the top of your list, since you didn't edit them.
+**Not chosen:** creating a fresh note and trashing all sources (every incoming link would need
+rewriting, and the merged note would look brand new).
+**Lock-in: low.** It only decides what one merge does.
+
+### 49. Answers are shown as plain text, and the app never acts on what Claude writes
+
+**Chosen:** answers appear as plain text with line breaks and simple bullet lists. No web links
+you can tap, no pictures, nothing loaded from anywhere. Proposed changes are shown and checked
+before anything is saved, and a new web link Claude adds shows its full address.
+**Why:** a note can contain text pasted from the web that tries to give Claude instructions. If
+the app turned Claude's words into links or pictures, such text could make the app quietly send
+your notes somewhere. Showing plain text closes that door.
+**What it leads to:** a web address in an answer has to be copied by hand. Answers look plainer
+than Claude's usual formatting.
+**Not chosen:** full formatted answers (nicer to read, and a door left open).
+**Lock-in: none.**
+
+### 50. Smaller choices, all easy to change
+
+- **Fallback when Claude declines:** if Opus 5.5's safety checks refuse a question (unlikely for
+  notes), Anthropic quietly retries it on another Claude model in the same request, and the answer
+  says which model answered. Your notes still only go to Anthropic. One switch turns it off; say
+  if you'd rather see "Claude declined" instead.
+- **Anthropic's own code library** (the "SDK") makes the requests, instead of hand-written
+  requests as in mi-cuaderno: it handles answers arriving word by word, retries when Anthropic is
+  busy, and clear error types. It loads when Claude is turned on, not at every app start.
+- **Test key costs nothing:** it uses Anthropic's free token counter with the word "Hi". It says
+  "works", "rejected", or "couldn't check" (for example when offline).
+- **One request at a time:** while Claude answers, Send stays disabled until it finishes or you
+  tap Cancel.
+- **No schema change:** nothing new is stored in notes or backups, so no upgrade and no backup
+  needed before updating (one is still wise before the first tidy).
+- **Follow-ups are capped at ten** per conversation, so a long conversation can't quietly grow
+  expensive.
+- **What Claude may not do:** delete notes or folders, rename folders, or touch your toolbar,
+  colours or styles.
