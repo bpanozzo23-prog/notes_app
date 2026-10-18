@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import ScreenHeader from "../components/ScreenHeader.jsx";
+import Dialog from "../components/Dialog.jsx";
+import { captureReorganisePayload } from "../claude/reorganise.js";
 import Confirm from "../components/Confirm.jsx";
 import Disclosure from "../components/Disclosure.jsx";
 import Sources from "../components/Sources.jsx";
@@ -17,6 +19,7 @@ export default function Ask({ notes, trash, folders, openNote, queue, run, busy,
   const access = useSyncExternalStore(notebookAccess.subscribe, notebookAccess.getSnapshot);
   const conversation = state.conversation;
   const [question, setQuestion] = useState("");
+  const [tidySheet, setTidySheet] = useState(false), [confirmTidy, setConfirmTidy] = useState(false);
   const [prepared, setPrepared] = useState(null), [preparingImages, setPreparingImages] = useState(false);
   const [notice, setNotice] = useState(""), [confirmNew, setConfirmNew] = useState(false);
   const [online, setOnline] = useState(navigator.onLine !== false), [clock, setClock] = useState(Date.now());
@@ -43,6 +46,16 @@ export default function Ask({ notes, trash, folders, openNote, queue, run, busy,
       const payload = await capture();
       if (alive.current) { setPrepared({ payload, question: question.trim(), images: null, now: new Date().toISOString() }); setNotice(""); }
     });
+  }
+  async function reorganise(confirmed = false) {
+    if (disabled) return;
+    if (!confirmed && claudeSession.getSnapshot().proposal) { setTidySheet(false); setConfirmTidy(true); return; }
+    const success = await run(async () => {
+      await queue.flush();
+      const payload = await captureReorganisePayload();
+      if (!claudeSession.prepareProposal(payload)) throw new Error("Wait for Claude's current request to finish.");
+    });
+    if (success) { setTidySheet(false); setConfirmTidy(false); onOpen({ screen: "claude-review" }); }
   }
   async function includeImages(checked) {
     if (!checked) { setPrepared({ ...prepared, images: null }); return; }
@@ -98,8 +111,14 @@ export default function Ask({ notes, trash, folders, openNote, queue, run, busy,
         <textarea id="ask-question" className="w-full resize-y rounded-lg border border-[var(--color-line)] bg-transparent p-3" rows={3} enterKeyHint="send" value={question} disabled={busy} onChange={(event) => setQuestion(event.target.value)} />
         {!state.request && <button className="app-button" disabled={disabled || !question.trim()} onClick={conversation ? followUp : prepare}>{conversation ? `Send · ${aboutMoney(estimate.dollars)}` : "Send"}</button>}
       </div>}
+      <button className="app-button" disabled={disabled} onClick={() => setTidySheet(true)}>Tidy the notebook</button>
       {state.request?.kind === "ask" && <button className="app-button" onClick={() => claudeSession.cancelRequest()}>Cancel</button>}
     </div>
+    {tidySheet && <Dialog title="Tidy the notebook" sheet busy={busy} onClose={() => setTidySheet(false)}>
+      {disabledMessage && <p role="status">{disabledMessage}</p>}
+      <button className="app-button w-full" disabled={disabled} onClick={() => reorganise()}>Titles, tags and folders</button>
+    </Dialog>}
+    {confirmTidy && <Confirm title="Discard Claude's other proposal?" confirmLabel="Discard and continue" busy={disabled} onCancel={() => setConfirmTidy(false)} onConfirm={() => reorganise(true)}>Only one proposal is kept at a time.</Confirm>}
     {prepared && <Disclosure prepared={prepared} busy={preparingImages} disabled={disabled} message={notice || disabledMessage} onImages={includeImages} onCancel={() => setPrepared(null)} onSend={sendFirst} />}
     {confirmNew && <Confirm title="Clear this conversation?" confirmLabel="Clear conversation" onCancel={() => setConfirmNew(false)} onConfirm={() => { claudeSession.clearConversation(); setQuestion(""); setConfirmNew(false); }}>The answers will be cleared from this session.</Confirm>}
   </section>;

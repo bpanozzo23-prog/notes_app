@@ -5,7 +5,7 @@ this one is for the owner: what was chosen, why, what it means for the app, what
 and how hard it would be to reverse ("lock-in"). Ordered by lock-in, hardest first. Updated whenever
 `DECISIONS.md` gains an entry with consequences for how the app behaves.
 
-Last updated 2026-10-18, with measured costs (§56).
+Last updated 2026-10-18, at step 3d (§57).
 
 ---
 
@@ -892,4 +892,22 @@ for the answer; follow-ups cost a fraction of that. The cost shown after each an
 exact; only the before-sending estimate changes.
 **How it's checked from now on:** I can rerun this check with the test key whenever the Claude
 features change (about 10¢ a run, within the $1-per-step allowance).
+**Lock-in: none.**
+
+### 57. Step 3d: titles, tags and folders across the notebook
+
+**Chosen:** the Ask screen has **Tidy the notebook → Titles, tags and folders**. Claude reads
+every note outside Trash (text, title, folder, tags; no pictures) and suggests better titles where
+a note has none or a vague one, tags (reusing yours where they fit) and folders (preferring your
+existing ones; a new folder only when several notes clearly belong together). It never changes a
+note's text and never deletes or renames folders. The review shows one card per note with Claude's
+reason and a tick per suggestion (title, folder, tags), all ticked to start; the title can be
+edited; **Untick this note** and **Untick all** help. Apply saves everything ticked at once, or
+nothing if any of those notes changed since Claude read them.
+**Undo, changed from the plan:** if you edit one of the affected notes afterwards, Undo offers
+**Undo the N unchanged notes**: it puts back the notes you haven't touched since and leaves your
+edited ones as they are, naming them. (The plan's "restore earlier versions as new notes" would
+have copied every note just to undo a few tags.) When Claude changed a note's text (a tidy), Undo
+still works as in §47.
+**Measured:** on the 18-note sample this cost 5.5¢, and Claude's suggestions were sensible.
 **Lock-in: none.**

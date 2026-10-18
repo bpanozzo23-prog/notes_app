@@ -72,7 +72,7 @@ it.each([false, true])("removes a created folder only if unused (used=%s)", asyn
 });
 it.each(["edit", "trash", "purge"])("after %s Undo changes nothing and offers fresh copies", async (kind) => {
   const before = await createNote({ title: "Original", html: '<p>Keep</p>' });
-  const { changeId } = await applyClaudeChanges(planFor([before]));
+  const { changeId } = await applyClaudeChanges(planFor([before], { title: "Tidied", html: "<p>Tidied body</p>" }));
   if (kind === "edit") await updateNote(before.id, { html: "<p>Later writing</p>" });
   else { await trashNote(before.id); if (kind === "purge") await purgeNow(before.id); }
   const later = await db.notes.get(before.id);
@@ -145,11 +145,55 @@ it("refuses unused new folders and names occupied since the proposal", async () 
 });
 it("one edited note makes a multi-note undo conflict without restoring any originals", async () => {
   const a = await createNote({ title: 'A' }), b = await createNote({ title: 'B' });
-  const { changeId } = await applyClaudeChanges(planFor([a, b]));
+  const { changeId } = await applyClaudeChanges(planFor([a, b], { html: "<p>Tidied body</p>" }));
   await updateNote(b.id, { html: '<p>Later</p>' });
   const beforeUndo = await db.notes.toArray();
   expect((await undoClaudeChange(changeId)).notes).toHaveLength(2);
   expect(await db.notes.toArray()).toEqual(beforeUndo);
   const { ids } = await restoreClaudeCopies(changeId); expect(ids).toHaveLength(2);
   expect((await db.notes.bulkGet(ids)).map((note) => note.title)).toEqual(['A (before Claude)', 'B (before Claude)']);
+});
+it.each(['edit', 'trash', 'purge', 'pin'])('metadata Undo after %s restores only unchanged notes, preserves dates, clears the record and never creates copies', async (kind) => {
+  const a = await createNote({ title: 'A', html: '<p>Keep A</p>' }), b = await createNote({ title: 'B', html: '<p>Keep B</p>' });
+  const plan = planFor([a, b], { title: 'Tidied', tags: ['clase'], folderId: { create: 'Together' } }); plan.createFolders = [{ name: 'Together' }];
+  const { changeId } = await applyClaudeChanges(plan), folder = (await db.folders.toArray())[0];
+  if (kind === 'edit') await updateNote(b.id, { title: 'Later B', html: '<p>My later text</p>' });
+  if (kind === 'pin') await updateNote(b.id, { pinned: true });
+  if (kind === 'trash' || kind === 'purge') { await trashNote(b.id); if (kind === 'purge') await purgeNow(b.id); }
+  const later = await db.notes.get(b.id), beforeUndo = await db.notes.toArray();
+  expect(await undoClaudeChange(changeId)).toMatchObject({ conflict: true, metadataOnly: true, unchanged: 1 });
+  expect(await db.notes.toArray()).toEqual(beforeUndo);
+  await expect(restoreClaudeCopies(changeId)).rejects.toThrow('unchanged notes');
+  const result = await undoClaudeChange(changeId, { unchangedOnly: true });
+  expect(result).toMatchObject({ restored: 1, skipped: [{ id: b.id, title: later?.title || 'B' }] });
+  expect(await db.notes.get(a.id)).toEqual({ ...a, rev: a.rev + 2 }); expect(await db.notes.get(b.id)).toEqual(later);
+  expect(await db.notes.count()).toBe(beforeUndo.length); expect(await getPref('claudeLastChange')).toBeUndefined();
+  expect(!!await db.folders.get(folder.id)).toBe(kind !== 'purge');
+});
+it('rechecks partial Undo after its offer, safely clears an all-changed record, and refuses an obsolete change id', async () => {
+  const a = await createNote({ title: 'A' }), b = await createNote({ title: 'B' });
+  const { changeId } = await applyClaudeChanges(planFor([a, b])); await updateNote(b.id, { title: 'Later B' });
+  expect(await undoClaudeChange(changeId)).toMatchObject({ unchanged: 1 });
+  await updateNote(a.id, { title: 'Later A' }); const later = await db.notes.toArray();
+  expect(await undoClaudeChange(changeId, { unchangedOnly: true })).toMatchObject({ restored: 0, skipped: [{ title: 'Later A' }, { title: 'Later B' }] });
+  expect(await db.notes.toArray()).toEqual(later); expect(await getPref('claudeLastChange')).toBeUndefined();
+  const next = await applyClaudeChanges(planFor(later)); await expect(undoClaudeChange(changeId, { unchangedOnly: true })).rejects.toThrow('no longer available');
+  expect((await getPref('claudeLastChange')).changeId).toBe(next.changeId);
+});
+it('rolls back partial Undo and retains its record when a later write fails', async () => {
+  const a = await createNote(), b = await createNote(), c = await createNote();
+  const { changeId } = await applyClaudeChanges(planFor([a, b, c])); await updateNote(c.id, { title: 'Later' });
+  const before = await db.notes.toArray(), undo = await getPref('claudeLastChange');
+  const put = db.notes.put.bind(db.notes); let writes = 0;
+  vi.spyOn(db.notes, 'put').mockImplementation((...args) => ++writes === 3 ? Promise.reject(new Error('Disk full')) : put(...args));
+  await expect(undoClaudeChange(changeId, { unchangedOnly: true })).rejects.toThrow('Disk full');
+  expect(await db.notes.toArray()).toEqual(before); expect(await getPref('claudeLastChange')).toEqual(undo);
+});
+it('a single body change anywhere keeps the copies path for the whole change', async () => {
+  const a = await createNote({ title: 'A' }), b = await createNote({ title: 'B' });
+  const plan = planFor([a, b]); plan.notes[1].patch = { html: '<p>New body</p>' };
+  const { changeId } = await applyClaudeChanges(plan); await updateNote(a.id, { title: 'Later' });
+  const before = await db.notes.toArray();
+  expect(await undoClaudeChange(changeId, { unchangedOnly: true })).toMatchObject({ conflict: true, metadataOnly: false });
+  expect(await db.notes.toArray()).toEqual(before); expect((await restoreClaudeCopies(changeId)).ids).toHaveLength(2);
 });

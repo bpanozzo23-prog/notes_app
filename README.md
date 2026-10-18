@@ -105,6 +105,9 @@ LLM can read. The code may become public; the notes never are.
 - **Measured costs — 0.3.5, 2026-10-18.** The agent's first real-request check (`npm run
   claude-check -- --real`, sample notebook, test key): question 6¢, follow-up 2¢, tidy 2¢.
   Estimates now use the measured token ratios; quoted sources drop internal markers. 3d is 0.3.6.
+- **Phase 3d — committed 2026-10-18 (0.3.6).** Tidy the notebook → Titles, tags and folders: per-note
+  cards with a tick per suggestion, all-or-nothing Apply, and Undo that skips notes edited since
+  for metadata-only changes. Real-request run on the sample: 5.5¢. Owner phone check pending.
 
 ## Running it
 

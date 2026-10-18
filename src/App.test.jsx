@@ -255,10 +255,13 @@ it("creates, renames and reorders folders; confirming deletion moves both live a
   fireEvent.click(screen.getByRole("button", { name: "Move Second up" }));
   await waitFor(async () => expect((await db.folders.orderBy("position").first()).name).toBe("Second"));
   await waitFor(() => expect(screen.getByRole("button", { name: "Move Second up" }).disabled).toBe(true));
+  // Buttons are disabled while the reorder saves (also true of "Move up" at the top): wait until
+  // the screen is idle again, or a slow run under load ignores the tap.
+  await waitFor(() => expect(screen.getByRole("button", { name: "Rename Old folder" }).disabled).toBe(false));
   fireEvent.click(screen.getByRole("button", { name: "Rename Old folder" }));
   fireEvent.change(screen.getByLabelText("Folder name"), { target: { value: "Renamed" } });
   fireEvent.click(screen.getByRole("button", { name: "Save name" }));
-  await screen.findByRole("button", { name: "Delete Renamed" });
+  await waitFor(() => expect(screen.getByRole("button", { name: "Delete Renamed" }).disabled).toBe(false));
   fireEvent.click(screen.getByRole("button", { name: "Delete Renamed" }));
   expect(screen.getByRole("dialog").textContent).toContain("2 notes (including any in Trash) will move to no folder");
   fireEvent.click(screen.getByRole("button", { name: "Delete folder", exact: true }));

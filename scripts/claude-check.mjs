@@ -120,12 +120,42 @@ if (outcome === "proposal") {
   ]);
   applied = { button: applied, afterText };
 }
+// Notebook metadata proposal; record failures/no-ops as well as an approved review.
+await button("Back").click(); // review → note
+await button("Back").click(); // note → list
+await button("Ask Claude").click(); await button("Tidy the notebook").click();
+await button("Titles, tags and folders").click();
+const discardOther = page.getByRole("dialog", { name: "Discard Claude's other proposal?" });
+if (await discardOther.isVisible()) await button("Discard and continue").click();
+await disclosure.waitFor();
+const reorganiseDisclosure = await disclosure.textContent(); await shot("reorganise-disclosure");
+await disclosure.getByRole("button", { name: "Send", exact: true }).click();
+const reorganiseOutcome = await Promise.race([
+  page.getByRole("button", { name: /^Apply \d+ changes?$/ }).waitFor().then(() => "proposal"),
+  page.getByRole("alert").first().waitFor().then(async () => `failed: ${await page.getByRole("alert").first().textContent()}`),
+  page.getByText("Claude suggests no changes.").waitFor().then(() => "no changes"),
+]);
+await shot("reorganise-review", true);
+const reorganiseRows = await page.getByRole("checkbox").count();
+let reorganiseApplied = null, reorganiseUndone = null;
+if (reorganiseOutcome === "proposal") {
+  reorganiseApplied = await page.getByRole("button", { name: /^Apply \d+ changes?$/ }).textContent();
+  await page.getByRole("button", { name: /^Apply \d+ changes?$/ }).click();
+  await page.getByText(/^Applied \d+ changes?\.$/).waitFor(); await shot("reorganise-applied", true);
+  await button("Undo").click();
+  reorganiseUndone = await Promise.race([
+    page.getByText("Earlier version restored.", { exact: true }).waitFor().then(() => "clean"),
+    page.getByText(/^A note changed after Claude's edit/).waitFor().then(() => "conflict"),
+  ]);
+  await shot("reorganise-undo", true);
+}
 await browser.close();
 
 const messages = calls.filter((call) => call.path === "/v1/messages");
 const summary = {
   disclosed: disclosed?.replace(/\s+/g, " ").trim(), sources, followEstimate, shownCosts,
   tidyDisclosure: tidyDisclosure?.replace(/\s+/g, " ").trim(), tidyOutcome: outcome, applied, undone,
+  reorganise: { disclosure: reorganiseDisclosure?.replace(/\s+/g, " ").trim(), outcome: reorganiseOutcome, rows: reorganiseRows, applied: reorganiseApplied, undone: reorganiseUndone },
   calls, totalDollars: messages.reduce((sum, call) => sum + (call.dollars ?? 0), 0),
   followUpReadCache: (messages[1]?.usage?.cache_read_input_tokens ?? 0) > 0,
 };

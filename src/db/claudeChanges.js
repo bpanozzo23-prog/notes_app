@@ -21,9 +21,9 @@ async function checkPlan(plan) {
     const folder = await db.folders.get(expected.id);
     if (!folder || folder.name !== expected.name) stale();
   }
-  if (plan.createFolders?.length) {
+  if (plan.createFolders?.length || plan.expectedNewFolders?.length) {
     const folders = await db.folders.toArray();
-    if (plan.createFolders.some(({ name }) => folders.some((folder) => folder.name.toLowerCase() === name.toLowerCase()))) stale();
+    if ([...(plan.createFolders ?? []).map(({ name }) => name), ...(plan.expectedNewFolders ?? [])].some((name) => folders.some((folder) => folder.name.toLowerCase() === name.toLowerCase()))) stale();
   }
   return notes;
 }
@@ -90,15 +90,20 @@ async function restoredPatch(before, fields, tombstones) {
   if (patch.folderId && !(await db.folders.get(patch.folderId))) patch.folderId = null;
   return patch;
 }
-export function undoClaudeChange(changeId) {
+export const isMetadataOnlyChange = (record) => record.createdNotes.length === 0 && record.trashedNotes.length === 0 && record.notes.every((entry) => entry.fields.every((field) => ["title", "tags", "folderId"].includes(field)));
+export function undoClaudeChange(changeId, { unchangedOnly = false } = {}) {
   return writeTransaction(tables(), async () => {
     const record = await readUndo(changeId);
     const notes = await db.notes.bulkGet(record.notes.map((entry) => entry.id));
-    if (notes.some((note, index) => !note || note.deletedAt !== null || note.rev !== record.notes[index].writtenRev)) {
-      return { conflict: true, notes: record.notes.map((entry) => ({ id: entry.id, title: entry.before.title })) };
+    const unchanged = notes.map((note, index) => !!note && note.deletedAt === null && note.rev === record.notes[index].writtenRev);
+    const metadataOnly = isMetadataOnlyChange(record);
+    if (unchanged.some((value) => !value) && !(unchangedOnly && metadataOnly)) {
+      return { conflict: true, metadataOnly, unchanged: unchanged.filter(Boolean).length, notes: record.notes.map((entry) => ({ id: entry.id, title: entry.before.title })) };
     }
+    const skipped = record.notes.filter((_entry, index) => !unchanged[index]).map((entry) => ({ id: entry.id, title: notes.find((note) => note?.id === entry.id)?.title || entry.before.title || "Untitled" }));
     const tombstones = new Set(await db.tombstones.toCollection().primaryKeys());
     for (const [index, entry] of record.notes.entries()) {
+      if (!unchanged[index]) continue;
       const patch = await restoredPatch(entry.before, entry.fields, tombstones);
       const next = await writeNoteInTransaction(notes[index], patch, { housekeeping: true });
       await db.notes.put({ ...next, updatedAt: entry.before.updatedAt });
@@ -106,12 +111,13 @@ export function undoClaudeChange(changeId) {
     }
     for (const id of record.createdFolders) if (!(await db.notes.filter((note) => note.folderId === id).count())) await db.folders.delete(id);
     await db.prefs.delete("claudeLastChange");
-    return { restored: record.notes.length };
+    return { restored: unchanged.filter(Boolean).length, ...(unchangedOnly ? { skipped } : {}) };
   });
 }
 export function restoreClaudeCopies(changeId) {
   return writeTransaction(tables(), async () => {
     const record = await readUndo(changeId);
+    if (isMetadataOnlyChange(record)) throw new Error("Use Undo for the unchanged notes instead.");
     const tombstones = new Set(await db.tombstones.toCollection().primaryKeys()), ids = [];
     for (const { before } of record.notes) {
       const at = nowIso(), id = newId();

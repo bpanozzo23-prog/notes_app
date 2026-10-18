@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 import { chromium, devices } from "playwright";
 import { notebookAnswer, followupAnswer, noteAnswer, refusalAnswer, cutAnswer, overloadedAnswer, fallbackAnswer } from "../src/claude/fixtures/ask.js";
 import { tidyClass, tidyImage, tidyMalformed, tidyCut, tidyRefusal, tidyUnknown } from "../src/claude/fixtures/tidy.js";
+import { reorganiseNotebook } from "../src/claude/fixtures/reorganise.js";
 import { sseFrames } from "../src/claude/fixtures/responses.js";
 import { installSteppedClaudeFetch } from "../src/claude/fixtures/browser.js";
 
@@ -42,6 +43,7 @@ await context.route("https://api.anthropic.com/**", async (route) => {
 });
 // Question markers are a screenshot convention only, never part of the app.
 await context.addInitScript(installSteppedClaudeFetch, { smoke: sseFrames(), cases: [
+  ["Suggest better titles, tags and folders across this notebook.", reorganiseNotebook],
   ["[shot:tidy-class]", tidyClass], ["[shot:tidy-image]", tidyImage], ["[shot:tidy-invalid]", tidyMalformed],
   ["[shot:tidy-cut]", tidyCut], ["[shot:tidy-refusal]", tidyRefusal], ["[shot:tidy-unknown]", tidyUnknown],
   ["[shot:refusal]", refusalAnswer], ["[shot:cut]", cutAnswer], ["[shot:overloaded]", overloadedAnswer],
@@ -528,6 +530,45 @@ await button("Notas de clase (before Claude)").click(); await beginTidy("[shot:t
 await back(); await back(); await button("Settings").click(); await button("Claude On").click();
 await button("Undo Claude's last change").waitFor(); await button("Undo Claude's last change").scrollIntoViewIfNeeded(); await shot("104-claude-settings-undo");
 await back(); await back();
+// Phase 3d: restore stable fixture handles after the earlier edits and copies.
+await button("Settings").click(); await page.getByLabel("Import backup").setInputFiles(sample);
+await button("Replace notebook").click();
+const reorganiseImportDownload = page.waitForEvent("download");
+await button("Import and replace").click(); await reorganiseImportDownload;
+await page.getByText(/^Backup imported\./).waitFor(); await back();
+await button("Ask Claude").click(); await shot("109-ask-tidy-notebook");
+const beginReorganise = async (takeShots = false) => {
+  await button("Tidy the notebook").click();
+  if (takeShots) await shot("110-tidy-notebook-sheet");
+  await button("Titles, tags and folders").click();
+  const discardOther = page.getByRole("dialog", { name: "Discard Claude's other proposal?" });
+  if (await discardOther.isVisible()) await button("Discard and continue").click();
+  await askDialog().waitFor();
+};
+await beginReorganise(true); await shot("111-reorganise-disclosure"); await finishTidy();
+await page.evaluate(() => window.scrollTo(0, 0)); await shot("112-reorganise-review-top");
+const reminderCard = page.getByRole("article", { name: "Recordatorio suelto", exact: true });
+await reminderCard.scrollIntoViewIfNeeded(); await shot("113-reorganise-three-rows");
+const shoppingCard = page.getByRole("article", { name: "Compras", exact: true });
+await shoppingCard.scrollIntoViewIfNeeded(); await shot("114-reorganise-new-folder");
+await reminderCard.getByRole("checkbox", { name: /^Tags:/ }).uncheck();
+await reminderCard.scrollIntoViewIfNeeded(); await shot("115-reorganise-row-unticked");
+await applyTidy(); await back(); await back();
+await button("Cuaderno para la biblioteca").waitFor(); await shot("116-reorganise-list-applied");
+await page.goForward(); await page.goForward(); await button("Undo").click();
+await page.getByText("Earlier version restored.", { exact: true }).waitFor(); await shot("117-reorganise-undo");
+await back(); await beginReorganise(); await finishTidy(); await applyTidy(); await back(); await back();
+await button("Cuaderno para la biblioteca").click(); await page.getByLabel("Title", { exact: true }).fill("Mi recordatorio después de Claude"); await back();
+await button("Settings").click(); await button("Claude On").click(); await button("Undo Claude's last change").click();
+await page.getByRole("dialog", { name: "Undo Claude's last change?" }).getByRole("button", { name: "Undo", exact: true }).click();
+await button("Undo the 4 unchanged notes").waitFor(); await button("Undo the 4 unchanged notes").scrollIntoViewIfNeeded(); await shot("118-reorganise-partial-undo-offer");
+await button("Undo the 4 unchanged notes").click(); await page.getByText(/^Restored 4 unchanged notes\./).waitFor(); await shot("119-reorganise-partial-undo-result");
+await back(); await back(); await button("Mi recordatorio después de Claude").waitFor(); await shot("120-reorganise-list-after-partial-undo");
+await button("Ask Claude").click(); await beginReorganise(); await finishTidy(); await back(); await back();
+await button("Mi recordatorio después de Claude").click(); await page.getByLabel("Title", { exact: true }).fill("Otra edición");
+await button("Claude's proposal is ready · Review").click();
+await page.getByText("Some notes changed since Claude read them. Ask again.", { exact: true }).waitFor(); await shot("121-reorganise-stale");
+await button("Discard").click(); await back();
 await button("Vocabulario — comida").click();
 // Only this fresh browser context's fixture notebook is involved in the guard screenshots.
 await page.evaluate(() => {

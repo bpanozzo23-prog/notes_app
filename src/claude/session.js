@@ -37,7 +37,7 @@ export function createClaudeSession(access = notebookAccess) {
       const previous = controller;
       controller = null;
       current = token();
-      emit({ request: null, ...(snapshot.request?.kind === "tidy" ? { proposal: null } : {}), ...(snapshot.conversation?.turns ? { conversation: { ...snapshot.conversation,
+      emit({ request: null, ...(["tidy", "reorganise"].includes(snapshot.request?.kind) ? { proposal: null } : {}), ...(snapshot.conversation?.turns ? { conversation: { ...snapshot.conversation,
         turns: snapshot.conversation.turns.map((turn) => turn.status === "running" ? { ...turn, status: "stopped" } : turn),
       } } : {}) });
       previous?.abort();
@@ -47,12 +47,12 @@ export function createClaudeSession(access = notebookAccess) {
     setProposal(value, proposal) { if (isCurrent(value)) emit({ proposal: proposal === null ? null : { ...proposal, token: value, generation: value.generation } }); },
     prepareProposal(payload) {
       if (snapshot.request) return false;
-      emit({ proposal: { id: newId(), kind: "tidy", payload, handles: payload.handles, generation: payload.generation, status: "disclosure" } });
+      emit({ proposal: { id: newId(), kind: payload.kind, payload, handles: payload.handles, generation: payload.generation, status: "disclosure" } });
       return true;
     },
     updateProposal(id, patch) { if (snapshot.proposal?.id === id) emit({ proposal: { ...snapshot.proposal, ...patch } }); },
     discardProposal() {
-      if (snapshot.request?.kind === "tidy") this.cancelRequest();
+      if (["tidy", "reorganise"].includes(snapshot.request?.kind)) this.cancelRequest();
       emit({ proposal: null });
     },
     clearConversation() {

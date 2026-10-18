@@ -14,14 +14,26 @@ import { STALE_PROPOSAL } from "../db/claudeChanges.js";
 import { addClaudeSpend } from "./prefs.js";
 
 export const DEFAULT_TIDY_INSTRUCTION = "Fix mistakes and make the formatting consistent, changing as little as possible.";
-const nullableString = { anyOf: [{ type: "string" }, { type: "null" }] };
+export const nullableString = { anyOf: [{ type: "string" }, { type: "null" }] };
+export const folderSchema = { type: "object", properties: { action: { type: "string", enum: ["keep", "existing", "create", "none"] }, name: nullableString }, required: ["action", "name"], additionalProperties: false };
 const properties = { summary: { type: "string" }, title: nullableString, titleReason: nullableString, html: nullableString, htmlReason: nullableString,
   tags: { anyOf: [{ type: "array", items: { type: "string" } }, { type: "null" }] }, tagsReason: nullableString,
-  folder: { type: "object", properties: { action: { type: "string", enum: ["keep", "existing", "create", "none"] }, name: nullableString }, required: ["action", "name"], additionalProperties: false }, folderReason: nullableString };
+  folder: folderSchema, folderReason: nullableString };
 export const TIDY_SCHEMA = { type: "object", properties, required: Object.keys(properties), additionalProperties: false };
 export function validateTitle(value) {
   if (typeof value !== "string" || /[\u0000-\u001f\u007f-\u009f]/.test(value) || value.trim().length > 200) throw new Error("Use a title of at most 200 characters, without control characters.");
   return value.trim();
+}
+export function validateFolder(folder, note, folders) {
+  if (["keep", "none"].includes(folder.action)) { if (folder.name !== null) throw new Error(); }
+  else {
+    if (typeof folder.name !== "string" || !isSafeId(folder.name.trim())) throw new Error();
+    const name = folder.name.trim(), matches = folders.filter((item) => item.name.toLowerCase() === name.toLowerCase());
+    if (matches.length > 1 || (!matches.length && folder.action === "existing")) throw new Error();
+    folder = matches.length ? { action: "existing", ...matches[0] } : { action: "create", name };
+  }
+  if (folder.action === "existing" && folder.id === note.folderId || folder.action === "none" && note.folderId === null) folder = { action: "keep", name: null };
+  return folder;
 }
 export async function captureTidyPayload(noteId, instruction = "") {
   instruction = instruction.trim();
@@ -56,7 +68,7 @@ export const handleMaps = (handles) => ({ imageHandles: new Map(handles.imageHan
 export function buildTidyRequest(payload) {
   return { model: CLAUDE_MODEL, max_tokens: PROPOSAL_MAX_TOKENS, output_config: { effort: PROPOSAL_EFFORT, format: { type: "json_schema", schema: TIDY_SCHEMA } }, system: payload.system, messages: [{ role: "user", content: payload.requestText }] };
 }
-function shape(value, schema) {
+export function shape(value, schema) {
   if (schema.anyOf) return schema.anyOf.some((item) => shape(value, item));
   if (schema.type === "null") return value === null;
   if (schema.type === "string") return typeof value === "string" && (!schema.enum || schema.enum.includes(value));
@@ -73,15 +85,7 @@ export function validateTidyProposal(raw, payload, handles = handleMaps(payload.
       if (value.tags.length > 50 || value.tags.some((tag) => !isSafeId(tag)) || new Set(value.tags).size !== value.tags.length) throw new Error();
       if (JSON.stringify([...value.tags].sort()) === JSON.stringify([...payload.note.tags].sort())) value.tags = null;
     }
-    let folder = value.folder;
-    if (["keep", "none"].includes(folder.action)) { if (folder.name !== null) throw new Error(); }
-    else {
-      if (typeof folder.name !== "string" || !isSafeId(folder.name.trim())) throw new Error();
-      const name = folder.name.trim(), matches = payload.folders.filter((item) => item.name.toLowerCase() === name.toLowerCase());
-      if (matches.length > 1 || (!matches.length && folder.action === "existing")) throw new Error();
-      folder = matches.length ? { action: "existing", ...matches[0] } : { action: "create", name };
-    }
-    if (folder.action === "existing" && folder.id === payload.note.folderId || folder.action === "none" && payload.note.folderId === null) folder = { action: "keep", name: null };
+    const folder = validateFolder(value.folder, payload.note, payload.folders);
     value.folder = folder;
     value.report = [];
     const currentHtml = normalizeBody(payload.note.html);
@@ -112,20 +116,21 @@ export function tidyPlan(payload, proposal, ticked, title = proposal.title) {
   return { generation: payload.generation, notes: [{ id: payload.note.id, expectedRev: payload.note.rev, patch }], createFolders, folderChecks };
 }
 export const tidyItemIds = (proposal) => [proposal.title !== null && "title", proposal.tags !== null && "tags", proposal.folder.action !== "keep" && "folder", ...proposal.changes.map((run) => run.id)].filter(Boolean);
-export async function runTidy({ payload, session = claudeSession, access = notebookAccess, fetch, maxRetries }) {
+export const runTidy = (options) => runProposal({ ...options, buildRequest: buildTidyRequest, validate: validateTidyProposal });
+export async function runProposal({ payload, buildRequest, validate, staleMessage = STALE_PROPOSAL, session = claudeSession, access = notebookAccess, fetch, maxRetries }) {
   if (!payload || payload.generation !== access.getGeneration()) return;
-  const request = session.beginRequest("tidy");
+  const request = session.beginRequest(payload.kind);
   if (!request) return;
   const { token, signal } = request;
-  let state = { id: session.getSnapshot().proposal?.id ?? token.id, kind: "tidy", payload, handles: payload.handles, startedAt: new Date().toISOString(), status: "running", proposal: null, changes: [], error: null, cost: { kind: "unknown" }, model: null };
+  let state = { id: session.getSnapshot().proposal?.id ?? token.id, kind: payload.kind, payload, handles: payload.handles, startedAt: new Date().toISOString(), status: "running", proposal: null, changes: [], error: null, cost: { kind: "unknown" }, model: null };
   const update = (patch) => { state = { ...state, ...patch }; session.setProposal(token, state); };
   update({});
   try {
     // Saving after disclosure must not change the snapshot; replacement must stop it.
     try { await db.transaction("r", db.prefs, () => checkGeneration(payload.generation)); }
-    catch { update({ status: "failed", error: STALE_PROPOSAL }); return; }
+    catch { update({ status: "failed", error: staleMessage }); return; }
     if (!session.isCurrent(token)) return;
-    const response = await streamMessage(buildTidyRequest(payload), { fetch, maxRetries, signal, onEvent(event) {
+    const response = await streamMessage(buildRequest(payload), { fetch, maxRetries, signal, onEvent(event) {
       if (event.type !== "message_start" || !session.isCurrent(token)) return;
       const { usage, model } = event.message;
       const dollars = priceUsage(model, { input_tokens: usage.input_tokens, cache_creation_input_tokens: usage.cache_creation_input_tokens ?? 0,
@@ -142,7 +147,7 @@ export async function runTidy({ payload, session = claudeSession, access = noteb
     if (response.stop_reason === "max_tokens") { update({ status: "failed", error: RESPONSE_ERRORS.truncated }); return; }
     try {
       if (response.stop_reason !== "end_turn") throw new Error();
-      const proposal = validateTidyProposal(response.content.filter((block) => block.type === "text").at(-1)?.text, payload);
+      const proposal = validate(response.content.filter((block) => block.type === "text").at(-1)?.text, payload);
       update({ status: "ready", proposal, changes: proposal.changes });
     } catch { update({ status: "failed", error: RESPONSE_ERRORS.invalid }); }
   } catch (error) { update({ status: "failed", error: toClaudeError(error).message }); }

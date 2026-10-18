@@ -689,3 +689,62 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   1,000 tokens and a tidy's to 1.5 × the note plus 800. Quoted sources no longer show the
   projection's `[x]`/`[ ]` and `[→ title]` markers. 0.3.5; 3d becomes 0.3.6 (each later step one
   more). — From the run above; `claude-check` re-measures them.
+
+## Phase 3d implementation
+
+- 2026-10-18 — Ask → Tidy the notebook → Titles, tags and folders captures every live note,
+  folder names and tag counts in one read transaction after flushing saves. The frozen request
+  carries creation-time/id-ordered N handles, displayed and stored titles, and the existing
+  Claude text projection; ids, stored HTML, image bytes and preferences stay local. Nothing is
+  sent until the disclosure's Send. — This extends the 3c capture and disclosure contract to
+  the notebook without exposing the key or changing note bodies.
+- 2026-10-18 — Share 3c's schema-shape, title and folder validation and its streaming runner,
+  fallback, effort, cost and spend handling. Notebook proposals reject unknown/repeated handles,
+  more than 40 changes, invalid titles/tags/folders and extra fields; no-ops disappear. New-folder
+  names are grouped case-insensitively using the first proposed spelling. — One reviewed name
+  must mean one folder, even if Claude varies its capitalisation between cards.
+- 2026-10-18 — Each note card shows its title, first text line and reason, with independent
+  title/folder/tags ticks and an editable title. Apply checks every affected note, even an
+  unticked card, and every source/destination folder; proposed new names must remain unused
+  even if their rows are unticked. Only approved folder rows create folders. All patches and
+  the complete Undo record use the existing guarded transaction. — Unticking cannot bypass a
+  stale proposal; an unapproved row cannot create an empty folder. There are no body patches.
+- 2026-10-18 — Owner-requested deviation from the direction file's Undo rule: when the actual
+  applied fields are only title, tags or folder, a later edit offers “Undo the N unchanged notes”
+  instead of copies. The transaction rechecks the change id, generation and each written rev,
+  restores only still-live unchanged notes, reports the current titles of skipped notes (the
+  old title if missing), then clears the record. Revisions advance; restored edit dates return
+  to their before values. A zero-unchanged offer can clear the record without changing notes.
+  Created folders are removed only if no note, including Trash, still uses them. Changes with
+  any body edit keep the existing all-notes copies path. — Duplicating unchanged bodies merely
+  to undo metadata would clutter the notebook and would not preserve any additional writing.
+- 2026-10-18 — Notebook proposal estimates use request plus system characters at the existing
+  plain-text token ratio, priced without caching, plus 6,000 output tokens. This allowance is
+  provisional until the owner runs the extended real-request check. — No counting request is
+  made before disclosure. No schema or backup-format change; release version is 0.3.6.
+- 2026-10-18 — Added streamed public-sample fixtures and shots 109–121 for entry, disclosure,
+  per-row review, a shared new folder, Apply, clean/partial Undo and stale refusal. The real
+  check now records the notebook proposal's disclosure, outcome, row count, Apply and Undo in
+  summary.json and takes full-page screenshots, retaining the existing key-reading code.
+  The public sample was regenerated unchanged. — The owner runs both browser scripts; this
+  implementation makes no network requests and does not access private-data or the test key.
+- 2026-10-18 — Local verification passed: `npm test` (52 files, 1,018 tests), the final targeted
+  reorganise checks (42 tests, including the distinct 40/41-note boundary and rollback),
+  `npm run build`, both browser scripts' syntax checks and `git diff --check`. The build retains
+  Vite's large-chunk warning. Screenshots, real Claude responses/costs and phone typing/layout
+  were not run or seen; those remain owner verification. No packages installed, server started,
+  commit or push made, or private-data accessed.
+- 2026-10-18 — Review fixes: redundant tag suggestions (adding a tag a note has, removing one it
+  lacks, repeats) are dropped instead of discarding the whole proposal; only a tag both added and
+  removed, or a malformed tag, makes it unusable. Cards don't repeat an untitled note's first line
+  and strip the projection's markers from the preview; Undo names notes as the list does
+  (`noteTitle`). The notebook-wide estimate uses its own measured ratio (0.5 tokens per character;
+  2,000-token reply allowance). The intermittent App folder test waited for "Move up" to be
+  disabled, which is also true while the screen is busy saving, then tapped Rename into a disabled
+  screen under load; it now waits for the buttons to be enabled again (not an app bug). — From the
+  diff, the shots and the real-request run.
+- 2026-10-18 — Real-request run with 3d (sample notebook, test key): question 6.6¢, follow-up
+  2.0¢ (cache read), tidy 2.0¢, titles/tags/folders 5.5¢ (6,621 in, 1,430 out); 16¢ in total.
+  Claude's notebook proposal (10 rows) passed validation: titled the untitled note, renamed a vague
+  reminder, reused existing tags, added one shared tag, and left well-organised notes alone; Apply
+  and Undo were clean.
