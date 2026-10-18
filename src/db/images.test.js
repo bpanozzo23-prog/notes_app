@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { db, notebookAccess } from "./db.js";
 import { addImageFile, cleanupFiles, getFile, fileStats, FILE_RETENTION_MS, MAX_IMAGE_BYTES } from "./files.js";
 import { buildBackup, importBackup, upgradeEnvelope, validateBackup } from "./backup.js";
-import { createNote, updateNote, trashNote } from "./notes.js";
+import { createNote, updateNote, trashNote, restoreNote } from "./notes.js";
 import { acquire, release, clearFileUrls } from "../editor/fileUrls.js";
 import { toBase64, fromBase64 } from "../lib/base64.js";
 import { jsonBlob, readFileAsText } from "../lib/file.js";
@@ -48,6 +48,7 @@ it("cleanup and statistics never read image bytes and only update changed metada
   await db.files.update(expired, { unusedSince: AT });
   await db.files.update(marked, { unusedSince: at(1).toISOString() });
   await createNote({ html: `<img data-file="${reused}"><img data-file="${live}">` });
+  await db.files.update(reused, { unusedSince: AT }); // Exercise cleanup's own stale-mark repair.
   const read = vi.fn((row) => row), update = vi.spyOn(db.files, "update");
   db.fileData.hook("reading", read);
   try {
@@ -93,6 +94,43 @@ it("cut from A and paste to B keeps the shared file", async () => {
   await updateNote(a.id, { html: "<p></p>" }); await cleanupFiles(at(0));
   await updateNote(b.id, { html }); await cleanupFiles(at(31));
   expect((await getFile(id)).unusedSince).toBeNull();
+});
+it.each(["create", "update", "restore"])("%s clears reused image marks without reading bytes; a later removal gets a fresh clock", async (operation) => {
+  const id = await addImageFile(image()), live = await addImageFile(image());
+  const html = `<img data-file="${id}"><img data-file="${live}"><img data-file="missing">`;
+  let note = await createNote({ html: operation === "restore" ? html : "<p></p>" });
+  if (operation === "restore") await trashNote(note.id);
+  await cleanupFiles(at(0));
+  // Restore can encounter a stale mark from another window/older build.
+  await db.files.update(id, { unusedSince: AT });
+  await db.files.update(live, { unusedSince: null });
+  const read = vi.fn((row) => row), update = vi.spyOn(db.files, "update");
+  db.fileData.hook("reading", read);
+  try {
+    if (operation === "create") note = await createNote({ html });
+    if (operation === "update") await updateNote(note.id, { html });
+    if (operation === "restore") await restoreNote(note.id);
+    expect(read).not.toHaveBeenCalled();
+    expect(update.mock.calls).toEqual([[id, { unusedSince: null }]]);
+    expect((await getFile(id)).unusedSince).toBeNull();
+  } finally { db.fileData.hook("reading").unsubscribe(read); }
+  await updateNote(note.id, { html: "<p></p>" });
+  await cleanupFiles(at(31));
+  expect((await getFile(id))?.unusedSince).toBe(at(31).toISOString());
+  expect(await db.fileData.get(id)).toEqual({ id, bytes: image().bytes });
+});
+it.each(["create", "update", "restore"])("%s rolls back note and metadata together if clearing a mark fails", async (operation) => {
+  const id = await addImageFile(image()), html = `<img data-file="${id}">`;
+  const note = await createNote({ html });
+  await trashNote(note.id);
+  await db.files.update(id, { unusedSince: AT });
+  const before = await db.notes.toArray();
+  vi.spyOn(db.files, "update").mockRejectedValueOnce(new Error("Storage full"));
+  const save = operation === "create" ? () => createNote({ html }) : operation === "update"
+    ? () => updateNote(note.id, { html }) : () => restoreNote(note.id);
+  await expect(save()).rejects.toThrow("Storage full");
+  expect(await db.notes.toArray()).toEqual(before);
+  expect((await getFile(id)).unusedSince).toBe(AT);
 });
 it("skips cleanup in read-only mode and rolls back failed cleanup", async () => {
   const id = await addImageFile(image());

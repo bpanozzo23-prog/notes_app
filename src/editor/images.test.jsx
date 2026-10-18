@@ -8,7 +8,8 @@ import { clearFileUrls } from "./fileUrls.js";
 import { SaveQueue } from "../lib/saveQueue.js";
 import { createNote, getNote, updateNote } from "../db/notes.js";
 import { addImageFile, getFile } from "../db/files.js";
-import { db } from "../db/db.js";
+import { db, notebookAccess } from "../db/db.js";
+import * as imageProcessing from "../lib/images.js";
 import { extractFileIds } from "../lib/text.js";
 import { noteFixture, resetDatabase } from "../test/fixtures.js";
 import { stubEditorGeometry } from "../test/editor.js";
@@ -91,6 +92,34 @@ it("uses the end if the placeholder's spot was deleted, and inserts batches seri
   expect(editor.getHTML().indexOf("Keep me")).toBeLessThan(editor.getHTML().indexOf("<img"));
   expect(editor.state.selection.empty).toBe(true);
   expect(editor.state.selection.from).toBeGreaterThan(editor.state.doc.content.size - 3);
+});
+it("saves an image started before versionchange before closing, while refusing new insertions", async () => {
+  const note = await createNote(), q = queue(updateNote), decoding = deferred();
+  const process = vi.spyOn(imageProcessing, "processImage").mockReturnValue(decoding.promise);
+  const props = { note, queue: q, onChange: (html) => q.schedule(note.id, { html }), toolbarIds: ["image"] };
+  const view = render(<DialogLock value={false}><NoteEditor {...props} /></DialogLock>);
+  const file = new File(["fixture"], "fixture.png", { type: "image/png" });
+  fireEvent.change(screen.getByLabelText("Add images"), { target: { files: [file] } });
+  await waitFor(() => expect(process).toHaveBeenCalledOnce());
+  act(() => { db.on("versionchange").fire({ oldVersion: 40, newVersion: 50 }); });
+  view.rerender(<DialogLock value={true}><NoteEditor {...props} busy /></DialogLock>);
+  const editor = screen.getByLabelText("Note body").editor;
+  act(() => { editor.options.editorProps.handlePaste(editor.view, { clipboardData: { files: [file] } }); });
+  let savedBeforeClose, storedBeforeClose;
+  const closing = notebookAccess.flushAndClose(async () => {
+    await q.flush();
+    savedBeforeClose = await getNote(note.id);
+    storedBeforeClose = await db.fileData.toArray();
+  });
+  await Promise.resolve();
+  expect(db.isOpen()).toBe(true);
+  expect(q.status).toBe("pending");
+  await act(async () => { decoding.resolve(image()); await closing; });
+  expect(db.isOpen()).toBe(false);
+  expect(notebookAccess.getSnapshot().versionChange).toBe("closed");
+  expect(process).toHaveBeenCalledOnce();
+  expect(storedBeforeClose).toHaveLength(1);
+  expect(extractFileIds(savedBeforeClose.html)).toEqual([storedBeforeClose[0].id]);
 });
 it("reports each failed image, inserts no failed nodes, and continues the batch", async () => {
   const editor = open(), q = queue(), report = vi.fn();

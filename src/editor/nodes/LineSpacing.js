@@ -3,6 +3,7 @@ import { Extension } from "@tiptap/core";
 export const LINE_SPACINGS = ["1", "1.15", "1.5", "2"];
 
 export function applyLineSpacing(tr, value, from = tr.selection.from, to = tr.selection.to) {
+  const storedMarks = tr.storedMarks;
   tr.doc.nodesBetween(from, to, (node, pos) => {
     if (!["paragraph", "heading"].includes(node.type.name)) return;
     tr.setNodeMarkup(pos, undefined, { ...node.attrs, lineHeight: value });
@@ -17,8 +18,8 @@ export function applyLineSpacing(tr, value, from = tr.selection.from, to = tr.se
     return false;
   });
   // Also clear a cursor's stored inline spacing, so subsequent typing stays on this line's spacing.
-  if (tr.selection.empty && tr.storedMarks) {
-    tr.setStoredMarks(tr.storedMarks.flatMap((mark) => {
+  if (tr.selection.empty && storedMarks) {
+    tr.setStoredMarks(storedMarks.flatMap((mark) => {
       if (mark.type.name !== "textStyle" || !mark.attrs.lineHeight) return [mark];
       const attrs = { ...mark.attrs, lineHeight: null };
       return Object.values(attrs).some((attr) => attr !== null) ? [mark.type.create(attrs)] : [];

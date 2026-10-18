@@ -80,6 +80,16 @@ it("sets an empty line's stored marks, block and spacing for the next typed text
   expect(captureLook(editor.state)).toEqual(green);
   expect(editor.state.doc.firstChild.attrs).toMatchObject({ level: 2, lineHeight: "1.5" });
 });
+it.each(["2", null])("spacing %s preserves the bold green 17 pt look prepared for typing", (spacing) => {
+  const editor = open('<p></p>');
+  editor.chain().setBold().setColor("#15803d").setFontSize("17pt").setLineHeight("1.5").run();
+  if (spacing === null) editor.commands.unsetLineSpacing();
+  else editor.commands.setLineSpacing(spacing);
+  editor.commands.insertContent("Typed");
+  expect(captureLook(editor.state)).toEqual(green);
+  expect(editor.state.doc.firstChild.attrs.lineHeight).toBe(spacing);
+  expect(editor.state.doc.firstChild.firstChild.marks.find((mark) => mark.type.name === "textStyle").attrs.lineHeight).toBeNull();
+});
 it("leaves code entirely unchanged and styles eligible text on either side", () => {
   const editor = open('<p>left <code>inline</code> right</p><pre><code>block</code></pre><p>end</p>');
   editor.commands.selectAll();

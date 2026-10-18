@@ -1,5 +1,5 @@
 import { allPrefs, db, writeTransaction } from "./db.js";
-import { resolveFormatting, sanitizePreference } from "../editor/formatting.js";
+import { DEFAULT_NAMED_STYLES, resolveFormatting, sanitizePreference } from "../editor/formatting.js";
 
 function checked(key, value) {
   const result = sanitizePreference(key, value);
@@ -31,6 +31,18 @@ export function deleteNamedStyle(id) {
     await db.prefs.put({ key: "namedStyles", value: formatting.namedStyles.filter((entry) => entry.id !== id) });
     for (const key of ["toolbar", "selectionMenu"]) {
       if (formatting[key].includes(`style:${id}`)) await db.prefs.put({ key, value: formatting[key].filter((entry) => entry !== `style:${id}`) });
+    }
+  });
+}
+
+export function resetNamedStyles() {
+  return writeTransaction([db.prefs], async () => {
+    const formatting = resolveFormatting(await allPrefs());
+    const defaults = new Set(DEFAULT_NAMED_STYLES.map((style) => `style:${style.id}`));
+    await db.prefs.delete("namedStyles");
+    for (const key of ["toolbar", "selectionMenu"]) {
+      const next = formatting[key].filter((id) => !id.startsWith("style:") || defaults.has(id));
+      if (next.length !== formatting[key].length) await db.prefs.put({ key, value: next });
     }
   });
 }

@@ -56,6 +56,7 @@ it("creates with/without a toolbar button, edits, reorders, and removes every to
   expect(await getPref("toolbar")).toEqual(DEFAULT_TOOLBAR);
 });
 it("confirms deletion, removes references together, and shows an empty list", async () => {
+  const overflow = document.body.style.overflow;
   await setPref("toolbar", ["style:default-heading", "bold", "style:default-heading"]);
   await setPref("selectionMenu", ["style:default-heading", "style:default-heading", "italic"]);
   await start();
@@ -69,6 +70,9 @@ it("confirms deletion, removes references together, and shows an empty list", as
   expect(await getPref("toolbar")).toEqual(["bold"]);
   expect(await getPref("selectionMenu")).toEqual(["italic"]);
   expect(screen.getByText("No named styles yet.")).toBeTruthy();
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(document.querySelector("main").parentElement.inert).toBeFalsy();
+  expect(document.body.style.overflow).toBe(overflow);
 });
 it("shows validation errors, accepts Other size and all line choices, and includes hidden current colours", async () => {
   await start(); await tap("+ New style"); await tap("Save", form());
@@ -126,6 +130,7 @@ it("Back and Escape discard the style form without leaving Named styles", async 
 it("disables style list and form editing in read-only mode", () => {
   const formatting = resolveFormatting({}), run = vi.fn();
   const view = render(<StyleSettings formatting={formatting} readOnly run={run} />);
+  expect(button("Reset").disabled).toBe(true);
   for (const control of screen.getAllByRole("button").filter((button) => button.getAttribute("aria-label") !== "Back")) expect(control.matches(":disabled")).toBe(true);
   view.rerender(<StyleEditor style={formatting.namedStyles[0]} formatting={formatting} readOnly run={run} onClose={() => {}} />);
   for (const control of screen.getByRole("dialog").querySelectorAll("button, input, select")) {
@@ -133,4 +138,30 @@ it("disables style list and form editing in read-only mode", () => {
     expect(control.matches(":disabled")).toBe(true);
   }
   expect(run).not.toHaveBeenCalled();
+});
+
+it("confirms Reset, restores default styles and removes every dangling style button atomically", async () => {
+  const custom = { ...DEFAULT_NAMED_STYLES[0], id: "custom", name: "Custom" };
+  await setPref("namedStyles", [custom]);
+  await setPref("toolbar", ["bold", "style:custom", "style:default-heading", "style:gone", "style:custom"]);
+  await setPref("selectionMenu", ["style:gone", "italic", "style:default-heading"]);
+  const before = await allPrefs();
+  await start(); await tap("Reset");
+  expect(screen.getByText("Reset named styles to the default? Text already styled keeps its look.")).toBeTruthy();
+  await tap("Cancel", form());
+  expect(await allPrefs()).toEqual(before);
+  await tap("Reset");
+  const put = db.prefs.put.bind(db.prefs);
+  const spy = vi.spyOn(db.prefs, "put").mockImplementation((row) => row.key === "selectionMenu" ? Promise.reject(new Error("Storage full")) : put(row));
+  await tap("Reset", form());
+  expect(form().getByRole("alert").textContent).toBe("Storage full");
+  expect(await allPrefs()).toEqual(before);
+  spy.mockRestore();
+  await tap("Reset", form());
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(await getPref("namedStyles")).toBeUndefined();
+  expect(resolveFormatting(await allPrefs()).namedStyles).toEqual(DEFAULT_NAMED_STYLES);
+  expect(button("Heading")).toBeTruthy();
+  expect(await getPref("toolbar")).toEqual(["bold", "style:default-heading"]);
+  expect(await getPref("selectionMenu")).toEqual(["italic", "style:default-heading"]);
 });

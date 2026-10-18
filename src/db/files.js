@@ -17,6 +17,15 @@ export async function addImageFile({ type, bytes, width, height }) {
   return row.id;
 }
 export const getFile = (id) => db.files.get(id);
+
+// Called inside the note writer's guarded transaction; never fetch image bytes.
+export async function clearReferencedFileMarks(html) {
+  for (const id of extractFileIds(html)) {
+    const file = await db.files.get(id);
+    if (file?.unusedSince != null) await db.files.update(id, { unusedSince: null });
+  }
+}
+
 export async function fileStats() {
   let count = 0, bytes = 0, base64Bytes = 0;
   await db.files.each((file) => { count++; bytes += file.size; base64Bytes += 4 * Math.ceil(file.size / 3); });

@@ -5,7 +5,7 @@ this one is for the owner: what was chosen, why, what it means for the app, what
 and how hard it would be to reverse ("lock-in"). Ordered by lock-in, hardest first. Updated whenever
 `DECISIONS.md` gains an entry with consequences for how the app behaves.
 
-Last updated 2026-10-18, with the Heading button (§36).
+Last updated 2026-10-18, at the Phase 2 closeout (§37).
 
 ---
 
@@ -527,5 +527,21 @@ replaces the separate Heading 1 and Heading 2 buttons in the default toolbar. Yo
 isn't changed automatically: in Settings → Formatting → Toolbar, tap **Add buttons** → Heading,
 then remove Heading 1 and Heading 2 with ⋮ → Remove. The separate buttons stay available if you
 ever want one back.
+**Lock-in: none.**
+
+### 37. Phase 2 closeout: what the review changed
+
+**Chosen:** before calling Phase 2 done, Codex read every change against the plan, as it did
+for Phase 1. It found two serious problems, both needing two windows of the app open at once,
+which is rare on the phone: a picture being added while another window installed an update could
+be stored but never placed in the note; and a picture you removed, brought back, then removed
+again could be deleted before its 30 days were up. Both are fixed: the picture now finishes
+going in before the update proceeds, and bringing a picture back restarts its 30 days. Four
+smaller fixes: deleting a style from inside its edit screen no longer freezes the app; choosing
+the heading level a line already has no longer pulls it out of a callout or list; changing line
+spacing on an empty line keeps the bold, colour or size you set for typing; and Named styles has
+a Reset button like the other formatting screens.
+**Still open:** the big-backup timing test on the phone, which sets when Settings warns that a
+backup is getting large.
 **Lock-in: none.**
 

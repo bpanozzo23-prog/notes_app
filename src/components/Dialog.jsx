@@ -6,6 +6,33 @@ const focusables = (node) => [...node.querySelectorAll('button:not(:disabled), i
 
 export const DialogLock = createContext(false);
 
+// Open layers are the lock's references. Keep the first snapshot until the last
+// dialog closes, even if React unmounts an outer dialog before its confirmation.
+const openLayers = new Set(), originalInert = new Map();
+let originalOverflow;
+function lockBackground(layer) {
+  if (!openLayers.size) originalOverflow = document.body.style.overflow;
+  for (const node of document.body.children) {
+    if (!originalInert.has(node)) originalInert.set(node, node.inert);
+  }
+  openLayers.add(layer);
+  updateBackground();
+  return () => {
+    openLayers.delete(layer);
+    if (openLayers.size) updateBackground();
+    else {
+      for (const [node, inert] of originalInert) node.inert = inert;
+      originalInert.clear();
+      document.body.style.overflow = originalOverflow;
+    }
+  };
+}
+function updateBackground() {
+  const top = [...openLayers].at(-1);
+  for (const node of originalInert.keys()) node.inert = node !== top;
+  document.body.style.overflow = "hidden";
+}
+
 export default function Dialog(props) {
   return useContext(DialogLock) ? null : <DialogPanel {...props} />;
 }
@@ -17,15 +44,10 @@ function DialogPanel({ title, children, onClose, busy = false, sheet = false, fu
   const layer = useRef(null);
   useLayoutEffect(() => {
     const previousFocus = document.activeElement;
-    const siblings = [...document.body.children].filter((node) => node !== layer.current);
-    const previousInert = siblings.map((node) => node.inert);
-    siblings.forEach((node) => { node.inert = true; });
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const unlock = lockBackground(layer.current);
     (panel.current.querySelector("[data-initial-focus]:not(:disabled)") ?? focusables(panel.current)[0] ?? panel.current).focus();
     return () => {
-      siblings.forEach((node, i) => { node.inert = previousInert[i]; });
-      document.body.style.overflow = overflow;
+      unlock();
       if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
     };
   }, []);

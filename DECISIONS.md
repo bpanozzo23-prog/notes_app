@@ -465,3 +465,20 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   buttons stay in the Add sheet. — The owner asked to combine the heading options into one
   button. A stored (customised) toolbar is not changed: the owner swaps the buttons in
   Settings → Formatting → Toolbar.
+
+## Phase 2f closeout
+
+- 2026-10-18 — Codex reviewed `git diff phase-2-base...HEAD` read-only (xhigh) against the
+  direction file. It reproduced two P1s (an image abandoned when another window upgrades the
+  database mid-insertion; a re-used image keeping an old unused mark), three P2 defects
+  (nested dialogs leaving the app inert, the heading tray lifting lines out of callouts and
+  lists, line spacing dropping typing formatting) and a missing Named styles Reset; all are
+  fixed below with a reproducing test each. Its remaining P2, the phone backup-size
+  measurement, is the owner's and stays open; `COMFORTABLE_BACKUP_BYTES` stays provisional at
+  150 MB until then. — Independent review before calling Phase 2 done, as the plan required.
+- 2026-10-18 — Tracked image insertions may finish while a database upgrade is pending; new insertions are refused immediately. — Review finding 1: the upgrade drain must save the image reference before closing, even while DialogLock blocks new input.
+- 2026-10-18 — Creating, saving HTML and restoring notes clear referenced images' unused marks in the same guarded transaction, reading only metadata and writing only marked rows. — Review finding 2: reuse must restart the 30-day grace period after a later removal, without loading image bytes.
+- 2026-10-18 — Dialogs share a module-level background lock whose open layers count its references; only the last close restores the original inert and overflow values, while focus restoration stays per dialog. — Review finding 3: deleting a style closes both dialogs in one commit and must leave the app usable.
+- 2026-10-18 — The heading tray and named-style application share a block-type helper that preserves attributes, skips matching or disallowed types, and never lifts or unwraps lines. — Review finding 4: choosing the current heading or Normal text must preserve callouts, quotes and lists.
+- 2026-10-18 — Line spacing captures stored typing marks before changing blocks and restores them with only inline spacing removed. — Review finding 5: changing spacing, including Default, must retain bold, colour and size prepared for typing.
+- 2026-10-18 — Named styles gains a confirmed Reset that deletes its preference and removes nondefault style references from toolbar and selection pop-up in one guarded transaction. — Review's Named styles Reset finding (7 in the report, task item 6): restore defaults without leaving dangling buttons or partially saved preferences.

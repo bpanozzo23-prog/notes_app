@@ -50,13 +50,13 @@ function imageError(error) {
 
 // One serial lane per mounted note. The queue waits for the whole lane, including the edit
 // emitted after the file row commits. Busy navigation may wait here; it must not cancel it.
-export function createImageInserter({ editor, queue, canInsert = () => true, report = () => {}, onPending = () => {}, process = processImage, store = addImageFile }) {
+export function createImageInserter({ editor, queue, mayStart = () => true, canInsert = () => true, report = () => {}, onPending = () => {}, process = processImage, store = addImageFile }) {
   let tail = Promise.resolve(), pending = 0, disposed = false;
   const valid = () => !disposed && !editor.isDestroyed && editor.isEditable && canInsert();
   return {
     dispose() { disposed = true; },
     insert(files, placeholder) {
-      if (!valid()) { if (placeholder) removeImagePosition(editor, placeholder); return Promise.resolve(); }
+      if (!mayStart() || !valid()) { if (placeholder) removeImagePosition(editor, placeholder); return Promise.resolve(); }
       const id = placeholder ?? reserveImagePosition(editor);
       const batch = Array.from(files);
       pending++; onPending(pending);

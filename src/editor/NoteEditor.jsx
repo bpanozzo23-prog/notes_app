@@ -28,7 +28,11 @@ function NoteDocument({ queue, onImageError, note, onChange, toolbarIds, formatt
   const [dockHeight, setDockHeight] = useState(0);
   const locked = useContext(DialogLock);
   current.current = { readOnly, locked, busy, onImageError };
-  const mayStart = () => !current.current.readOnly && !current.current.locked && !current.current.busy;
+  const mayStart = () => {
+    const access = notebookAccess.getSnapshot();
+    return !current.current.readOnly && !current.current.locked && !current.current.busy &&
+      !access.readOnly && !access.replaced && !access.versionChange;
+  };
   const closeTray = () => setOpenTray(null);
   useOverlay(!!openTray && !locked && !readOnly, closeTray);
   useEffect(() => { if (locked || readOnly || busy) { setOpenTray(null); setPainterLook(null); } }, [locked, readOnly, busy]);
@@ -74,10 +78,12 @@ function NoteDocument({ queue, onImageError, note, onChange, toolbarIds, formatt
   });
   useEffect(() => {
     if (!editor) return;
-    const controller = createImageInserter({ editor, queue, onPending: setAdding,
+    const controller = createImageInserter({ editor, queue, onPending: setAdding, mayStart,
       canInsert: () => {
         const access = notebookAccess.getSnapshot();
-        return !current.current.readOnly && !current.current.locked && !access.readOnly && !access.replaced && !access.versionChange;
+        // The pending upgrade locks new input, but its drain must save tracked images.
+        return !current.current.readOnly && !access.readOnly && !access.replaced &&
+          (access.versionChange === "pending" || (!current.current.locked && !access.versionChange));
       },
       report: (message) => { setImageErrors((errors) => [...errors, message]); current.current.onImageError?.(message); },
     });

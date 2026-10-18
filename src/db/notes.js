@@ -2,6 +2,7 @@ import { db, writeTransaction } from "./db.js";
 import { newId } from "../lib/ids.js";
 import { nowIso } from "../lib/dates.js";
 import { extractNoteLinks, htmlToText, neutralizeNoteLinks } from "../lib/text.js";
+import { clearReferencedFileMarks } from "./files.js";
 
 const EDIT_FIELDS = ["title", "html", "folderId", "tags"];
 const WRITE_FIELDS = [...EDIT_FIELDS, "pinned", "deletedAt"];
@@ -46,16 +47,17 @@ export async function createNote({ folderId = null, title = "", html = "<p></p>"
     id: newId(), ...cleanPatch({ title, html, folderId }), tags: [], pinned: false, rev: 1,
     createdAt: at, updatedAt: at, deletedAt: null,
   };
-  await writeTransaction([db.notes, db.folders], async () => {
+  await writeTransaction([db.notes, db.folders, db.files], async () => {
     await checkFolder(folderId);
     await db.notes.add(note);
+    await clearReferencedFileMarks(note.html);
   });
   return note;
 }
 
 export async function updateNote(id, patch) {
   const clean = cleanPatch(patch);
-  return writeTransaction([db.notes, db.folders], async () => {
+  return writeTransaction([db.notes, db.folders, db.files], async () => {
     const note = await db.notes.get(id);
     if (!note) throw new Error("Note does not exist");
     if (Object.hasOwn(clean, "folderId")) await checkFolder(clean.folderId);
@@ -63,6 +65,7 @@ export async function updateNote(id, patch) {
       JSON.stringify(clean[key]) !== JSON.stringify(note[key]));
     const next = { ...note, ...clean, updatedAt: edited ? nowIso() : note.updatedAt, rev: note.rev + 1 };
     await db.notes.put(next);
+    if (Object.hasOwn(clean, "html")) await clearReferencedFileMarks(next.html);
     return next;
   });
 }
@@ -71,7 +74,7 @@ export const setPinned = (id, pinned) => updateNote(id, { pinned });
 export const trashNote = (id) => updateNote(id, { deletedAt: nowIso() });
 
 export async function restoreNote(id) {
-  return writeTransaction([db.notes, db.tombstones], async () => {
+  return writeTransaction([db.notes, db.tombstones, db.files], async () => {
     const note = await db.notes.get(id);
     if (!note) throw new Error("Note does not exist");
     // A target might have been purged while this source note was also in Trash.
@@ -79,6 +82,7 @@ export async function restoreNote(id) {
     const html = neutralizeNoteLinks(note.html, ids);
     const next = { ...note, html, text: htmlToText(html), linkedIds: extractNoteLinks(html), deletedAt: null, rev: note.rev + 1 };
     await db.notes.put(next);
+    await clearReferencedFileMarks(next.html);
     return next;
   });
 }

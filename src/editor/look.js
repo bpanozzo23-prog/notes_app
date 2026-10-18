@@ -1,6 +1,7 @@
 import { closeHistory } from "@tiptap/pm/history";
 import { normalizeColor } from "./colors.js";
 import { applyLineSpacing } from "./nodes/LineSpacing.js";
+import { applyBlockType } from "./blockType.js";
 
 export const EMPTY_LOOK = Object.freeze({ bold: false, italic: false, underline: false, strike: false,
   color: null, highlight: null, fontSize: null, fontFamily: null });
@@ -66,16 +67,7 @@ export function applyLook(editor, look, options = {}) {
       for (const name of replacedMarks) tr.removeMark(start, end, schema.marks[name]);
       for (const mark of marks) tr.addMark(start, end, mark);
     });
-    if (block) tr.doc.nodesBetween(from, to, (node, pos) => {
-      if (node.type.spec.code) return false;
-      if (!["paragraph", "heading"].includes(node.type.name)) return;
-      const type = schema.nodes[block === "paragraph" ? "paragraph" : "heading"];
-      const $pos = tr.doc.resolve(pos), index = $pos.index();
-      if ($pos.parent.canReplaceWith(index, index + 1, type)) {
-        tr.setNodeMarkup(pos, type, { ...node.attrs, ...(block === "paragraph" ? {} : { level: Number(block.slice(1)) }) });
-      }
-      return false;
-    });
+    if (block) applyBlockType(tr, block, from, to);
     // Omitted spacing (painter) leaves lines alone; an explicit null (style Default) clears it.
     if (Object.hasOwn(options, "lineHeight")) applyLineSpacing(tr, lineHeight, from, to);
     // Match StarterKit’s trailing paragraph in this transaction, before stored marks.

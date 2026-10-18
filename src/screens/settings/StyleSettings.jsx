@@ -6,10 +6,11 @@ import ListControls, { moveEntry } from "./ListControls.jsx";
 import StyleEditor, { deleteStyleMessage } from "./StyleEditor.jsx";
 import { lookStyle } from "../../editor/look.js";
 import { setPref } from "../../db/db.js";
-import { deleteNamedStyle } from "../../db/styles.js";
+import { deleteNamedStyle, resetNamedStyles } from "../../db/styles.js";
 
 export default function StyleSettings({ formatting, busy, readOnly, onBack, run, refresh, error }) {
   const [editing, setEditing] = useState(null), [options, setOptions] = useState(null), [deleting, setDeleting] = useState(null);
+  const [reset, setReset] = useState(false);
   const entries = formatting.namedStyles;
   const selected = entries.find((entry) => entry.id === options), index = entries.indexOf(selected);
   const disabled = busy || readOnly;
@@ -28,10 +29,17 @@ export default function StyleSettings({ formatting, busy, readOnly, onBack, run,
           <ListControls label={style.name} index={index} count={entries.length} disabled={disabled} onMove={(target) => move(index, target)} onOptions={() => setOptions(style.id)} />
         </li>)}
       </ul>
-      <button className="app-button mt-4" disabled={disabled || entries.length >= 50} onClick={() => setEditing({})}>+ New style</button>
+      <div className="mt-4 flex gap-2">
+        <button className="app-button" disabled={disabled || entries.length >= 50} onClick={() => setEditing({})}>+ New style</button>
+        <button className="app-button" disabled={disabled} onClick={() => setReset(true)}>Reset</button>
+      </div>
       {entries.length >= 50 && <p className="mt-2 text-sm">Up to 50 styles can be saved.</p>}
     </div>
     {editing && <StyleEditor style={editing.id ? editing : undefined} {...{ formatting, busy, readOnly, run, refresh, error }} onClose={() => setEditing(null)} />}
+    {reset && <Confirm title="Reset named styles?" confirmLabel="Reset" busy={disabled} error={error} onCancel={() => setReset(false)}
+      onConfirm={async () => { if (!disabled && await run(async () => { await resetNamedStyles(); await refresh(); })) setReset(false); }}>
+      Reset named styles to the default? Text already styled keeps its look.
+    </Confirm>}
     {selected && <Dialog title={selected.name} sheet busy={busy} onClose={() => setOptions(null)}>
       <div className="flex flex-col gap-2">
         <button className="app-button" disabled={disabled} onClick={() => { setEditing(selected); setOptions(null); }}>Edit</button>

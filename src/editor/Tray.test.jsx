@@ -56,3 +56,37 @@ it("shows the current callout and removes it through the same tray", () => {
   expect(editor.getHTML()).toBe('<p>Chosen words</p>');
   expect(document.activeElement).toBe(body);
 });
+
+it.each([
+  ['<div data-callout="tip"><h2>word</h2></div>', "Heading 2"],
+  ['<div data-callout="tip"><p>word</p></div>', "Normal text"],
+  ['<blockquote><h2>word</h2></blockquote><p></p>', "Heading 2"],
+  ['<blockquote><p>word</p></blockquote><p></p>', "Normal text"],
+  ['<ul><li><p>first</p><h2>word</h2></li></ul><p></p>', "Heading 2"],
+  ['<ul><li><p>word</p></li></ul><p></p>', "Normal text"],
+])("repeating %s / %s keeps the containing structure", (html, label) => {
+  render(<NoteEditor note={noteFixture({ html })} onChange={() => {}} />);
+  const editor = screen.getByLabelText("Note body").editor;
+  stubEditorGeometry(editor);
+  act(() => {
+    editor.state.doc.descendants((node, pos) => { if (node.isText && node.text === "word") editor.commands.setTextSelection(pos + 1); });
+  });
+  const before = editor.getJSON(), selection = editor.state.selection.toJSON();
+  for (let i = 0; i < 2; i++) {
+    act(() => trayOptions("heading", editor).find((option) => option.label === label).run({ editor }));
+    expect(editor.getJSON()).toEqual(before);
+    expect(editor.state.selection.toJSON()).toEqual(selection);
+  }
+});
+
+it("changes every eligible selected line without lifting, preserving spacing and skipping a list's first paragraph", () => {
+  render(<NoteEditor note={noteFixture({ html: '<div data-callout="tip"><h2 style="line-height: 2">callout</h2><ul><li><p>first</p><p>second</p></li></ul></div>' })} onChange={() => {}} />);
+  const editor = screen.getByLabelText("Note body").editor;
+  stubEditorGeometry(editor);
+  act(() => {
+    editor.commands.selectAll();
+    trayOptions("heading", editor).find((option) => option.label === "Heading 3").run({ editor });
+  });
+  expect(editor.getHTML()).toBe('<div data-callout="tip"><h3 style="line-height: 2;">callout</h3><ul><li><p>first</p><h3>second</h3></li></ul></div>');
+  editor.state.doc.check();
+});
