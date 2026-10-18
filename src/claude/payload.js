@@ -14,7 +14,7 @@ export function deepFreeze(value) {
   return value;
 }
 // Read-only capture is permitted. Never read all preferences (in particular, the key).
-async function checkGeneration(expected = notebookAccess.getGeneration()) {
+export async function checkGeneration(expected = notebookAccess.getGeneration()) {
   const access = notebookAccess.getSnapshot();
   if (access.replaced || expected !== notebookAccess.getGeneration()) throw new NotebookReplacedError();
   if (access.versionChange === "closed") throw new Error(DATABASE_UPDATED);
@@ -86,6 +86,11 @@ export async function prepareNoteImages(payload) {
 }
 export const imageTokens = ({ width, height }) => Math.min(4784, Math.ceil(width / 28) * Math.ceil(height / 28));
 export function estimateRequest({ kind = "question", payload, images, history = [], question = "", now = new Date() }) {
+  if (kind === "tidy") {
+    const tokens = Math.ceil((payload.requestText.length + payload.system.length) / 3);
+    const output = Math.ceil(payload.claudeHtml.length / 3) * 2 + 3000;
+    return { tokens, dollars: priceUsage(CLAUDE_MODEL, { input_tokens: tokens, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: output }) };
+  }
   const documents = buildDocuments(payload);
   const base = Math.ceil((ASK_SYSTEM_PROMPT.length + documents.reduce((sum, doc) => sum + doc.title.length + doc.context.length + doc.source.data.length, 0)) / 3);
   const previous = history.filter((turn) => turn.status === "completed").at(-1);

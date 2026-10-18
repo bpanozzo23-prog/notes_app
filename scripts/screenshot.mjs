@@ -10,6 +10,7 @@ import { mkdirSync, writeFileSync, unlinkSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium, devices } from "playwright";
 import { notebookAnswer, followupAnswer, noteAnswer, refusalAnswer, cutAnswer, overloadedAnswer, fallbackAnswer } from "../src/claude/fixtures/ask.js";
+import { tidyClass, tidyImage, tidyMalformed, tidyCut, tidyRefusal, tidyUnknown } from "../src/claude/fixtures/tidy.js";
 import { sseFrames } from "../src/claude/fixtures/responses.js";
 import { installSteppedClaudeFetch } from "../src/claude/fixtures/browser.js";
 
@@ -41,6 +42,8 @@ await context.route("https://api.anthropic.com/**", async (route) => {
 });
 // Question markers are a screenshot convention only, never part of the app.
 await context.addInitScript(installSteppedClaudeFetch, { smoke: sseFrames(), cases: [
+  ["[shot:tidy-class]", tidyClass], ["[shot:tidy-image]", tidyImage], ["[shot:tidy-invalid]", tidyMalformed],
+  ["[shot:tidy-cut]", tidyCut], ["[shot:tidy-refusal]", tidyRefusal], ["[shot:tidy-unknown]", tidyUnknown],
   ["[shot:refusal]", refusalAnswer], ["[shot:cut]", cutAnswer], ["[shot:overloaded]", overloadedAnswer],
   ["[shot:fallback]", fallbackAnswer], ["¿Me das un ejercicio?", followupAnswer],
   ["Describe la captura", noteAnswer], ["repasar", notebookAnswer],
@@ -453,6 +456,65 @@ await sendDisclosed(); await release(); await page.getByLabel("Follow-up questio
 await newQuestion(); await beginAsk("[shot:fallback]"); await sendDisclosed(); await release();
 await page.getByText(/answered by Opus 4.8/).waitFor(); await shot("87-ask-fallback");
 await newQuestion(); await back(); await back();
+// Phase 3c: fixture-only proposals, partial approval, stale refusal and both Undo paths.
+// The same script accepts width/height arguments: run at 412, 375, and reduced height.
+const beginTidy = async (instruction, sheetShot = false) => {
+  await button("Claude").click();
+  await page.getByLabel("What should Claude do? Leave blank to fix mistakes and tidy the formatting.").fill(instruction);
+  if (sheetShot) await shot("88-note-tidy-sheet");
+  await button("Continue").click();
+  const discardOther = page.getByRole("dialog", { name: "Discard Claude's other proposal?" });
+  if (await discardOther.isVisible()) await button("Discard and continue").click();
+  await askDialog().waitFor();
+};
+const finishTidy = async () => { await sendDisclosed(); await release(); await page.getByRole("button", { name: /^Apply \d+ changes?$/ }).waitFor(); };
+const applyTidy = async () => { await page.getByRole("button", { name: /^Apply \d+ changes?$/ }).click(); await page.getByText(/^Applied \d+ changes?\.$/).waitFor(); };
+await button("Notas de clase").click();
+await beginTidy("Fix accents and make the supplies a list. [shot:tidy-class]", true);
+await shot("89-tidy-disclosure"); await sendDisclosed(); await release(2);
+await page.getByText(/^Claude is working on a proposal/).waitFor(); await shot("90-tidy-working");
+await release(); await button("Apply 3 changes").waitFor(); await shot("91-tidy-review-top");
+// Each paragraph edited in place is its own change; the second turns into the list.
+await page.locator('article[aria-label="Change 2 of 2"] .bg-blue-50 ul').scrollIntoViewIfNeeded();
+await shot("92-tidy-list-change");
+await page.getByRole("checkbox", { name: /^Tags:/ }).uncheck();
+await button("Apply 2 changes").scrollIntoViewIfNeeded(); await shot("93-tidy-partial");
+await applyTidy(); await shot("94-tidy-applied"); await back();
+await page.getByLabel("Note body").waitFor(); await shot("95-note-after-tidy");
+await page.goForward(); await button("Undo").click(); await page.getByText("Earlier version restored.", { exact: true }).waitFor();
+await back(); await page.getByLabel("Note body").waitFor(); await shot("96-note-after-undo");
+await beginTidy("[shot:tidy-class]"); await finishTidy(); await back();
+await page.getByLabel("Title", { exact: true }).fill("Notas de clase editada");
+await button("Claude's proposal is ready · Review").click();
+await page.getByText("This note changed since Claude read it. Ask again.", { exact: true }).waitFor();
+await shot("97-tidy-stale"); await button("Discard").click();
+await page.getByLabel("Title", { exact: true }).fill("Notas de clase");
+await beginTidy("[shot:tidy-class]"); await finishTidy(); await applyTidy(); await back();
+await page.getByLabel("Title", { exact: true }).fill("Mis notas después de Claude");
+await page.goForward(); await button("Undo").click();
+await button("Restore the earlier versions as new notes").waitFor(); await shot("98-tidy-undo-conflict");
+await button("Restore the earlier versions as new notes").click();
+await page.getByText("Earlier versions restored as new notes.", { exact: true }).waitFor();
+await back(); await back(); await button("Notas de clase (before Claude)").waitFor(); await shot("99-tidy-earlier-copy");
+await button("Captura de ejemplo").click(); await beginTidy("Remove the image. [shot:tidy-image]"); await finishTidy();
+await page.getByText("Removes an image", { exact: true }).scrollIntoViewIfNeeded(); await shot("100-tidy-image-removal");
+await button("Discard").click(); await back();
+await button("Notas de clase (before Claude)").click(); await beginTidy("[shot:tidy-class]"); await sendDisclosed();
+await back(); await back(); await release(); await button("Claude's proposal is ready · Review").waitFor(); await shot("101-tidy-ready-bar");
+await button("Claude's proposal is ready · Review").click(); await button("Discard").click();
+for (const [marker, name, expected] of [
+  ["invalid", "102-tidy-invalid", "Claude's proposal couldn't be used; nothing was changed."],
+  ["cut", "103-tidy-cut-short", "The proposal was cut short; nothing was changed."],
+  ["refusal", "105-tidy-refusal", "Claude declined to answer this."],
+]) {
+  await button("Notas de clase (before Claude)").click(); await beginTidy(`[shot:tidy-${marker}]`);
+  await sendDisclosed(); await release(); await page.getByText(expected, { exact: true }).waitFor(); await shot(name);
+  await button("Discard").click(); await back();
+}
+await button("Notas de clase (before Claude)").click(); await beginTidy("[shot:tidy-class]"); await finishTidy(); await applyTidy();
+await back(); await back(); await button("Settings").click(); await button("Claude On").click();
+await button("Undo Claude's last change").waitFor(); await button("Undo Claude's last change").scrollIntoViewIfNeeded(); await shot("104-claude-settings-undo");
+await back(); await back();
 await button("Vocabulario — comida").click();
 // Only this fresh browser context's fixture notebook is involved in the guard screenshots.
 await page.evaluate(() => {

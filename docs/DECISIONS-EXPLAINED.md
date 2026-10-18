@@ -5,7 +5,7 @@ this one is for the owner: what was chosen, why, what it means for the app, what
 and how hard it would be to reverse ("lock-in"). Ordered by lock-in, hardest first. Updated whenever
 `DECISIONS.md` gains an entry with consequences for how the app behaves.
 
-Last updated 2026-10-18, with note dates (§53).
+Last updated 2026-10-18, at step 3c (§54).
 
 ---
 
@@ -836,3 +836,27 @@ most recently edited first.
 housekeeping such as a deleted folder, don't change it. From step 3c, applying a change Claude
 proposed counts as an edit.
 **Lock-in: none.** Nothing new is stored.
+
+### 54. Step 3c: Claude tidies one note, with your approval
+
+**Chosen:** in a note, the Claude button now also offers **Tidy this note**, with an optional
+instruction ("fix my accents", "make this a list"; leave it blank and Claude fixes mistakes and
+makes the formatting consistent, changing as little as possible). A confirmation box says what
+goes (this note's text, formatting, title, folder and tags; your folder names, tags and the
+titles of your other notes; no images, no Trash) and the estimated cost. Claude's suggestion
+opens on **Review Claude's changes**: each changed paragraph, list or callout is a numbered
+change with Before above After, a "Words" line for small fixes ("tu → tú") or what the
+formatting became ("now a bulleted list"), and anything it does to a picture or link. A new title,
+tags or folder are rows of their own; you can edit the title. Everything starts ticked; untick
+what you don't want and tap **Apply N changes**. If the note changed since Claude read it,
+nothing is applied and you're asked to ask again. **Undo** appears right after applying and in
+Settings → Claude; if you've edited the note since, it offers to restore the earlier version as a
+new note "(before Claude)" instead of overwriting your edit. If you leave while Claude works, a
+bar at the top says "Claude's proposal is ready · Review"; nothing jumps screens on its own.
+**What changed during review:** opening a note Claude had just tidied quietly re-saved it,
+because the editor adds an empty line after a list or heading at the end of a note and Claude's
+version didn't have it; that made the note look edited and stopped a clean Undo. The app now
+adds that line the same way the editor does, and a test checks the two always agree.
+**What you'll notice:** applied changes count as an edit (the note moves to the top of the list
+with today's date). Undo puts the note back exactly, including its old edit date.
+**Lock-in:** as §44–47.

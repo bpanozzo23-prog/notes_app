@@ -95,6 +95,10 @@ LLM can read. The code may become public; the notes never are.
 - **Note dates — committed 2026-10-18 (0.3.2, owner's request).** Each note ends with "Created …
   · Edited …"; the notes list shows each note's last edit beside its folder. The remaining Phase 3
   steps are each one version later than the direction file lists (3c is 0.3.3).
+- **Phase 3c — committed 2026-10-18 (0.3.3).** Tidy this note: Claude proposes, the review shows
+  each change Before/After with ticks (all ticked to start), Apply only if the note is unchanged
+  since Claude read it, all-or-nothing, and Undo (or "(before Claude)" copies after a later
+  edit). Released after the owner exports a backup; owner phone check pending.
 
 ## Running it
 

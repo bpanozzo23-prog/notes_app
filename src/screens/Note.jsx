@@ -6,6 +6,7 @@ import ScreenHeader from "../components/ScreenHeader.jsx";
 import FolderPicker from "../components/FolderPicker.jsx";
 import TagInput from "../components/TagInput.jsx";
 import Dialog from "../components/Dialog.jsx";
+import { captureTidyPayload } from "../claude/proposals.js";
 import { claudeSession } from "../claude/session.js";
 import Confirm from "../components/Confirm.jsx";
 import { noteTitle, tagsInUse, visibleNotes } from "../lib/notebookView.js";
@@ -17,11 +18,23 @@ const CONTENT_FIELDS = ["title", "html", "folderId", "tags"];
 export default function Note({ initialNote, notes, folders, toolbarIds, formatting, readOnly = false, queue, status, busy, onBack, onDelete, onOpenNote, error, run, refresh, onImageError, claudeReady, onOpen }) {
   const [note, setNote] = useState(initialNote);
   const [claudeSheet, setClaudeSheet] = useState(false);
+  const [instruction, setInstruction] = useState("");
+  const [confirmTidy, setConfirmTidy] = useState(false);
+  async function tidyNote(confirmed = false) {
+    const existing = claudeSession.getSnapshot().proposal;
+    if (!confirmed && existing) { setClaudeSheet(false); setConfirmTidy(true); return; }
+    const success = await run(async () => {
+      await queue.flush();
+      const payload = await captureTidyPayload(note.id, instruction);
+      if (!claudeSession.prepareProposal(payload)) throw new Error("Wait for Claude's current request to finish.");
+    });
+    if (success) { setClaudeSheet(false); setConfirmTidy(false); onOpen({ screen: "claude-review" }); }
+  }
   const [confirmAsk, setConfirmAsk] = useState(false);
   function askNote(clear = false) {
     const scope = claudeSession.getSnapshot().conversation?.scope;
     if (!clear && scope && (scope.kind !== "note" || scope.noteId !== note.id)) { setClaudeSheet(false); setConfirmAsk(true); return; }
-    if (clear) claudeSession.clearSession();
+    if (clear) claudeSession.clearConversation();
     claudeSession.setPendingScope({ kind: "note", noteId: note.id });
     setClaudeSheet(false); setConfirmAsk(false); onOpen({ screen: "ask" });
   }
@@ -78,7 +91,13 @@ export default function Note({ initialNote, notes, folders, toolbarIds, formatti
         </li>)}
       </ul>
     </section>}
-    {claudeSheet && <Dialog title="Claude" sheet onClose={() => setClaudeSheet(false)}><button className="app-button w-full" onClick={() => askNote()}>Ask about this note</button></Dialog>}
+    {claudeSheet && <Dialog title="Claude" sheet busy={busy} onClose={() => setClaudeSheet(false)}><div className="space-y-3"><button className="app-button w-full" disabled={busy} onClick={() => askNote()}>Ask about this note</button>
+      <h2 className="font-semibold">Tidy this note</h2>
+      <label className="block text-sm" htmlFor="tidy-instruction">What should Claude do? Leave blank to fix mistakes and tidy the formatting.</label>
+      <textarea id="tidy-instruction" disabled={busy} rows={3} maxLength={500} className="w-full rounded border p-2" value={instruction} onChange={(event) => setInstruction(event.target.value)} />
+      <button className="app-button" disabled={busy || readOnly || claudeSession.isBusy()} onClick={() => tidyNote()}>Continue</button>
+    </div></Dialog>}
+    {confirmTidy && <Confirm title="Discard Claude's other proposal?" confirmLabel="Discard and continue" busy={busy} onCancel={() => setConfirmTidy(false)} onConfirm={() => tidyNote(true)}>Only one proposal is kept at a time.</Confirm>}
     {confirmAsk && <Confirm title="Clear the current conversation and ask about this note?" confirmLabel="Clear and ask" onCancel={() => setConfirmAsk(false)} onConfirm={() => askNote(true)}>The current answers will be cleared.</Confirm>}
     <p className="mx-4 mt-6 text-xs text-[var(--color-muted)]">{noteDates(note)}</p>
     {linkEditor && <LinkPicker editor={linkEditor} noteId={note.id} notes={notes} folders={folders} onClose={() => setLinkEditor(null)} />}

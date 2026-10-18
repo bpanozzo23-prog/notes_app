@@ -605,3 +605,36 @@ Append-only. One dated line per decision: what was decided, then why, after the 
 - 2026-10-18 — This ships as 0.3.2, before 3c, so the remaining Phase 3 steps are each one
   version later than `docs/PHASE-3-DIRECTION.md` lists: 3c 0.3.3, 3d 0.3.4, 3e 0.3.5, 3f 0.3.6,
   3g 0.3.7. — The owner wanted it before the tidy steps; the direction file is left as approved.
+
+## Phase 3c implementation
+
+- 2026-10-18 — Tidy captures only the generation and the two colour preferences, alongside notes, folders and image metadata in one read transaction. Handle maps are stored as frozen entry arrays and reconstructed as Maps at the HTML boundary. — `Object.freeze(Map)` does not prevent `set`; neither the key nor image bytes should enter a proposal payload. Missing and trashed link targets receive handles but their titles and bodies are never sent.
+- 2026-10-18 — An unsent proposal has an internal `disclosure` state in the session store; each proposal also has an identity independent of the current network request. New question clears only Ask, while Discard clears only the proposal. — The disclosure must survive navigation without sending, and later Ask requests must not prevent review or Apply of an existing proposal.
+- 2026-10-18 — Link defaults come from the schema built from the actual editor extensions; unissued references are removed before review, and an invalid resulting document is refused. Preview links prevent ordinary, auxiliary and context-menu activation. — Editor defaults should not be duplicated, and generated links must never open anything from the review.
+- 2026-10-18 — Adjacent changed blocks remain one change, except standalone images, which have separate ticks. The sample's two consecutive class paragraphs therefore share one body-change card (spelling fixes and a new list), with a separate tags tick. — This follows the approved `diffArrays` grouping rule; splitting adjacent replacements into paragraph pairs would guess at correspondence and conflict with structural changes.
+- 2026-10-18 — The source folder and any suggested existing destination are checked by id and exact name on review and inside Apply. Ambiguous case-insensitive folder matches are refused; a newly occupied create-name is stale. New-folder patches use a local `{ create: name }` reference resolved to a fresh id inside the transaction, and unused creation requests are refused. — No folder is created before approval, and no concurrent rename or creation silently changes what was reviewed.
+- 2026-10-18 — Apply returns the number of notes written; the review separately reports the number of approved ticks. Undo uses the shared writer in housekeeping mode, then restores the prior `updatedAt` inside the same transaction; copies receive fresh ids and dates. Old-body image marks are cleared when the undo record is written, as well as during cleanup. — Revision numbers always advance, and an already-running unused-image clock cannot expire an image that Undo now needs.
+- 2026-10-18 — Tidy estimates price input without caching and use twice the note HTML's estimated tokens plus 3,000 for output. Completed unusable and cut-short replies still record their known cost; interrupted replies retain a lower bound from message-start usage. — Proposal requests do not set a cache point, and a paid but unusable response must not disappear from the spending estimate.
+- 2026-10-18 — Added textareas to the shared dialog focus loop, and ignored malformed Undo records in the Settings row. — The new instruction box must be keyboard reachable; an invalid device-local preference must not crash Settings or expose arbitrary preference contents.
+- 2026-10-18 — Shots 88–105 exercise tidy disclosure, working, partial review, Apply, both Undo paths, stale detection, image effects, the ready bar, failures and Settings Undo, using only fixture markers in the screenshot script. The existing public sample was regenerated unchanged and fixture assumptions are tested against it. — No new content vocabulary is needed. The agent did not run screenshots, start a server, install packages or make real requests; the owner's task reserves screenshots and phone checks for the owner. Version 0.3.3; schema remains 4.
+- 2026-10-18 — A final generation-only read before Send refuses an undisclosed notebook replacement even if its broadcast was missed, without rejecting ordinary edits to the frozen snapshot. Undo confirmations and conflict offers retain the specific change id they describe. — These close two races: sending a replaced notebook, and restoring copies from a newer Undo record while an older offer is open. Android Back closes the disclosure overlay first; its Cancel button returns to the note without racing the shared overlay recovery.
+- 2026-10-18 — Starting another tidy confirms replacement of any in-memory proposal, including one for the same note. — A new capture creates a different proposal even when the note id is unchanged; the previous review must not disappear silently.
+- 2026-10-18 — Review fixes. (1) Whole note bodies are normalised exactly as the editor stores
+  them: the editor appends an empty paragraph on its first transaction when a note ends with a
+  block other than a paragraph or callout (StarterKit's TrailingNode with `notAfter:
+  ["callout"]`), and our serialiser did not, so merely opening a note whose tidied body ended in a
+  list saved it again: `updatedAt` moved ("Edited") and a clean Undo became the copies-only
+  conflict. Found by the screenshot run (Apply → Back → Forward → Undo). `normalizeBody`,
+  `fromClaudeHtml` and `assembleBody` now add it; a test compares `normalizeBody` with a real
+  editor's HTML after one transaction for every supported sample and sample note. (2) Neighbouring
+  blocks each edited in place pair one-to-one, so each has its own tick (the contract's per-block
+  approval); uneven groups stay one change, and trailing empty paragraphs travel with the last
+  pair. (3) A change whose shape changed ("now a bulleted list") hides the word-by-word line,
+  which was unreadable there; the editor's end-of-note empty line is left out of previews (still
+  saved). (4) "Apply 1 change" / "Applied 1 change." wording, without a duplicate "· Undo" text.
+  (5) The ready bar is sticky, so it is visible on a scrolled list. — Found reading the diff and
+  shots 88–105.
+- 2026-10-18 — Noted, not changed: a note whose stored HTML ends in a list or heading without
+  the trailing paragraph (only HTML not written by this editor: the public sample notebook, or a
+  hand-made backup) is saved once when first opened, which moves its edit date. Notes typed in the
+  app always already have it.

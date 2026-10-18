@@ -2,7 +2,7 @@ import { createContext, useContext, useId, useLayoutEffect, useRef } from "react
 import { createPortal } from "react-dom";
 import { useOverlay } from "../lib/overlays.jsx";
 
-const focusables = (node) => [...node.querySelectorAll('button:not(:disabled), input:not(:disabled), select:not(:disabled), [tabindex="0"]')];
+const focusables = (node) => [...node.querySelectorAll('button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex="0"]')];
 
 export const DialogLock = createContext(false);
 

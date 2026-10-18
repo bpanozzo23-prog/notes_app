@@ -196,3 +196,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--color-accen
 .image-missing { padding: 2rem; background: #f3f4f6; text-align: center; }
 
 .image-size-toggle[aria-pressed="true"] { background: #dbeafe; box-shadow: inset 0 0 0 2px #2563eb; }
+
+/* Proposal previews use the real editor vocabulary without its typing-area minimum. */
+.claude-preview .ProseMirror { min-height: 0; overflow-wrap: anywhere; }
+.claude-preview .ProseMirror a { cursor: default; }
+.claude-preview .ProseMirror input { pointer-events: none; }

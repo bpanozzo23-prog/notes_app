@@ -101,6 +101,6 @@ export default function Ask({ notes, trash, folders, openNote, queue, run, busy,
       {state.request?.kind === "ask" && <button className="app-button" onClick={() => claudeSession.cancelRequest()}>Cancel</button>}
     </div>
     {prepared && <Disclosure prepared={prepared} busy={preparingImages} disabled={disabled} message={notice || disabledMessage} onImages={includeImages} onCancel={() => setPrepared(null)} onSend={sendFirst} />}
-    {confirmNew && <Confirm title="Clear this conversation?" confirmLabel="Clear conversation" onCancel={() => setConfirmNew(false)} onConfirm={() => { claudeSession.clearSession(); setQuestion(""); setConfirmNew(false); }}>The answers will be cleared from this session.</Confirm>}
+    {confirmNew && <Confirm title="Clear this conversation?" confirmLabel="Clear conversation" onCancel={() => setConfirmNew(false)} onConfirm={() => { claudeSession.clearConversation(); setQuestion(""); setConfirmNew(false); }}>The answers will be cleared from this session.</Confirm>}
   </section>;
 }

@@ -1,6 +1,6 @@
 {
   "name": "notes_app",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "scripts": {
     "dev": "vite --host",
     "build": "vite build",
@@ -22,6 +22,7 @@
     "@tiptap/react": "^3.32.0",
     "@tiptap/starter-kit": "^3.32.0",
     "dexie": "^4.4.6",
+    "diff": "^9.0.0",
     "lucide-react": "^1.57.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",

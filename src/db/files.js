@@ -35,8 +35,12 @@ export async function cleanupFiles(now = new Date()) {
   if (notebookAccess.getSnapshot().readOnly) return;
   const at = new Date(now).toISOString();
   const cutoff = new Date(new Date(now).getTime() - FILE_RETENTION_MS).toISOString();
-  return writeTransaction([db.notes, db.files, db.fileData], async () => {
+  return writeTransaction([db.notes, db.files, db.fileData, db.prefs], async () => {
     const referenced = new Set((await db.notes.toArray()).flatMap((note) => extractFileIds(note.html)));
+    const undo = (await db.prefs.get("claudeLastChange"))?.value;
+    if (Array.isArray(undo?.notes)) for (const entry of undo.notes) {
+      if (typeof entry?.before?.html === "string") for (const id of extractFileIds(entry.before.html)) referenced.add(id);
+    }
     // Index cursors return ids only; null marks have no unusedSince index entry.
     const [ids, markedIds] = await Promise.all([
       db.files.toCollection().primaryKeys(), db.files.orderBy("unusedSince").primaryKeys(),

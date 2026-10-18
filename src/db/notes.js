@@ -56,18 +56,25 @@ export async function createNote({ folderId = null, title = "", html = "<p></p>"
 }
 
 export async function updateNote(id, patch) {
-  const clean = cleanPatch(patch);
+  const clean = cleanPatch(patch); // Validate and capture before opening the transaction.
+  const captured = Object.fromEntries(Object.keys(patch).map((key) => [key, clean[key]]));
   return writeTransaction([db.notes, db.folders, db.files], async () => {
     const note = await db.notes.get(id);
     if (!note) throw new Error("Note does not exist");
-    if (Object.hasOwn(clean, "folderId")) await checkFolder(clean.folderId);
-    const edited = EDIT_FIELDS.some((key) => Object.hasOwn(clean, key) &&
-      JSON.stringify(clean[key]) !== JSON.stringify(note[key]));
-    const next = { ...note, ...clean, updatedAt: edited ? nowIso() : note.updatedAt, rev: note.rev + 1 };
-    await db.notes.put(next);
-    if (Object.hasOwn(clean, "html")) await clearReferencedFileMarks(next.html);
-    return next;
+    return writeNoteInTransaction(note, captured);
   });
+}
+
+// Only call inside a guarded notes/folders/files transaction.
+export async function writeNoteInTransaction(note, patch, { housekeeping = false } = {}) {
+  const clean = cleanPatch(patch);
+  if (Object.hasOwn(clean, "folderId")) await checkFolder(clean.folderId);
+  const edited = EDIT_FIELDS.some((key) => Object.hasOwn(clean, key) &&
+    JSON.stringify(clean[key]) !== JSON.stringify(note[key]));
+  const next = { ...note, ...clean, updatedAt: edited && !housekeeping ? nowIso() : note.updatedAt, rev: note.rev + 1 };
+  await db.notes.put(next);
+  if (Object.hasOwn(clean, "html")) await clearReferencedFileMarks(next.html);
+  return next;
 }
 
 export const setPinned = (id, pinned) => updateNote(id, { pinned });

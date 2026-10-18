@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import ScreenHeader from "../../components/ScreenHeader.jsx";
+import ClaudeUndo from "../../components/ClaudeUndo.jsx";
 import Confirm from "../../components/Confirm.jsx";
 import { db, writeTransaction, notebookAccess, ReadOnlyNotebookError, NotebookReplacedError, DATABASE_UPDATED } from "../../db/db.js";
 import { useClaudeStatus, saveClaudeKey, setClaudeEnabled, removeClaudeKey, readClaudeSpend } from "../../claude/prefs.js";
@@ -7,7 +8,7 @@ import { loadClaudeSdk, testClaudeKey } from "../../claude/client.js";
 import { claudeSession, canStartClaudeRequest } from "../../claude/session.js";
 import { SPEND_LIMIT_URL } from "../../claude/config.js";
 
-export default function ClaudeSettings({ busy, readOnly, onBack, run, refresh, error }) {
+export default function ClaudeSettings({ busy, readOnly, onBack, run, refresh, error, queue }) {
   const [revision, setRevision] = useState(0);
   const status = useClaudeStatus(revision);
   const access = useSyncExternalStore(notebookAccess.subscribe, notebookAccess.getSnapshot);
@@ -90,6 +91,7 @@ export default function ClaudeSettings({ busy, readOnly, onBack, run, refresh, e
           {status.hasKey && !typed ? "Turn on" : "Save key and turn on"}
         </button>
       </>}
+      <ClaudeUndo settings run={run} queue={queue} refresh={refresh} disabled={disabled} />
     </div>
     {confirmRemove && <Confirm title="Remove the API key from this phone?" confirmLabel="Remove key" busy={disabled} error={error}
       onCancel={() => setConfirmRemove(false)} onConfirm={() => run(async () => {

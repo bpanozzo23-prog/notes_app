@@ -8,6 +8,8 @@ import useNotebook from "./lib/useNotebook.js";
 import { activeEntry, createNavigationController, initialNavigation } from "./lib/navigation.js";
 import { resolveFormatting } from "./editor/formatting.js";
 import { notebookAccess, ReadOnlyNotebookError, NotebookReplacedError, DATABASE_UPDATED } from "./db/db.js";
+import ClaudeReview from "./screens/ClaudeReview.jsx";
+import ClaudeReadyBar from "./components/ClaudeReadyBar.jsx";
 import Ask from "./screens/Ask.jsx";
 import NotesList from "./screens/NotesList.jsx";
 import Note from "./screens/Note.jsx";
@@ -200,15 +202,17 @@ export default function App() {
       <button className="min-h-11 underline" disabled={busy || access.replaced || access.versionChange === "closed" || waitingForReload} onClick={retrySave}>Retry save</button>
     </div>}
     {message && <p role="status" className="mx-4 my-3 text-sm">{message}</p>}
+    {ready && <ClaudeReadyBar screen={route.screen} onOpen={open} busy={locked} />}
     {ready && <div className="flex flex-1 flex-col" inert={locked} aria-busy={locked}>
       {route.screen === "list" && <NotesList key={route.key} {...notebook} busy={locked} readOnly={access.readOnly} trashCount={notebook.trash.length} filter={route.filter} query={route.query} onQuery={nav.setQuery} onFilter={nav.setFilter} claudeReady={claudeReady} onOpen={open} onNew={() => run(newNote)} />}
       {route.screen === "note" && selected && <Note key={route.key} {...shared} onImageError={setMessage} initialNote={selected} notes={notebook.notes} folders={notebook.folders} queue={queue} status={status} onDelete={deleteNote} onOpenNote={openNote}
         formatting={formatting} claudeReady={claudeReady} onOpen={open} />}
+      {route.screen === "claude-review" && <ClaudeReview {...notebook} {...shared} queue={queue} claudeReady={claudeReady} />}
       {route.screen === "ask" && <Ask {...notebook} {...shared} claudeReady={claudeReady} openNote={openNote} onOpen={open} queue={queue} />}
       {route.screen === "folders" && <Folders {...notebook} {...shared} />}
       {route.screen === "trash" && <Trash trash={notebook.trash} {...shared} />}
       {route.screen === "settings" && <Settings cleanupError={cleanupError} {...shared} notebook={notebook} queue={queue} onOpen={open} setMessage={setMessage} updateState={updateState} />}
-      {route.screen === "settings-claude" && <ClaudeSettings {...shared} />}
+      {route.screen === "settings-claude" && <ClaudeSettings {...shared} queue={queue} />}
       {route.screen === "settings-toolbar" && <ToolbarSettings {...shared} formatting={formatting} />}
       {route.screen === "settings-styles" && <StyleSettings {...shared} formatting={formatting} />}
       {route.screen === "settings-colours" && <ColourSettings {...shared} formatting={formatting} />}
