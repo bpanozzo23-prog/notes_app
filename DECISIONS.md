@@ -661,3 +661,18 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   fieldset to keep Copy as text usable in read-only mode had left tags looking editable; nothing
   would have saved). A test checks every control in the row. The remaining Phase 3 steps are each
   one more version later: 3d 0.3.5, 3e 0.3.6, 3f 0.3.7, 3g 0.3.8. — Found reading the diff.
+- 2026-10-18 — The owner verified the text export on the published app (Export notes as text,
+  Copy as text): "The phone check passes."
+
+## Agent testing with real requests (2026-10-18)
+
+- 2026-10-18 — The agent gets its own test key (`~/.config/notes_app/test-key`, mode 600, in a
+  separate Anthropic workspace `notes_app-tests` with its own spend limit), used only against the
+  made-up sample notebook, never the owner's notes, and never handed to Codex. Standing allowance:
+  up to $1 per step without asking, each run's cost reported; more needs the owner's go-ahead with
+  a reason. Recorded in `AGENTS.md`. — The owner asked what the agent could test with the right
+  access; real requests let it check Claude's actual answers, citations, caching, costs and
+  proposals before they reach the phone. The workspace limit is the hard cap.
+- 2026-10-18 — Also planned without any new access: service-worker update and offline tests on
+  a production build, page freeze/resume during a request (Android app switching) and dropped
+  connections mid-stream, in headless Chromium. — Covers several phone-checklist items.

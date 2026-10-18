@@ -25,6 +25,12 @@ features; the owner's notes are the one thing that must never be lost or leaked.
   say plainly what it did not see.
 - **Never commit a note, a backup or a key.** `.gitignore` covers the known paths; keep it that way
   and check `git status` before every commit. Commit only when asked.
+- **Real Claude requests cost the owner money.** Tests and shots use made-up fixtures. For real-API
+  checks there is a test key at `~/.config/notes_app/test-key` (mode 600, outside the repo; its own
+  Anthropic workspace `notes_app-tests` with a spend limit). Use it only against the made-up sample
+  notebook, never the owner's notes; never print, log or copy it; never give it to Codex. Standing
+  allowance (owner, 2026-10-18): up to **$1 per step** without asking, each run's cost reported;
+  above that, ask first with the reason. Free calls (token counting) need no allowance.
 - **Explain choices and define jargon the first time it appears.** The owner reads everything.
 - **Copy mi-cuaderno's patterns, not its code.** `~/code/mi-cuaderno` has the Dexie layer, backup
   export/import, the on-device Anthropic key with a spend cap, and the PWA/GitHub Pages setup.
