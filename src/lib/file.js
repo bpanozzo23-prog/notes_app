@@ -8,7 +8,15 @@ export function jsonBlob(obj) {
 }
 
 export function downloadJson(obj, filename) {
-  const url = URL.createObjectURL(jsonBlob(obj));
+  downloadBlob(jsonBlob(obj), filename);
+}
+
+export function downloadText(text, filename) {
+  downloadBlob(new Blob([text], { type: "text/markdown;charset=utf-8" }), filename);
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.download = filename;

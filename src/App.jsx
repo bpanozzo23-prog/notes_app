@@ -206,7 +206,7 @@ export default function App() {
     {ready && <div className="flex flex-1 flex-col" inert={locked} aria-busy={locked}>
       {route.screen === "list" && <NotesList key={route.key} {...notebook} busy={locked} readOnly={access.readOnly} trashCount={notebook.trash.length} filter={route.filter} query={route.query} onQuery={nav.setQuery} onFilter={nav.setFilter} claudeReady={claudeReady} onOpen={open} onNew={() => run(newNote)} />}
       {route.screen === "note" && selected && <Note key={route.key} {...shared} onImageError={setMessage} initialNote={selected} notes={notebook.notes} folders={notebook.folders} queue={queue} status={status} onDelete={deleteNote} onOpenNote={openNote}
-        formatting={formatting} claudeReady={claudeReady} onOpen={open} />}
+        formatting={formatting} claudeReady={claudeReady} onOpen={open} setMessage={setMessage} />}
       {route.screen === "claude-review" && <ClaudeReview {...notebook} {...shared} queue={queue} claudeReady={claudeReady} />}
       {route.screen === "ask" && <Ask {...notebook} {...shared} claudeReady={claudeReady} openNote={openNote} onOpen={open} queue={queue} />}
       {route.screen === "folders" && <Folders {...notebook} {...shared} />}

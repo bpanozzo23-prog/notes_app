@@ -1,0 +1,350 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`exports the public sample deterministically without preferences or image bytes 1`] = `
+"# Notes — exported 18 Oct 2026, 14:52
+18 notes. Made by notes_app. Pictures appear as [image]; links between notes as "text [→ Title]".
+
+## Español
+
+### Vocabulario — comida
+Tags: spanish, vocab · Created 1 Oct 2026 · Edited 16 Oct 2026 · Pinned
+
+##### Frutas y verduras
+
+- la manzana — apple
+- el plátano — banana
+- la zanahoria — carrot
+- el pimiento — pepper (the vegetable)
+
+##### En el restaurante
+
+- la cuenta, por favor — the bill, please
+- ¿Qué me recomienda? — what do you recommend?
+- ¡Buen provecho! — enjoy your meal
+
+Ver también Gramática — ser y estar [→ Gramática — ser y estar] y Frases útiles [→ Frases útiles].
+
+### Ideas para la próxima clase
+Tags: spanish · Created 19 Oct 2026 · Edited 19 Oct 2026
+
+Revisar ser y estar. Buscar ejemplos en Frases útiles y escribir dos frases nuevas.
+
+### Notas de clase
+Tags: spanish · Created 18 Oct 2026 · Edited 18 Oct 2026
+
+ojala que tu vengas mañana. el examen es en el aula grande. Tengo que recivir el correo, pero creo que se escribe recibir.
+
+Para clase necesito un cuaderno, un lapiz, repasar los verbos y traer el libro.
+
+### Muestra de formato
+Tags: test · Created 17 Oct 2026 · Edited 17 Oct 2026
+
+##### Colores y letras
+
+Amarillo · Azul · Verde · Resaltado clásico
+
+Doce puntos · Diecisiete · Veinticuatro
+
+Una frase en serif · Una frase monoespaciada
+
+Un poco de espacio para leer estas palabras de ejemplo con calma.
+
+[Note]
+###### Recordatorio
+
+Estas son palabras de muestra.
+
+[Tip]
+Practica un poco cada día:
+
+- Leer una página.
+- Escribir una frase.
+
+[Warning]
+Revisa los acentos antes de terminar.
+
+[Important]
+Guarda una copia de tus notas.
+
+Línea fina
+
+---
+
+Línea gruesa
+
+---
+
+Línea discontinua
+
+---
+
+Línea de puntos
+
+---
+
+Una palabra para recordar.
+
+Fin de la muestra.
+
+### Gramática — ser y estar
+Tags: spanish, grammar · Created 2 Oct 2026 · Edited 15 Oct 2026
+
+#### Ser vs. estar
+
+Ser for what something is: identity, origin, time, material.
+
+Estar for how or where something is: location, condition, ongoing action.
+
+> El niño es alto. El niño está cansado.
+
+##### Trampas
+
+1. "Estar" for location of people and things, "ser" for events: la fiesta es en mi casa.
+2. Adjectives that change meaning: aburrido (boring / bored), listo (clever / ready).
+
+---
+
+Lista de práctica en Frases para repasar [→ Frases para repasar].
+
+### Frases para repasar
+Tags: spanish, todo · Created 4 Oct 2026 · Edited 14 Oct 2026
+
+[x] subjuntivo después de "ojalá"
+[ ] pretérito vs. imperfecto
+[ ] por vs. para
+
+Reglas en la nota de gramática [→ Gramática — ser y estar].
+
+### Frases útiles
+Tags: spanish, phrases · Created 3 Oct 2026 · Edited 10 Oct 2026
+
+- ¿Me puedes echar una mano? — can you give me a hand?
+- No tengo ni idea. — I have no idea.
+- Vale, nos vemos mañana. — OK, see you tomorrow.
+- Me da igual. — I don't mind.
+- Ojalá que llueva café. — if only it rained coffee (from the song).
+
+## Libros y podcasts
+
+### Lista de lecturas
+Tags: book · Created 19 Oct 2026 · Edited 19 Oct 2026
+
+Leer El principito y Pedro Páramo. Después, probar Ficciones.
+
+### Libros por leer
+Tags: book · Created 18 Oct 2026 · Edited 18 Oct 2026
+
+- El principito
+- Pedro Páramo
+- La casa de los espíritus
+
+### Cien años de soledad
+Tags: book, spanish · Created 5 Oct 2026 · Edited 12 Oct 2026
+
+Gabriel García Márquez, audiolibro. Capítulos 1–4.
+
+##### Personajes
+
+- José Arcadio Buendía — el fundador, obsesionado con la alquimia
+- Úrsula Iguarán — la que mantiene la casa en pie
+- Melquíades — el gitano, trae el hielo y los imanes
+
+##### Ideas
+
+> "El mundo era tan reciente, que muchas cosas carecían de nombre."
+
+La repetición de nombres es a propósito: el tiempo en Macondo da vueltas.
+
+### Podcast — Hidden Brain, habits
+Tags: podcast · Created 6 Oct 2026 · Edited 8 Oct 2026
+
+Episode on habit formation. Three takeaways:
+
+1. Cues beat willpower. Change the environment, not the intention.
+2. Stack a new habit onto an existing one.
+3. Missing once is fine; missing twice starts a new habit.
+
+Episode page: hiddenbrain.org <https://hiddenbrain.org/>
+
+### Atomic Habits — reread chapter 3 before the next podcast episode.
+Tags: book · Created 7 Oct 2026 · Edited 7 Oct 2026
+
+Atomic Habits — reread chapter 3 before the next podcast episode.
+
+Compare with the Hidden Brain notes [→ Podcast — Hidden Brain, habits].
+
+## Reflexiones
+
+### Reflexión — octubre
+Tags: journal · Created 8 Oct 2026 · Edited 13 Oct 2026
+
+Mes de poner orden. Lo que funcionó: estudiar español diez minutos antes del café. Lo que no: dejar las notas en tres aplicaciones distintas.
+
+Pregunta abierta: ¿qué quiero que pueda hacer el asistente con estas notas?
+
+- buscar entre todas
+- resumir un tema
+- decirme qué repasar
+
+## No folder
+
+### Prompts que reutilizo
+Tags: prompts, reuse · Created 9 Oct 2026 · Edited 11 Oct 2026 · Pinned
+
+Explain like a tutor:
+
+> Explain this Spanish sentence word by word, then give two similar examples at the same level.
+
+Review my writing:
+
+> Correct the grammar, keep my wording where it is natural, and list each change with a one-line reason.
+
+Tip: paste the note text after the prompt.
+
+### Recordatorio suelto
+Created 20 Oct 2026 · Edited 20 Oct 2026
+
+Llevar el cuaderno azul a la biblioteca el jueves.
+
+### Captura de ejemplo
+Tags: test · Created 17 Oct 2026 · Edited 17 Oct 2026
+
+Un paisaje inventado para probar las imágenes.
+
+[image]
+
+Esta imagen se guarda con la nota.
+
+### Compras
+Tags: list · Created 10 Oct 2026 · Edited 9 Oct 2026
+
+[ ] pilas AA
+[ ] café de filtro
+[x] cable USB-C
+
+### Nota larga para probar el scroll
+Tags: test · Created 11 Oct 2026 · Edited 6 Oct 2026
+
+Esta nota existe para que el editor tenga que desplazarse con el teclado abierto.
+
+###### Sección 1
+
+Párrafo 1. El niño come manzanas y la niña lee un libro mientras llueve en la ciudad. Nada de esto es real; es texto de relleno con acentos: á é í ó ú ñ.
+
+###### Sección 2
+
+Párrafo 2. El niño come manzanas y la niña lee un libro mientras llueve en la ciudad. Nada de esto es real; es texto de relleno con acentos: á é í ó ú ñ.
+
+###### Sección 3
+
+Párrafo 3. El niño come manzanas y la niña lee un libro mientras llueve en la ciudad. Nada de esto es real; es texto de relleno con acentos: á é í ó ú ñ.
+
+###### Sección 4
+
+Párrafo 4. El niño come manzanas y la niña lee un libro mientras llueve en la ciudad. Nada de esto es real; es texto de relleno con acentos: á é í ó ú ñ.
+
+###### Sección 5
+
+Párrafo 5. El niño come manzanas y la niña lee un libro mientras llueve en la ciudad. Nada de esto es real; es texto de relleno con acentos: á é í ó ú ñ.
+
+###### Sección 6
+
+Párrafo 6. El niño come manzanas y la niña lee un libro mientras llueve en la ciudad. Nada de esto es real; es texto de relleno con acentos: á é í ó ú ñ.
+
+###### Sección 7
+
+Párrafo 7. El niño come manzanas y la niña lee un libro mientras llueve en la ciudad. Nada de esto es real; es texto de relleno con acentos: á é í ó ú ñ.
+
+###### Sección 8
+
+Párrafo 8. El niño come manzanas y la niña lee un libro mientras llueve en la ciudad. Nada de esto es real; es texto de relleno con acentos: á é í ó ú ñ.
+
+###### Sección 9
+
+Párrafo 9. El niño come manzanas y la niña lee un libro mientras llueve en la ciudad. Nada de esto es real; es texto de relleno con acentos: á é í ó ú ñ.
+
+###### Sección 10
+
+Párrafo 10. El niño come manzanas y la niña lee un libro mientras llueve en la ciudad. Nada de esto es real; es texto de relleno con acentos: á é í ó ú ñ.
+
+###### Sección 11
+
+Párrafo 11. El niño come manzanas y la niña lee un libro mientras llueve en la ciudad. Nada de esto es real; es texto de relleno con acentos: á é í ó ú ñ.
+
+###### Sección 12
+
+Párrafo 12. El niño come manzanas y la niña lee un libro mientras llueve en la ciudad. Nada de esto es real; es texto de relleno con acentos: á é í ó ú ñ.
+
+###### Sección 13
+
+Párrafo 13. El niño come manzanas y la niña lee un libro mientras llueve en la ciudad. Nada de esto es real; es texto de relleno con acentos: á é í ó ú ñ.
+
+###### Sección 14
+
+Párrafo 14. El niño come manzanas y la niña lee un libro mientras llueve en la ciudad. Nada de esto es real; es texto de relleno con acentos: á é í ó ú ñ.
+
+###### Sección 15
+
+Párrafo 15. El niño come manzanas y la niña lee un libro mientras llueve en la ciudad. Nada de esto es real; es texto de relleno con acentos: á é í ó ú ñ.
+
+###### Sección 16
+
+Párrafo 16. El niño come manzanas y la niña lee un libro mientras llueve en la ciudad. Nada de esto es real; es texto de relleno con acentos: á é í ó ú ñ.
+
+###### Sección 17
+
+Párrafo 17. El niño come manzanas y la niña lee un libro mientras llueve en la ciudad. Nada de esto es real; es texto de relleno con acentos: á é í ó ú ñ.
+
+###### Sección 18
+
+Párrafo 18. El niño come manzanas y la niña lee un libro mientras llueve en la ciudad. Nada de esto es real; es texto de relleno con acentos: á é í ó ú ñ.
+
+###### Sección 19
+
+Párrafo 19. El niño come manzanas y la niña lee un libro mientras llueve en la ciudad. Nada de esto es real; es texto de relleno con acentos: á é í ó ú ñ.
+
+###### Sección 20
+
+Párrafo 20. El niño come manzanas y la niña lee un libro mientras llueve en la ciudad. Nada de esto es real; es texto de relleno con acentos: á é í ó ú ñ.
+
+###### Sección 21
+
+Párrafo 21. El niño come manzanas y la niña lee un libro mientras llueve en la ciudad. Nada de esto es real; es texto de relleno con acentos: á é í ó ú ñ.
+
+###### Sección 22
+
+Párrafo 22. El niño come manzanas y la niña lee un libro mientras llueve en la ciudad. Nada de esto es real; es texto de relleno con acentos: á é í ó ú ñ.
+
+###### Sección 23
+
+Párrafo 23. El niño come manzanas y la niña lee un libro mientras llueve en la ciudad. Nada de esto es real; es texto de relleno con acentos: á é í ó ú ñ.
+
+###### Sección 24
+
+Párrafo 24. El niño come manzanas y la niña lee un libro mientras llueve en la ciudad. Nada de esto es real; es texto de relleno con acentos: á é í ó ú ñ.
+
+###### Sección 25
+
+Párrafo 25. El niño come manzanas y la niña lee un libro mientras llueve en la ciudad. Nada de esto es real; es texto de relleno con acentos: á é í ó ú ñ.
+
+###### Sección 26
+
+Párrafo 26. El niño come manzanas y la niña lee un libro mientras llueve en la ciudad. Nada de esto es real; es texto de relleno con acentos: á é í ó ú ñ.
+
+###### Sección 27
+
+Párrafo 27. El niño come manzanas y la niña lee un libro mientras llueve en la ciudad. Nada de esto es real; es texto de relleno con acentos: á é í ó ú ñ.
+
+###### Sección 28
+
+Párrafo 28. El niño come manzanas y la niña lee un libro mientras llueve en la ciudad. Nada de esto es real; es texto de relleno con acentos: á é í ó ú ñ.
+
+###### Sección 29
+
+Párrafo 29. El niño come manzanas y la niña lee un libro mientras llueve en la ciudad. Nada de esto es real; es texto de relleno con acentos: á é í ó ú ñ.
+
+###### Sección 30
+
+Párrafo 30. El niño come manzanas y la niña lee un libro mientras llueve en la ciudad. Nada de esto es real; es texto de relleno con acentos: á é í ó ú ñ.
+"
+`;

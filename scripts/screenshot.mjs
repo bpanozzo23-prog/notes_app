@@ -108,6 +108,12 @@ await button("Import and replace").click();
 await download;
 await page.getByText(/^Backup imported\./).waitFor();
 await shot("03-settings-after-import");
+// Export the pristine public sample before any screenshot step edits its notes.
+await button("Export notes as text").scrollIntoViewIfNeeded();
+await shot("106-settings-text-export");
+const textDownload = page.waitForEvent("download");
+await button("Export notes as text").click();
+await (await textDownload).saveAs(`${out}/106-sample-export.md`);
 await back();
 await shot("04-list");
 
@@ -121,6 +127,13 @@ await button("All").click();
 
 await button("Vocabulario — comida").click();
 await shot("07-note-vocab");
+await shot("107-note-copy-as-text");
+// Force the real plain-HTTP fallback even when running against HTTPS or localhost.
+await page.evaluate(() => Object.defineProperty(navigator, "clipboard", { configurable: true, value: undefined }));
+await button("Copy as text").click();
+await page.getByText("Copied as text.", { exact: true }).waitFor();
+await shot("108-note-copied-as-text");
+await page.evaluate(() => { delete navigator.clipboard; });
 await page.getByLabel("Note body").click();
 await page.keyboard.press("Control+A");
 await shot("08-selection-menu");

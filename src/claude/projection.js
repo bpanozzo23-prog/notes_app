@@ -3,7 +3,7 @@ import { extensions } from "../editor/extensions.js";
 import { noteTitle } from "../lib/notebookView.js";
 
 // Parse through exactly the vocabulary the editor stores. No HTML is sent or rendered.
-export function noteToClaudeText(html, lookup = () => undefined) {
+export function noteToClaudeText(html, lookup = () => undefined, { headingOffset = 0 } = {}) {
   const find = typeof lookup === "function" ? lookup : (id) => lookup.get?.(id) ?? lookup[id];
   function inline(nodes = []) {
     const groups = [];
@@ -26,7 +26,7 @@ export function noteToClaudeText(html, lookup = () => undefined) {
     const children = node.content ?? [];
     switch (node.type) {
       case "paragraph": case "codeBlock": return inline(children);
-      case "heading": return `${"#".repeat(node.attrs.level)} ${inline(children)}`;
+      case "heading": return `${"#".repeat(Math.min(6, node.attrs.level + headingOffset))} ${inline(children)}`;
       case "image": return "[image]";
       case "divider": case "horizontalRule": return "---";
       case "blockquote": return children.map((child) => block(child, depth)).join("\n\n").split("\n").map((line) => `> ${line}`).join("\n");

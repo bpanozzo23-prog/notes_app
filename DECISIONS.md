@@ -642,3 +642,22 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   checklist (tidy with partial ticks, Apply, Undo, an instruction, stale refusal, Undo after an
   edit, the ready bar, cost): "Phone check passes and it seemed to handle Spanish ok and keep my
   wording."
+
+## Text export (0.3.4)
+
+- 2026-10-18 — Export notes as text downloads Markdown; Copy as text copies one note, with a
+  textarea fallback for plain HTTP or denied clipboard access. Both flush saves and read fresh
+  notes and folders, including in read-only mode; neither reads preferences or changes
+  `lastBackupAt`. — A small readable file for other apps and AI tools is not a backup.
+- 2026-10-18 — Reuse the Claude text projection with an optional heading offset (capped at six),
+  keeping its default output unchanged. Export live notes in folder/pinned/recent order, with
+  absolute en-GB dates, image markers and resolved note links; omit empty folder sections and
+  put missing-folder references under No folder. — Keep structure and every live note without
+  pictures, settings, a schema change or changes to Ask's cached prompt.
+- 2026-10-18 — Shots 106–108 cover Settings, the copy row and its success message; the script
+  saves the pristine sample's real download as `106-sample-export.md`. — The owner runs and
+  checks screenshots and phone clipboard/download behavior; these were not run by the agent.
+- 2026-10-18 — Review fix: the tag field stays inside a read-only `fieldset` (moving the row's
+  fieldset to keep Copy as text usable in read-only mode had left tags looking editable; nothing
+  would have saved). A test checks every control in the row. The remaining Phase 3 steps are each
+  one more version later: 3d 0.3.5, 3e 0.3.6, 3f 0.3.7, 3g 0.3.8. — Found reading the diff.

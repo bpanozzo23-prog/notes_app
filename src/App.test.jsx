@@ -13,11 +13,11 @@ import { createNote, getNote, trashNote } from "./db/notes.js";
 import { backupFixture, noteFixture, resetDatabase } from "./test/fixtures.js";
 import { createFolder } from "./db/folders.js";
 import { NAVIGATION_KEY, activeEntry } from "./lib/navigation.js";
-import { downloadJson } from "./lib/file.js";
+import { downloadJson, downloadText } from "./lib/file.js";
 import { stubEditorGeometry, tapEditorLink } from "./test/editor.js";
 import { extractNoteLinks } from "./lib/text.js";
 
-vi.mock("./lib/file.js", async (importOriginal) => ({ ...await importOriginal(), downloadJson: vi.fn() }));
+vi.mock("./lib/file.js", async (importOriginal) => ({ ...await importOriginal(), downloadJson: vi.fn(), downloadText: vi.fn() }));
 const pwa = vi.hoisted(() => ({ needRefresh: false, offlineReady: false, update: vi.fn(), options: null, setOfflineReady: null }));
 vi.mock("virtual:pwa-register/react", async () => {
   const { useState } = await import("react");
@@ -49,6 +49,7 @@ afterEach(async () => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   delete navigator.storage;
+  delete navigator.clipboard;
 });
 async function start() {
   render(<StrictMode><App /></StrictMode>);
@@ -495,7 +496,7 @@ it.each(["open", "purge", "refresh"])("shows a boot failure instead of an empty 
   expect(await db.notes.count()).toBe(1);
 });
 
-it("opens a newer database for reading, skips boot purge, and disables all editing and backup controls", async () => {
+it("opens a newer database for reading, allows text export/copy, and disables editing and backup controls", async () => {
   const live = await createNote({ title: "Newer notebook" });
   await db.notes.add(noteFixture({ id: "old-trash", title: "Expired", deletedAt: "2020-01-01T00:00:00.000Z" }));
   await createFolder("Read only folder");
@@ -518,6 +519,11 @@ it("opens a newer database for reading, skips boot purge, and disables all editi
   expect(screen.getByLabelText("Note body").editor.isEditable).toBe(false);
   for (const label of ["Pin note", "Choose folder", "Delete", "Bold"]) expect(screen.getByRole("button", { name: label, exact: true }).matches(":disabled")).toBe(true);
   expect(screen.getByLabelText("Add tag").matches(":disabled")).toBe(true);
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+  fireEvent.click(screen.getByRole("button", { name: "Copy as text" }));
+  await screen.findByText("Copied as text.");
+  expect(writeText.mock.calls[0][0]).toContain("# Newer notebook\nFolder: No folder");
   await back();
   fireEvent.click(screen.getByRole("button", { name: "Folders", exact: true }));
   await screen.findByLabelText("New folder name");
@@ -532,6 +538,11 @@ it("opens a newer database for reading, skips boot purge, and disables all editi
   await settings();
   expect(screen.getByRole("button", { name: "Export backup" }).disabled).toBe(true);
   expect(screen.getByLabelText("Import backup").disabled).toBe(true);
+  fireEvent.click(screen.getByRole("button", { name: "Export notes as text" }));
+  await screen.findByText("Text download started.");
+  expect(downloadText.mock.calls[0][0]).toContain("### Newer notebook");
+  expect(downloadText.mock.calls[0][0]).not.toContain("Expired");
+  expect(await getPref("lastBackupAt")).toBeUndefined();
   expect(await getNote(live.id)).toEqual(live);
   expect(await db.tombstones.count()).toBe(0);
 });

@@ -5,7 +5,7 @@ this one is for the owner: what was chosen, why, what it means for the app, what
 and how hard it would be to reverse ("lock-in"). Ordered by lock-in, hardest first. Updated whenever
 `DECISIONS.md` gains an entry with consequences for how the app behaves.
 
-Last updated 2026-10-18, at step 3c (§54).
+Last updated 2026-10-18, with the text export (§55).
 
 ---
 
@@ -860,3 +860,18 @@ adds that line the same way the editor does, and a test checks the two always ag
 **What you'll notice:** applied changes count as an edit (the note moves to the top of the list
 with today's date). Undo puts the note back exactly, including its old edit date.
 **Lock-in:** as §44–47.
+
+### 55. Your notes as text, for other apps and AI tools (your request)
+
+**Chosen:** Settings → Backup has **Export notes as text**: one readable file (`.md`, plain text
+with headings) of every note outside Trash, grouped by folder, each with its title, tags and
+dates, and its text with headings, lists and links kept and `[image]` where pictures are. It's
+small enough to paste or upload into claude.ai or any chat app, or to send me through Taildrop.
+Each note also has a **Copy as text** button (next to pin) that copies that one note the same
+way. Neither sends anything anywhere: the file downloads, the copy goes to your clipboard.
+**Why:** the backup file works but is full of web-page code and pictures written as text; this is
+the same tidy text the app already sends Claude when you ask a question.
+**What it leads to:** once exported or copied, the text is outside the app's protections, so
+treat it like any copy of your notes. It isn't a backup: it can't be imported, has no pictures or
+settings, and doesn't change "Last backup".
+**Lock-in: none.**

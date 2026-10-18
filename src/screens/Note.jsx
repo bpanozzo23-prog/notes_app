@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Pin, Trash2, Sparkles } from "lucide-react";
+import { Pin, Trash2, Sparkles, Copy } from "lucide-react";
+import { db } from "../db/db.js";
+import { liveNotes } from "../db/notes.js";
+import { allFolders } from "../db/folders.js";
+import { noteToText } from "../lib/textExport.js";
+import { copyText } from "../lib/clipboard.js";
 import NoteEditor from "../editor/NoteEditor.jsx";
 import LinkPicker from "../editor/LinkPicker.jsx";
 import ScreenHeader from "../components/ScreenHeader.jsx";
@@ -15,11 +20,23 @@ import { noteDates, nowIso } from "../lib/dates.js";
 // The fields whose change counts as an edit, as in src/db/notes.js.
 const CONTENT_FIELDS = ["title", "html", "folderId", "tags"];
 
-export default function Note({ initialNote, notes, folders, toolbarIds, formatting, readOnly = false, queue, status, busy, onBack, onDelete, onOpenNote, error, run, refresh, onImageError, claudeReady, onOpen }) {
+export default function Note({ initialNote, notes, folders, toolbarIds, formatting, readOnly = false, queue, status, busy, onBack, onDelete, onOpenNote, error, run, refresh, onImageError, claudeReady, onOpen, setMessage }) {
   const [note, setNote] = useState(initialNote);
   const [claudeSheet, setClaudeSheet] = useState(false);
   const [instruction, setInstruction] = useState("");
   const [confirmTidy, setConfirmTidy] = useState(false);
+  async function copyAsText() {
+    await queue.flush();
+    const [notes, folders] = await db.transaction("r", db.notes, db.folders, () => Promise.all([liveNotes(), allFolders()]));
+    const saved = notes.find((row) => row.id === note.id);
+    if (!saved) throw new Error("That note no longer exists or is in Trash.");
+    try {
+      await copyText(noteToText(saved, folders, notes));
+      setMessage("Copied as text.");
+    } catch {
+      setMessage("Couldn't copy. Use Settings → Export notes as text.");
+    }
+  }
   async function tidyNote(confirmed = false) {
     const existing = claudeSession.getSnapshot().proposal;
     if (!confirmed && existing) { setClaudeSheet(false); setConfirmTidy(true); return; }
@@ -70,14 +87,18 @@ export default function Note({ initialNote, notes, folders, toolbarIds, formatti
     </ScreenHeader>
     <input className="mx-4 min-w-0 bg-transparent py-2 text-xl font-semibold outline-none" aria-label="Title" placeholder="Title (optional)"
       readOnly={readOnly} value={note.title} onChange={(event) => edit({ title: event.target.value })} />
-    <fieldset disabled={readOnly} className="mx-4 mb-2 min-w-0 border-b border-[var(--color-line)] pb-3">
+    <div className="mx-4 mb-2 min-w-0 border-b border-[var(--color-line)] pb-3">
       <div className="flex items-center gap-1">
-        <div className="min-w-0 flex-1"><FolderPicker folders={folders} value={note.folderId} onChange={(folderId) => edit({ folderId })} /></div>
-        <button className="icon-button" aria-label="Pin note" aria-pressed={note.pinned} onClick={() => edit({ pinned: !note.pinned })}><Pin size={18} aria-hidden="true" /></button>
-        <button className="icon-button text-red-700" aria-label="Delete" onClick={() => setConfirmDelete(true)}><Trash2 size={18} aria-hidden="true" /></button>
+        <fieldset disabled={readOnly} className="min-w-0 flex-1"><FolderPicker folders={folders} value={note.folderId} onChange={(folderId) => edit({ folderId })} /></fieldset>
+        <button className="icon-button" aria-label="Copy as text" disabled={busy} onClick={() => run(copyAsText)}><Copy size={18} aria-hidden="true" /></button>
+        <button className="icon-button" aria-label="Pin note" disabled={readOnly} aria-pressed={note.pinned} onClick={() => edit({ pinned: !note.pinned })}><Pin size={18} aria-hidden="true" /></button>
+        <button className="icon-button text-red-700" aria-label="Delete" disabled={readOnly} onClick={() => setConfirmDelete(true)}><Trash2 size={18} aria-hidden="true" /></button>
       </div>
-      <TagInput tags={note.tags} allTags={tagsInUse(notes)} onChange={(tags) => edit({ tags })} />
-    </fieldset>
+      <fieldset disabled={readOnly} className="min-w-0">
+        {/* Copy as text works read-only; editing tags must not. */}
+        <fieldset disabled={readOnly} className="min-w-0"><TagInput tags={note.tags} allTags={tagsInUse(notes)} onChange={(tags) => edit({ tags })} /></fieldset>
+      </fieldset>
+    </div>
     <NoteEditor queue={queue} onImageError={onImageError} note={note} onChange={(html) => edit({ html })} toolbarIds={toolbarIds} formatting={formatting} readOnly={readOnly} busy={busy} run={run} refresh={refresh} error={error} onEditor={onEditor}
       ui={{ openLinkPicker, openNote: onOpenNote, removeLink }} />
     {linkedFrom.length > 0 && <section aria-label="Linked from" className="mx-4 mt-4 border-t border-[var(--color-line)] pt-4">

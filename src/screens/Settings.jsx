@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
 import { COMFORTABLE_BACKUP_BYTES, buildBackup, backupFilename, importBackup, validateBackup } from "../db/backup.js";
 import { fileStats } from "../db/files.js";
-import { setPref } from "../db/db.js";
-import { downloadJson, readFileAsText } from "../lib/file.js";
+import { db, setPref } from "../db/db.js";
+import { liveNotes } from "../db/notes.js";
+import { allFolders } from "../db/folders.js";
+import { downloadJson, downloadText, readFileAsText } from "../lib/file.js";
+import { notebookToText } from "../lib/textExport.js";
 import { nowIso } from "../lib/dates.js";
 import { APP_VERSION, SCHEMA_VERSION } from "../version.js";
 import ScreenHeader from "../components/ScreenHeader.jsx";
@@ -39,6 +42,13 @@ export default function Settings({ cleanupError, notebook, queue, run, busy, rea
     await refresh();
     setMessage("Backup download started.");
   }
+  async function exportText() {
+    await queue.flush();
+    const [notes, folders] = await db.transaction("r", db.notes, db.folders, () => Promise.all([liveNotes(), allFolders()]));
+    const now = new Date();
+    downloadText(notebookToText({ notes, folders, now }), `notes-text-${now.toISOString().slice(0, 19).replaceAll(":", "-")}.md`);
+    setMessage("Text download started.");
+  }
   async function replaceFromPreview() {
     await queue.flush();
     const before = await buildBackup();
@@ -73,6 +83,8 @@ export default function Settings({ cleanupError, notebook, queue, run, busy, rea
         <h2 className="font-semibold">Backup</h2>
         <button className="app-button" disabled={busy || readOnly} onClick={() => run(exportFile)}>Export backup</button>
         <p className="text-sm text-[var(--color-muted)]">Last backup: {prefs.lastBackupAt ? new Date(prefs.lastBackupAt).toLocaleString() : "Not yet exported"}</p>
+        <button className="app-button" disabled={busy} onClick={() => run(exportText)}>Export notes as text</button>
+        <p className="text-sm text-[var(--color-muted)]">A readable file of your notes for other apps and AI tools. No pictures or settings.</p>
       </div>
       <div className="space-y-3">
         <label className="block font-semibold" htmlFor="backup-file">Import backup</label>

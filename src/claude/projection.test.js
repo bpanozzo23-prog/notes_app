@@ -22,6 +22,12 @@ it("preserves nested lists, multiple paragraphs, hard breaks, and quotes", () =>
   expect(noteToClaudeText('<ul><li><p>First<br>line</p><p>Second</p><ol><li><p>Nested</p><ul><li><p>Deep</p></li></ul></li></ol></li></ul><blockquote><p>Quote</p><p>Again</p></blockquote>'))
     .toBe('- First\n  line\n  Second\n  1. Nested\n    - Deep\n\n> Quote\n>\n> Again');
 });
+it("offsets headings, caps them at six, and leaves the default bytes unchanged", () => {
+  const html = "<h1>One</h1><h2>Two</h2><h3>Three</h3><p>Body</p>";
+  expect(noteToClaudeText(html)).toBe("# One\n\n## Two\n\n### Three\n\nBody");
+  expect(noteToClaudeText(html, undefined, { headingOffset: 0 })).toBe(noteToClaudeText(html));
+  expect(noteToClaudeText(html, undefined, { headingOffset: 4 })).toBe("##### One\n\n###### Two\n\n###### Three\n\nBody");
+});
 it("projects every sample note deterministically with resolved links", () => {
   const sample = JSON.parse(readFileSync(resolve(__dirname, '../../public/sample-notebook.json'), 'utf8'));
   const lookup = new Map(sample.notes.map((note) => [note.id, note]));
