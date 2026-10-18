@@ -98,7 +98,7 @@ LLM can read. The code may become public; the notes never are.
 - **Phase 3c — committed 2026-10-18 (0.3.3).** Tidy this note: Claude proposes, the review shows
   each change Before/After with ticks (all ticked to start), Apply only if the note is unchanged
   since Claude read it, all-or-nothing, and Undo (or "(before Claude)" copies after a later
-  edit). Released after the owner exports a backup; owner phone check pending.
+  edit). Deployed after the owner's backup; owner-verified on the phone 2026-10-18.
 
 ## Running it
 

@@ -638,3 +638,7 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   the trailing paragraph (only HTML not written by this editor: the public sample notebook, or a
   hand-made backup) is saved once when first opened, which moves its edit date. Notes typed in the
   app always already have it.
+- 2026-10-18 — The owner verified 3c on the published app with their own key, through the
+  checklist (tidy with partial ticks, Apply, Undo, an instruction, stale refusal, Undo after an
+  edit, the ready bar, cost): "Phone check passes and it seemed to handle Spanish ok and keep my
+  wording."
