@@ -1,3 +1,4 @@
+import { lookStyle } from "./look.js";
 import { X } from "lucide-react";
 import { useEditorState } from "@tiptap/react";
 import ActionButton, { ActionIcon } from "./ActionButton.jsx";
@@ -10,6 +11,17 @@ import { DIVIDER_STYLES } from "./nodes/Divider.js";
 
 function MoreTray({ ids, ...props }) {
   return <div className="flex flex-wrap gap-0.5"><ActionButtons ids={ids} {...props} /></div>;
+}
+
+function StylesTray({ formatting = resolveFormatting({}), ui }) {
+  return <div className="flex min-w-0 flex-col gap-1">
+    {formatting.namedStyles.map((style) => <ActionButton key={style.id} compact={false} label={style.name}
+      onAction={() => ui.runAction(resolveAction(`style:${style.id}`, formatting))}>
+      <span className="block truncate text-left" style={lookStyle(style.look)}>{style.name}</span>
+    </ActionButton>)}
+    {!formatting.namedStyles.length && <p className="px-2 text-sm">No named styles yet.</p>}
+    <ActionButton compact={false} label="Save this look as a style…" onAction={ui.saveLook}>Save this look as a style…</ActionButton>
+  </div>;
 }
 
 const option = (id, label, command, isActive, previewStyle) => ({
@@ -65,6 +77,7 @@ function PickerTray({ name, editor, formatting, ui }) {
 
 export const TRAYS = Object.freeze(Object.assign(Object.create(null), {
   more: { label: "More", render: MoreTray },
+  styles: { label: "Named styles", render: StylesTray },
   ...Object.fromEntries([["textColor", "Text colour"], ["highlightColor", "Highlight colour"], ["fontSize", "Font size"],
     ["fontFamily", "Typeface"], ["lineHeight", "Line spacing"], ["callout", "Callout"], ["divider", "Divider styles"]]
     .map(([name, label]) => [name, { label, render: PickerTray }])),

@@ -2,6 +2,8 @@
 // `npm run shots` and for trying the app without personal notes (Settings → Import backup).
 // Nothing in it comes from the owner's notes. Re-run after changing the content below:
 //   node scripts/make-sample-notebook.mjs
+import { DEFAULT_NAMED_STYLES } from "../src/editor/formatting.js";
+import { EMPTY_LOOK } from "../src/editor/look.js";
 import { writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { extractNoteLinks, htmlToText } from "../src/lib/text.js";
@@ -19,7 +21,7 @@ const folders = [
 
 const notes = [
   { n: 13, title: "Muestra de formato", folder: 1, tags: ["test"], created: 17, updated: 17,
-    html: `<h2>Colores y letras</h2><p><mark data-color="#fde68a" style="background-color: #fde68a; color: inherit">Amarillo</mark> · <mark data-color="#bfdbfe" style="background-color: #bfdbfe; color: inherit">Azul</mark> · <mark data-color="#a7f3d0" style="background-color: #a7f3d0; color: inherit">Verde</mark> · <mark>Resaltado clásico</mark></p><p><span style="font-size: 12pt">Doce puntos</span> · <span style="font-size: 17pt">Diecisiete</span> · <span style="font-size: 24pt">Veinticuatro</span></p><p><span style="font-family: serif">Una frase en serif</span> · <span style="font-family: monospace">Una frase monoespaciada</span></p><p style="line-height: 1.5">Un poco de espacio para leer estas palabras de ejemplo con calma.</p><div data-callout="note"><h3>Recordatorio</h3><p>Estas son palabras de muestra.</p></div><div data-callout="tip"><p>Practica un poco cada día:</p><ul><li><p>Leer una página.</p></li><li><p>Escribir una frase.</p></li></ul></div><div data-callout="warning"><p>Revisa los acentos antes de terminar.</p></div><div data-callout="important"><p>Guarda una copia de tus notas.</p></div><p>Línea fina</p><hr><p>Línea gruesa</p><hr data-style="thick"><p>Línea discontinua</p><hr data-style="dashed"><p>Línea de puntos</p><hr data-style="dotted"><p>Fin de la muestra.</p>` },
+    html: `<h2>Colores y letras</h2><p><mark data-color="#fde68a" style="background-color: #fde68a; color: inherit">Amarillo</mark> · <mark data-color="#bfdbfe" style="background-color: #bfdbfe; color: inherit">Azul</mark> · <mark data-color="#a7f3d0" style="background-color: #a7f3d0; color: inherit">Verde</mark> · <mark>Resaltado clásico</mark></p><p><span style="font-size: 12pt">Doce puntos</span> · <span style="font-size: 17pt">Diecisiete</span> · <span style="font-size: 24pt">Veinticuatro</span></p><p><span style="font-family: serif">Una frase en serif</span> · <span style="font-family: monospace">Una frase monoespaciada</span></p><p style="line-height: 1.5">Un poco de espacio para leer estas palabras de ejemplo con calma.</p><div data-callout="note"><h3>Recordatorio</h3><p>Estas son palabras de muestra.</p></div><div data-callout="tip"><p>Practica un poco cada día:</p><ul><li><p>Leer una página.</p></li><li><p>Escribir una frase.</p></li></ul></div><div data-callout="warning"><p>Revisa los acentos antes de terminar.</p></div><div data-callout="important"><p>Guarda una copia de tus notas.</p></div><p>Línea fina</p><hr><p>Línea gruesa</p><hr data-style="thick"><p>Línea discontinua</p><hr data-style="dashed"><p>Línea de puntos</p><hr data-style="dotted"><p><span style="color: #15803d; font-size: 17pt"><strong>Una palabra para recordar.</strong></span></p><p>Fin de la muestra.</p>` },
 
   { n: 1, title: "Vocabulario — comida", folder: 1, tags: ["spanish", "vocab"], pinned: true, created: 1, updated: 16,
     html: `<h2>Frutas y verduras</h2><ul><li><p><strong>la manzana</strong> — apple</p></li><li><p><strong>el plátano</strong> — banana</p></li><li><p><strong>la zanahoria</strong> — carrot</p></li><li><p><strong>el pimiento</strong> — pepper (the vegetable)</p></li></ul><h2>En el restaurante</h2><ul><li><p><em>la cuenta, por favor</em> — the bill, please</p></li><li><p><em>¿Qué me recomienda?</em> — what do you recommend?</p></li><li><p><span style="color: rgb(21, 128, 61)">¡Buen provecho!</span> — enjoy your meal</p></li></ul><p>Ver también ${link(2, "Gramática — ser y estar")} y ${link(3, "Frases útiles")}.</p>` },
@@ -55,7 +57,10 @@ const envelope = {
     pinned: note.pinned ?? false, rev: 1, createdAt: day(note.created), updatedAt: day(note.updated, 18),
     deletedAt: note.deleted ? day(note.deleted, 20) : null,
   })),
-  folders, tombstones: [], preferences: {},
+  folders, tombstones: [], preferences: { namedStyles: [...DEFAULT_NAMED_STYLES,
+    { id: "sample-palabra", name: "Palabra", look: { ...EMPTY_LOOK, bold: true, color: "#15803d", fontSize: "17pt" }, block: null, lineHeight: null },
+    { id: "sample-ejemplo", name: "Ejemplo", look: { ...EMPTY_LOOK, italic: true, color: "#4b5563" }, block: null, lineHeight: null },
+  ] },
 };
 
 const out = fileURLToPath(new URL("../public/sample-notebook.json", import.meta.url));

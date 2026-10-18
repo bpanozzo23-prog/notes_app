@@ -15,6 +15,7 @@ import Settings from "./screens/Settings.jsx";
 import { DialogLock } from "./components/Dialog.jsx";
 import { OverlayNavigation } from "./lib/overlays.jsx";
 import ToolbarSettings from "./screens/settings/ToolbarSettings.jsx";
+import StyleSettings from "./screens/settings/StyleSettings.jsx";
 import ColourSettings from "./screens/settings/ColourSettings.jsx";
 import PopupSettings from "./screens/settings/PopupSettings.jsx";
 
@@ -186,6 +187,7 @@ export default function App() {
       {route.screen === "trash" && <Trash trash={notebook.trash} {...shared} />}
       {route.screen === "settings" && <Settings {...shared} notebook={notebook} queue={queue} onOpen={open} setMessage={setMessage} updateState={updateState} />}
       {route.screen === "settings-toolbar" && <ToolbarSettings {...shared} formatting={formatting} />}
+      {route.screen === "settings-styles" && <StyleSettings {...shared} formatting={formatting} />}
       {route.screen === "settings-colours" && <ColourSettings {...shared} formatting={formatting} />}
       {route.screen === "settings-selection" && <PopupSettings {...shared} formatting={formatting} />}
     </div>}

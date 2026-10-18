@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { lookStyle } from "./look.js";
 import { createPortal } from "react-dom";
 
 function LabelBubble({ label, anchor }) {
@@ -19,6 +20,7 @@ function LabelBubble({ label, anchor }) {
 
 export function ActionIcon({ action, size = 20 }) {
   const Icon = action.icon;
+  if (action.look) return <span aria-hidden="true" style={lookStyle(action.look, false)}>Aa</span>;
   if (action.tray === "textColor" || action.tray === "highlightColor") return <span className="flex flex-col items-center" aria-hidden="true">
     <Icon size={size} /><span className="h-1 w-5 rounded" style={{ background: action.barColor ?? "transparent" }} />
   </span>;

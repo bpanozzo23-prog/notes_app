@@ -33,6 +33,8 @@ const checkPopup = async () => {
   if (!box || box.x < 0 || box.y < 0 || box.x + box.width > viewport.width || box.y + box.height > viewport.height) {
     throw new Error(`Selection pop-up is outside the visible viewport: ${JSON.stringify(box)}`);
   }
+  const dock = await page.locator("[data-formatting-dock]").boundingBox();
+  if (dock && box.y + box.height > dock.y) throw new Error("Selection pop-up overlaps the toolbar or hint");
 };
 
 await page.goto(url, { waitUntil: "networkidle" });
@@ -197,8 +199,65 @@ for (const [label, slug] of [["Text colour", "text-colour"], ["Highlight colour"
   await shot(`39-tray-${slug}`);
   await button("Close tray").click();
 }
+// Phase 2d: styles and painter use fixture text and real toolbar/form controls.
+const selectText = async (text, range = false) => {
+  await page.evaluate(({ text, range }) => {
+    const editor = document.querySelector('[aria-label="Note body"]').editor;
+    let start;
+    editor.state.doc.descendants((node, pos) => { if (node.isText && node.text.includes(text)) start = pos + node.text.indexOf(text); });
+    if (start === undefined) throw new Error(`Missing fixture text: ${text}`);
+    editor.commands.setTextSelection(range ? { from: start, to: start + text.length } : start + 1);
+    editor.view.focus();
+    const node = editor.view.domAtPos(start).node;
+    (node.nodeType === Node.TEXT_NODE ? node.parentElement : node).scrollIntoView({ block: "center" });
+  }, { text, range });
+};
+await selectText("Un poco de espacio", true);
+await toolbar.getByRole("button", { name: "Named styles", exact: true }).click();
+await shot("40-styles-tray");
+await page.getByRole("region", { name: "Named styles tray" }).getByRole("button", { name: "Palabra", exact: true }).click();
+await shot("41-style-selection");
+await selectText("Fin de la muestra.");
+await toolbar.getByRole("button", { name: "Named styles", exact: true }).click();
+await page.getByRole("region", { name: "Named styles tray" }).getByRole("button", { name: "Heading", exact: true }).click();
+await shot("42-style-whole-line");
+await toolbar.getByRole("button", { name: "Named styles", exact: true }).click();
+await button("Save this look as a style…").click();
+await shot("43-save-this-look");
+await page.getByLabel("Name", { exact: true }).fill("Mi muestra");
+await page.getByRole("switch", { name: "Button in the toolbar" }).check();
+await shot("44-save-this-look-options");
+await button("Save").click();
+await page.getByRole("dialog").waitFor({ state: "hidden" });
+await toolbar.getByRole("button", { name: "Mi muestra", exact: true }).scrollIntoViewIfNeeded();
+await shot("45-style-toolbar-button");
+await selectText("Una palabra para recordar.");
+await toolbar.getByRole("button", { name: "Format painter", exact: true }).click();
+await shot("46-painter-armed");
+await selectText("Fin de la muestra.", true);
+await button("Apply format").waitFor();
+await shot("47-painter-apply-popup");
+await checkPopup();
+await button("Apply format").click();
+await shot("48-painter-applied");
 await back();
 await button("Settings").click();
+await button("Named styles").click();
+await shot("49-named-styles-settings");
+await button("+ New style").click();
+await shot("50-new-style");
+await page.getByLabel("Size", { exact: true }).selectOption("other");
+await page.getByLabel("Other size (pt)").fill("72");
+await page.getByLabel("Name", { exact: true }).fill("Una muestra con nombre largo para probar");
+await page.getByLabel("Line", { exact: true }).scrollIntoViewIfNeeded();
+await shot("51-new-style-options");
+await button("Cancel").click();
+await button("Heading").click();
+await shot("52-edit-style");
+await page.getByLabel("Line", { exact: true }).scrollIntoViewIfNeeded();
+await shot("53-edit-style-options");
+await button("Cancel").click();
+await back();
 
 await back();
 await button("Vocabulario — comida").click();

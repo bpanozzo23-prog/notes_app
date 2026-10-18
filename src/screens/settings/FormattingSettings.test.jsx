@@ -69,7 +69,7 @@ it("saves layout, reorder, long-distance moves, removals and additions immediate
   await click("+ Add buttons");
   const sheet = within(screen.getByRole("dialog"));
   expect(document.activeElement).toBe(sheet.getByRole("heading", { name: "Text" }));
-  expect(sheet.getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent)).toEqual(["Text", "Colours", "Size & font", "Lines & blocks", "Insert", "Tools"]);
+  expect(sheet.getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent)).toEqual(["Text", "Colours", "Size & font", "Lines & blocks", "Named styles", "Insert", "Tools"]);
   expect(sheet.getByRole("button", { name: "Added Bold" }).disabled).toBe(true);
   await click("Add Heading 3", sheet);
   await values("toolbar", ["bold", "italic", "h3"]);

@@ -43,13 +43,15 @@ it("preserves every formatting-note value through editor, save, reopen, backup, 
   expect(reopened.getHTML()).toBe(original);
   const backup = await buildBackup();
   expect(backup.schemaVersion).toBe(3);
+  expect(backup.preferences.namedStyles).toEqual(sample.preferences.namedStyles);
   await db.notes.clear();
   await importBackup(backup);
+  expect((await buildBackup()).preferences.namedStyles).toEqual(sample.preferences.namedStyles);
   const restored = open((await db.notes.get(note.id)).html).getHTML();
   expect(restored).toBe(original);
   const body = document.createElement("div"); body.innerHTML = restored;
   expect([...body.querySelectorAll("mark")].map((node) => node.dataset.color ?? null)).toEqual(["#fde68a", "#bfdbfe", "#a7f3d0", null]);
-  expect([...body.querySelectorAll("span")].map((node) => node.style.fontSize || node.style.fontFamily)).toEqual(["12pt", "17pt", "24pt", "serif", "monospace"]);
+  expect([...body.querySelectorAll("span")].map((node) => node.style.fontSize || node.style.fontFamily)).toEqual(["12pt", "17pt", "24pt", "serif", "monospace", "17pt"]);
   expect(body.querySelector('p[style]').style.lineHeight).toBe("1.5");
   expect([...body.querySelectorAll('[data-callout]')].map((node) => node.dataset.callout)).toEqual(["note", "tip", "warning", "important"]);
   expect([...body.querySelectorAll('hr')].map((node) => node.dataset.style ?? "thin")).toEqual(["thin", "thick", "dashed", "dotted"]);

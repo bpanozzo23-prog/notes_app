@@ -38,7 +38,7 @@ export default function Settings({ notebook, queue, run, busy, readOnly, onBack,
       <section>
         <h2 className="mb-2 font-semibold">Formatting</h2>
         <div className="divide-y divide-[var(--color-line)]">
-          {[["settings-toolbar", "Toolbar"], ["settings-selection", "Selection pop-up"], ["settings-colours", "Colours"]].map(([screen, label]) =>
+          {[["settings-toolbar", "Toolbar"], ["settings-selection", "Selection pop-up"], ["settings-colours", "Colours"], ["settings-styles", "Named styles"]].map(([screen, label]) =>
             <button key={screen} className="flex min-h-11 w-full items-center justify-between py-2 text-left" disabled={busy} onClick={() => onOpen({ screen })}>
               {label}<ChevronRight size={18} aria-hidden="true" />
             </button>)}

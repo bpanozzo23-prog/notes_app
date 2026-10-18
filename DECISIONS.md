@@ -385,3 +385,29 @@ Append-only. One dated line per decision: what was decided, then why, after the 
 - 2026-10-17 — Colours and toolbar lists share the arrow/menu controls and reorder helper; the
   colour form uses a separate fixed footer for Cancel/Add. — Reuses the existing focus and
   overlay behavior and leaves the form actions reachable at reduced phone height.
+
+## Phase 2d implementation
+
+- 2026-10-17 — Named styles use Paintbrush and the format painter uses PaintRoller; style
+  buttons share an “Aa” preview, with size omitted on the toolbar and capped at 20 pt in rows,
+  trays and the form. — Reuses the installed icons and 2c's preview cap at phone width.
+- 2026-10-17 — The style form uses native selects for size, typeface, spacing and line type,
+  with text toggles and palette swatches; its full-height Dialog keeps errors and actions in a
+  separate fixed footer. — Long choices remain readable and Save stays reachable at 375 × 450.
+- 2026-10-17 — An explicit null spacing means the style's Default: clear block and legacy
+  inline spacing. Omitted spacing leaves the line alone for the painter. — The shared helper
+  must distinguish resetting a style's spacing from copying only its text look.
+- 2026-10-17 — Style saves and deletion read current preferences inside the guarded transaction;
+  a toolbar switch left unchanged does not store a toolbar, and deletion writes only lists that
+  contained that style. — Defaults keep following future improvements, and a failed write rolls
+  back the definition and all affected button lists together.
+- 2026-10-17 — Applying a look starts a separate undo event and, when needed, adds StarterKit's
+  trailing paragraph in that same transaction before setting empty-line stored marks. — The
+  editor's later automatic paragraph transaction otherwise discards the next-typing look when an
+  empty final paragraph becomes a heading.
+- 2026-10-17 — The selection pop-up reserves the measured height of the toolbar, painter hint
+  and open tray when positioning itself. — The first screenshot run caught Apply format behind
+  the hint bar; a viewport-only boundary left the button visible but untappable.
+- 2026-10-17 — The owner verified 2b on the published app (layouts, ⋯ More with the keyboard
+  open, Back closing overlays, long-press labels, pop-up settings, export/import of the
+  toolbar): "2b checks out on my end."

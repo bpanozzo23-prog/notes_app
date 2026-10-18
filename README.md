@@ -47,13 +47,17 @@ LLM can read. The code may become public; the notes never are.
 - **Phase 2b — deployed 2026-10-17 (0.2.1).** Settings → Formatting → Toolbar and Selection
   pop-up: add, remove and reorder buttons, choose one swiping row, two rows, or one row + ⋯ More,
   with a live preview. Long-press any formatting button to see its name. Android Back closes an
-  open panel or dialog before leaving the screen. Owner phone check pending.
+  open panel or dialog before leaving the screen. Owner-verified on the phone 2026-10-17.
 - **Phase 2c — committed 2026-10-17 (0.2.2, schema 3), released after the owner's 2b check and a
   fresh backup.** Colour menus in the owner's order (Settings → Formatting → Colours: reorder,
   hide, add your own), highlights in several colours, font size, typeface and line spacing,
   four callout types (Note, Tip, Warning, Important) and four divider styles. The default
   toolbar gains the colour, highlight and size menus and Callout (a customised toolbar is kept).
-  Next: 2d, named styles and the format painter.
+- **Phase 2d — committed 2026-10-17 (0.2.3), released with 2c.** Named styles: a Styles button
+  lists them, each tap applies a snapshot of its look (with no selection, to the whole line);
+  Settings → Formatting → Named styles creates, edits, reorders and deletes them, and any style
+  can be its own toolbar button. "Save this look as a style" starts one from the text at the
+  cursor. Format painter: copy a look, select text, tap Apply format. Next: 2e, images.
 
 ## Running it
 

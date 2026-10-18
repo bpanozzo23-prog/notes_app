@@ -8,7 +8,7 @@ import TagInput from "../components/TagInput.jsx";
 import Confirm from "../components/Confirm.jsx";
 import { noteTitle, tagsInUse, visibleNotes } from "../lib/notebookView.js";
 
-export default function Note({ initialNote, notes, folders, toolbarIds, formatting, readOnly = false, queue, status, busy, onBack, onDelete, onOpenNote, error }) {
+export default function Note({ initialNote, notes, folders, toolbarIds, formatting, readOnly = false, queue, status, busy, onBack, onDelete, onOpenNote, error, run, refresh }) {
   const [note, setNote] = useState(initialNote);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [linkEditor, setLinkEditor] = useState(null);
@@ -47,7 +47,7 @@ export default function Note({ initialNote, notes, folders, toolbarIds, formatti
       </div>
       <TagInput tags={note.tags} allTags={tagsInUse(notes)} onChange={(tags) => edit({ tags })} />
     </fieldset>
-    <NoteEditor note={note} onChange={(html) => edit({ html })} toolbarIds={toolbarIds} formatting={formatting} readOnly={readOnly} onEditor={onEditor}
+    <NoteEditor note={note} onChange={(html) => edit({ html })} toolbarIds={toolbarIds} formatting={formatting} readOnly={readOnly} busy={busy} run={run} refresh={refresh} error={error} onEditor={onEditor}
       ui={{ openLinkPicker, openNote: onOpenNote, removeLink }} />
     {linkedFrom.length > 0 && <section aria-label="Linked from" className="mx-4 mt-4 border-t border-[var(--color-line)] pt-4">
       <h2 className="font-semibold">Linked from</h2>

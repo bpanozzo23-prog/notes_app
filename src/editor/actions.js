@@ -1,9 +1,10 @@
 import {
   Bold, Italic, Underline, Strikethrough, Highlighter, Heading1, Heading2, Heading3, List,
   ListOrdered, ListChecks, Quote, Minus, Undo2, Redo2, Eraser, Link, Circle,
-  Baseline, ALargeSmall, CaseSensitive, ListCollapse, MessageSquare, Info, Lightbulb, TriangleAlert, CircleAlert, SeparatorHorizontal,
+  Paintbrush, PaintRoller, Baseline, ALargeSmall, CaseSensitive, ListCollapse, MessageSquare, Info, Lightbulb, TriangleAlert, CircleAlert, SeparatorHorizontal,
 } from "lucide-react";
 
+import { applyLook } from "./look.js";
 import { normalizeColor, highlightActive } from "./colors.js";
 
 // Build chains inside run: each tap must see the current document.
@@ -42,6 +43,9 @@ const calloutIcons = { note: Info, tip: Lightbulb, warning: TriangleAlert, impor
 const title = (value) => value[0].toUpperCase() + value.slice(1);
 
 export const actions = [
+  picker("styles", "Named styles", Paintbrush, "Named styles"),
+  { id: "painter", label: "Format painter", icon: PaintRoller, group: "Tools", kind: "toggle",
+    run: ({ ui }) => ui?.togglePainter?.() },
   picker("textColor", "Text colour", Baseline, "Colours"),
   picker("highlightColor", "Highlight colour", Highlighter, "Colours"),
   picker("fontSize", "Font size", ALargeSmall, "Size & font"),
@@ -88,6 +92,11 @@ export const actions = [
 export const ACTIONS = Object.freeze(Object.assign(Object.create(null), Object.fromEntries(actions.map((entry) => [entry.id, entry]))));
 export function resolveAction(id, formatting) {
   if (typeof id !== "string") return null;
+  if (id.startsWith("style:")) {
+    const style = formatting?.namedStyles?.find((entry) => entry.id === id.slice(6));
+    return style ? { id, label: style.name, group: "Named styles", kind: "command", look: style.look,
+      run: ({ editor }) => applyLook(editor, style.look, { block: style.block, lineHeight: style.lineHeight }) } : null;
+  }
   if (id === "highlight") {
     const color = formatting?.highlightColors?.find((entry) => !entry.hidden)?.color ?? "#fde68a";
     const entry = highlightAction(color, "Highlight", id);
@@ -117,12 +126,13 @@ export function availableActions(formatting) {
     "fontSize", "fontFamily",
     "h1", "h2", "h3", "bulletList", "orderedList", "taskList", "blockquote", "callout",
     ...Object.keys(calloutIcons).map((type) => `callout:${type}`), "hr", "divider", "hr:thick", "hr:dashed", "hr:dotted", "lineHeight",
-    "link", "clearFormatting", "undo", "redo",
+    "styles", ...(formatting?.namedStyles ?? []).map((style) => `style:${style.id}`),
+    "link", "painter", "clearFormatting", "undo", "redo",
   ].map((id) => resolveAction(id, formatting));
 }
 
 export const DEFAULT_TOOLBAR = [
-  "bold", "italic", "underline", "highlight", "strike", "textColor", "highlightColor", "fontSize", "color:none", "color:#dc2626",
+  "bold", "italic", "underline", "highlight", "strike", "textColor", "highlightColor", "fontSize", "styles", "painter", "color:none", "color:#dc2626",
   "color:#15803d", "color:#2563eb", "color:#7c3aed", "h1", "h2", "bulletList",
   "orderedList", "taskList", "blockquote", "callout", "link", "hr", "clearFormatting", "undo", "redo",
 ];

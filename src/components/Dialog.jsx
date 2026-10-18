@@ -2,7 +2,7 @@ import { createContext, useContext, useId, useLayoutEffect, useRef } from "react
 import { createPortal } from "react-dom";
 import { useOverlay } from "../lib/overlays.jsx";
 
-const focusables = (node) => [...node.querySelectorAll('button:not(:disabled), input:not(:disabled), [tabindex="0"]')];
+const focusables = (node) => [...node.querySelectorAll('button:not(:disabled), input:not(:disabled), select:not(:disabled), [tabindex="0"]')];
 
 export const DialogLock = createContext(false);
 
@@ -10,7 +10,7 @@ export default function Dialog(props) {
   return useContext(DialogLock) ? null : <DialogPanel {...props} />;
 }
 
-function DialogPanel({ title, children, onClose, busy = false, sheet = false, descriptionId, footer }) {
+function DialogPanel({ title, children, onClose, busy = false, sheet = false, fullScreen = false, descriptionId, footer }) {
   useOverlay(true, onClose, busy);
   const titleId = useId();
   const panel = useRef(null);
@@ -32,7 +32,7 @@ function DialogPanel({ title, children, onClose, busy = false, sheet = false, de
 
   return createPortal(<div ref={layer} className={`fixed inset-0 z-50 flex justify-center bg-black/30 ${sheet ? "items-end" : "items-center p-4"}`}>
     <div ref={panel} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId} aria-busy={busy} tabIndex={-1}
-      className={`w-full max-w-md bg-[var(--color-paper)] shadow-xl max-h-[85dvh] ${sheet ? "rounded-t-2xl" : "rounded-xl"} ${footer ? "flex flex-col overflow-hidden" : "overflow-y-auto p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]"}`}
+      className={`w-full max-w-md bg-[var(--color-paper)] shadow-xl ${fullScreen ? "h-dvh max-h-dvh" : "max-h-[85dvh]"} ${sheet && !fullScreen ? "rounded-t-2xl" : "rounded-xl"} ${footer ? "flex flex-col overflow-hidden" : "overflow-y-auto p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]"}`}
       onKeyDown={(event) => {
         if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); if (!busy) onClose(); }
         if (event.key !== "Tab") return;

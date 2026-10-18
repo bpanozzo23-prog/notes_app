@@ -7,7 +7,7 @@ import { extensions } from "./extensions.js";
 it("resolves every existing fixed action unchanged, with a group", () => {
   for (const action of actions) {
     expect(resolveAction(action.id)).toMatchObject({ id: action.id, label: action.label });
-    expect(["Text", "Colours", "Size & font", "Lines & blocks", "Insert", "Tools"]).toContain(action.group);
+    expect(["Text", "Colours", "Size & font", "Lines & blocks", "Named styles", "Insert", "Tools"]).toContain(action.group);
   }
 });
 
@@ -26,7 +26,7 @@ it("offers grouped actions with visible colours in palette order and uses rename
     "lineHeight", "callout", "callout:note", "callout:tip", "callout:warning", "callout:important",
     "hr", "divider", "hr:thick", "hr:dashed", "hr:dotted",
   ]));
-  expect([...new Set(offered.map((action) => action.group))]).toEqual(["Text", "Colours", "Size & font", "Lines & blocks", "Insert", "Tools"]);
+  expect([...new Set(offered.map((action) => action.group))]).toEqual(["Text", "Colours", "Size & font", "Lines & blocks", "Named styles", "Insert", "Tools"]);
   expect(resolveAction("color:#dc2626", formatting).label).toBe("Berry");
   expect(resolveAction("color:#15803d", formatting).label).toBe("Forest");
 });
@@ -110,4 +110,12 @@ it("sets the first palette highlight on a mixed plain/coloured selection instead
   expect(editor.getAttributes("highlight").color).toBe(formatting.highlightColors[0].color);
   expect(action.isActive(editor)).toBe(true);
   editor.destroy();
+});
+
+it("offers named styles in owner order and adds only the two requested default toolbar buttons", () => {
+  const formatting = resolveFormatting({});
+  formatting.namedStyles.push({ ...formatting.namedStyles[0], id: "second", name: "Second" });
+  expect(availableActions(formatting).filter((action) => action.group === "Named styles").map((action) => action.id))
+    .toEqual(["styles", "style:default-heading", "style:second"]);
+  expect(DEFAULT_TOOLBAR.slice(DEFAULT_TOOLBAR.indexOf("fontSize"), DEFAULT_TOOLBAR.indexOf("fontSize") + 3)).toEqual(["fontSize", "styles", "painter"]);
 });

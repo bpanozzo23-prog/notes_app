@@ -3,6 +3,7 @@ export function normalizeColor(value) {
   if (typeof value !== "string") return null;
   const color = value.toLowerCase().trim();
   if (/^#[0-9a-f]{6}$/.test(color)) return color;
+  if (/^#[0-9a-f]{3}$/.test(color)) return `#${[...color.slice(1)].map((part) => part + part).join("")}`;
   const match = color.match(/^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/);
   return match && match.slice(1).every((part) => Number(part) <= 255)
     ? `#${match.slice(1).map((part) => Number(part).toString(16).padStart(2, "0")).join("")}` : null;

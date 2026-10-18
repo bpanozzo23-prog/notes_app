@@ -15,7 +15,7 @@ export function ActionButtons({ editor, ids, formatting, ui = {}, size = 20, rea
     const action = resolveAction(id, formatting);
     if (!action) return null;
     return <ActionButton key={`${id}:${index}`} label={action.label} disabled={readOnly}
-      pressed={action.kind === "toggle" ? !!active?.[id] : undefined}
+      pressed={id === "painter" ? !!ui.painterArmed : action.kind === "toggle" ? !!active?.[id] : undefined}
       expanded={action.tray ? ui.openTray === action.tray : undefined}
       onAction={() => {
         if (!editor) return;

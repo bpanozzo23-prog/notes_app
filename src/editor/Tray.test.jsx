@@ -9,7 +9,7 @@ import { stubEditorGeometry } from "../test/editor.js";
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 const tap = (button) => { expect(fireEvent.pointerDown(button)).toBe(false); fireEvent.pointerUp(button); fireEvent.click(button); };
 
-it.each(Object.keys(TRAYS).filter((name) => name !== "more"))("every %s option applies through ActionButton and closes with editor focus and selection intact", (name) => {
+it.each(Object.keys(TRAYS).filter((name) => name !== "more" && name !== "styles"))("every %s option applies through ActionButton and closes with editor focus and selection intact", (name) => {
   const formatting = resolveFormatting({ toolbar: [name], selectionMenu: [] });
   const bodyHtml = '<p>Chosen words</p>';
   render(<NoteEditor note={noteFixture({ html: bodyHtml })} formatting={formatting} onChange={() => {}} />);

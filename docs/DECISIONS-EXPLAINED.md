@@ -5,7 +5,7 @@ this one is for the owner: what was chosen, why, what it means for the app, what
 and how hard it would be to reverse ("lock-in"). Ordered by lock-in, hardest first. Updated whenever
 `DECISIONS.md` gains an entry with consequences for how the app behaves.
 
-Last updated 2026-10-17, with step 2c (§33).
+Last updated 2026-10-17, with step 2d (§34).
 
 ---
 
@@ -478,4 +478,23 @@ the colour, highlight and size menus and Callout. A toolbar you customised in 2b
 add the new buttons from Add buttons if you want them. Your notes move to schema version 3, so
 an older copy of the app opens them read-only until it updates.
 **Lock-in:** as §24: these are now written into notes' HTML.
+
+### 34. Step 2d: named styles and the format painter
+
+**Chosen:** the **Styles** button opens a panel listing your named styles, each drawn in its own
+look; tap one to apply it. With text selected it styles the selection; with nothing selected it
+styles the whole line; on an empty line, what you type next comes out in that style. Applying a
+style replaces the earlier look of that text (bold, italics, colours, size, typeface), keeps
+links, and leaves code alone. A style can also make the line a heading and set its spacing; a
+style whose spacing is "Default" sets the line back to normal spacing. One Undo removes the whole
+change. Settings → Formatting → **Named styles** creates, edits, reorders and deletes styles; the
+editor has a "Button in the toolbar" switch that gives a style its own button. **Save this look
+as a style…** at the bottom of the Styles panel starts a new style from the text at the cursor.
+The **format painter** copies the look where the cursor is; a bar says "Format copied. Select
+text, then tap Apply format." Select the target text and tap **Apply format** in the pop-up; it
+applies once and switches off. Cancel or tapping the painter with nothing selected stops it.
+**What you'll notice:** two example styles come with the sample notebook only; your own notebook
+starts with the "Heading" example (17 pt, bold, underline, green, as a heading). If you never
+customised the toolbar, Styles and the painter appear after the size button.
+**Lock-in:** as §25 and §28: styles are snapshots, and applying one replaces the earlier look.
 

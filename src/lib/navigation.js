@@ -1,7 +1,7 @@
 import { newId, SAFE_STRING } from "./ids.js";
 
 export const NAVIGATION_KEY = "notesNavigation";
-const SCREENS = ["list", "note", "folders", "trash", "settings", "settings-toolbar", "settings-selection", "settings-colours"];
+const SCREENS = ["list", "note", "folders", "trash", "settings", "settings-toolbar", "settings-selection", "settings-colours", "settings-styles"];
 const safeString = (value) => typeof value === "string" && SAFE_STRING.test(value);
 const safeScroll = (value) => Number.isFinite(value) && value >= 0 ? value : 0;
 export const activeEntry = (navigation) => navigation.stack.at(-1);
