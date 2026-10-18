@@ -748,3 +748,27 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   Claude's notebook proposal (10 rows) passed validation: titled the untitled note, renamed a vague
   reminder, reused existing tags, added one shared tag, and left well-organised notes alone; Apply
   and Undo were clean.
+- 2026-10-18 — Asked at the start of 3e: the owner's 3d phone check has not been done yet. It
+  stays pending; 3e proceeds (no schema change, and 3d's Undo covers its changes).
+
+## Free browser checks (2026-10-18)
+
+- 2026-10-18 — `npm run browser-checks` (`scripts/browser-checks.mjs`) builds the app twice (two
+  releases differing by one marker), serves them itself and drives headless Chromium at phone
+  size, with the made-up sample notebook and made-up answers streamed by its own stand-in for
+  Anthropic: nothing reaches Anthropic and it costs nothing. First run, on 0.3.6: 15 of 15 checks
+  pass. The service worker installs and serves the app; the app reopens offline with the notes,
+  every app file from the cache, and Ask says it is offline; a connection dropped mid-answer keeps
+  what arrived, labelled "Connection lost", and Try again finishes it without repeating the
+  question; an answer streamed while the page was frozen (Chrome's page-lifecycle freeze, what
+  Android does on an app switch) completes on resume, and one whose connection died while frozen
+  shows "Connection lost"; an update arriving mid-answer keeps Reload disabled ("Waiting for
+  Claude's answer."), then offers "Reload (clears Claude's conversation)" and never reloads by
+  itself, also when another tab applies the update; Reload brings the new release with the notes.
+  — The owner asked for the free checks offered on 2026-10-18 to be fitted in before 3g. Not
+  covered: how Android itself freezes or kills a page or its connection, the installed app's update
+  on the phone, and Samsung Internet.
+- 2026-10-18 — Chromium's offline emulation does not stop the browser's own background check for
+  a new service worker (`sw.js` and the workbox file it imports), so the offline check ignores
+  those two and requires every other file to come from the cache. — Seen in the second run; it is
+  not page traffic.

@@ -117,6 +117,7 @@ npm run dev        # Vite with --host, port 5174; app is under /notes_app/
 npm test           # Vitest, jsdom, fake-indexeddb; fixture data only
 npm run build      # dist/ includes sw.js and manifest.webmanifest
 npm run preview -- --host  # serve the built app under /notes_app/ for local review
+npm run browser-checks     # free headless checks: update prompt, offline, freeze, dropped connection
 ```
 
 Phone dev entry: `http://brent-dell-system-xps-l502x:5174/`; with the Pages base configured, open

@@ -7,7 +7,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "shots": "node scripts/screenshot.mjs",
-    "claude-check": "node scripts/claude-check.mjs"
+    "claude-check": "node scripts/claude-check.mjs",
+    "browser-checks": "node scripts/browser-checks.mjs"
   },
   "type": "module",
   "private": "true",
