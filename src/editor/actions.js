@@ -1,7 +1,10 @@
 import {
   Bold, Italic, Underline, Strikethrough, Highlighter, Heading1, Heading2, Heading3, List,
   ListOrdered, ListChecks, Quote, Minus, Undo2, Redo2, Eraser, Link, Circle,
+  Baseline, ALargeSmall, CaseSensitive, ListCollapse, MessageSquare, Info, Lightbulb, TriangleAlert, CircleAlert, SeparatorHorizontal,
 } from "lucide-react";
+
+import { normalizeColor, highlightActive } from "./colors.js";
 
 // Build chains inside run: each tap must see the current document.
 const action = (id, label, icon, command, active) => ({
@@ -10,27 +13,57 @@ const action = (id, label, icon, command, active) => ({
   ...(active ? { isActive: active } : {}),
 });
 const mark = (id, label, icon, command) => action(id, label, icon, command, (editor) => editor.isActive(id));
-// HTML parsing normalises saved hex colours to rgb(). Both forms mean the same swatch.
-const rgb = (hex) => `rgb(${hex.slice(1).match(/../g).map((part) => parseInt(part, 16)).join(", ")})`;
-
 function colorAction(color, label) {
   return {
     ...action(`color:${color ?? "none"}`, label, Circle,
       (chain) => color ? chain.setColor(color) : chain.unsetColor(),
       (editor) => {
-        const actual = editor.getAttributes("textStyle").color?.toLowerCase() ?? null;
-        return actual === color || (color !== null && actual === rgb(color));
+        return normalizeColor(editor.getAttributes("textStyle").color) === color;
       }),
     group: "Colours", color,
   };
 }
 
+function highlightAction(color, label, id = `highlight:${color ?? "none"}`) {
+  return {
+    id, label, icon: Highlighter, color, group: "Colours", kind: "toggle",
+    isActive: (editor) => color ? highlightActive(editor, color) : !editor.isActive("highlight"),
+    run: ({ editor }) => {
+      const remove = !color || highlightActive(editor, color);
+      const chain = editor.chain().focus();
+      return (remove ? chain.unsetHighlight() : chain.setHighlight({ color })).run();
+    },
+  };
+}
+const picker = (id, label, icon, group) => ({
+  id, label, icon, group, kind: "picker", tray: id, run: ({ ui }) => ui?.toggleTray?.(id),
+});
+const calloutIcons = { note: Info, tip: Lightbulb, warning: TriangleAlert, important: CircleAlert };
+const title = (value) => value[0].toUpperCase() + value.slice(1);
+
 export const actions = [
+  picker("textColor", "Text colour", Baseline, "Colours"),
+  picker("highlightColor", "Highlight colour", Highlighter, "Colours"),
+  picker("fontSize", "Font size", ALargeSmall, "Size & font"),
+  picker("fontFamily", "Typeface", CaseSensitive, "Size & font"),
+  picker("lineHeight", "Line spacing", ListCollapse, "Lines & blocks"),
+  picker("callout", "Callout", MessageSquare, "Lines & blocks"),
+  picker("divider", "Divider styles", SeparatorHorizontal, "Lines & blocks"),
+  highlightAction(null, "No highlight"),
+  highlightAction("#fde68a", "Highlight", "highlight"),
+  ...Object.entries(calloutIcons).map(([type, icon]) => ({
+    ...action(`callout:${type}`, `${title(type)} callout`, icon, (chain) => chain.toggleCallout(type),
+      (editor) => editor.isActive("callout", { type })), group: "Lines & blocks", calloutType: type,
+  })),
+  ...["thick", "dashed", "dotted"].map((style) => ({
+    ...action(`hr:${style}`, `${title(style)} divider`, Minus, (chain) => chain.setDivider(style),
+      (editor) => editor.isActive("horizontalRule", { dividerStyle: style })), group: "Lines & blocks", dividerStyle: style,
+  })),
   mark("bold", "Bold", Bold, (chain) => chain.toggleBold()),
   mark("italic", "Italic", Italic, (chain) => chain.toggleItalic()),
   mark("underline", "Underline", Underline, (chain) => chain.toggleUnderline()),
   mark("strike", "Strikethrough", Strikethrough, (chain) => chain.toggleStrike()),
-  mark("highlight", "Highlight", Highlighter, (chain) => chain.toggleHighlight()),
+
   ...[[null, "Default colour"], ["#dc2626", "Red"], ["#15803d", "Green"], ["#2563eb", "Blue"], ["#7c3aed", "Purple"]]
     .map(([color, label]) => colorAction(color, label)),
   action("h1", "Heading 1", Heading1, (chain) => chain.toggleHeading({ level: 1 }), (editor) => editor.isActive("heading", { level: 1 })),
@@ -40,7 +73,7 @@ export const actions = [
   mark("orderedList", "Numbered list", ListOrdered, (chain) => chain.toggleOrderedList()),
   mark("taskList", "Checklist", ListChecks, (chain) => chain.toggleTaskList()),
   mark("blockquote", "Quote", Quote, (chain) => chain.toggleBlockquote()),
-  action("hr", "Divider", Minus, (chain) => chain.setHorizontalRule()),
+  action("hr", "Divider", Minus, (chain) => chain.setDivider("thin")),
   action("clearFormatting", "Clear formatting", Eraser, (chain) => chain.unsetAllMarks().clearNodes()),
   action("undo", "Undo", Undo2, (chain) => chain.undo()),
   action("redo", "Redo", Redo2, (chain) => chain.redo()),
@@ -55,26 +88,42 @@ export const actions = [
 export const ACTIONS = Object.freeze(Object.assign(Object.create(null), Object.fromEntries(actions.map((entry) => [entry.id, entry]))));
 export function resolveAction(id, formatting) {
   if (typeof id !== "string") return null;
-  const namedColor = formatting?.textColors?.find((entry) => `color:${entry.color}` === id.toLowerCase());
-  if (namedColor) return colorAction(namedColor.color, namedColor.name);
-  if (ACTIONS[id]) return ACTIONS[id];
-  if (!/^color:#[0-9a-fA-F]{6}$/.test(id)) return null;
-  const color = id.slice(6).toLowerCase();
-  return colorAction(color, formatting?.textColors?.find((entry) => entry.color === color)?.name ?? color);
+  if (id === "highlight") {
+    const color = formatting?.highlightColors?.find((entry) => !entry.hidden)?.color ?? "#fde68a";
+    const entry = highlightAction(color, "Highlight", id);
+    // A legacy plain mark always removes on the first tap, even after reordering the palette.
+    const active = (editor) => highlightActive(editor, color) || highlightActive(editor, null);
+    return { ...entry, isActive: active, run: ({ editor }) => active(editor)
+      ? editor.chain().focus().unsetHighlight().run() : entry.run({ editor }) };
+  }
+  if (id === "textColor" || id === "highlightColor") {
+    const palette = formatting?.[id === "textColor" ? "textColors" : "highlightColors"];
+    return { ...ACTIONS[id], barColor: palette?.find((entry) => !entry.hidden)?.color ?? (palette ? null : id === "textColor" ? "#dc2626" : "#fde68a") };
+  }
+  if (/^(color|highlight):#[0-9a-fA-F]{6}$/.test(id)) {
+    if (!formatting && ACTIONS[id]) return ACTIONS[id];
+    const [kind, raw] = id.split(":"), color = raw.toLowerCase();
+    const name = formatting?.[kind === "color" ? "textColors" : "highlightColors"]?.find((entry) => entry.color === color)?.name;
+    return kind === "color" ? colorAction(color, name ?? color) : highlightAction(color, `${name ?? color} highlight`);
+  }
+  return ACTIONS[id] ?? null;
 }
 
 export function availableActions(formatting) {
   return [
-    "bold", "italic", "underline", "strike", "highlight", "color:none",
-    ...(formatting?.textColors ?? []).filter((entry) => !entry.hidden).map((entry) => `color:${entry.color}`),
-    "h1", "h2", "h3", "bulletList", "orderedList", "taskList", "blockquote", "hr",
+    "bold", "italic", "underline", "strike", "textColor", "highlightColor", "highlight", "highlight:none",
+    ...(formatting?.highlightColors ?? []).filter((entry) => !entry.hidden).map((entry) => `highlight:${entry.color}`),
+    "color:none", ...(formatting?.textColors ?? []).filter((entry) => !entry.hidden).map((entry) => `color:${entry.color}`),
+    "fontSize", "fontFamily",
+    "h1", "h2", "h3", "bulletList", "orderedList", "taskList", "blockquote", "callout",
+    ...Object.keys(calloutIcons).map((type) => `callout:${type}`), "hr", "divider", "hr:thick", "hr:dashed", "hr:dotted", "lineHeight",
     "link", "clearFormatting", "undo", "redo",
   ].map((id) => resolveAction(id, formatting));
 }
 
 export const DEFAULT_TOOLBAR = [
-  "bold", "italic", "underline", "highlight", "strike", "color:none", "color:#dc2626",
+  "bold", "italic", "underline", "highlight", "strike", "textColor", "highlightColor", "fontSize", "color:none", "color:#dc2626",
   "color:#15803d", "color:#2563eb", "color:#7c3aed", "h1", "h2", "bulletList",
-  "orderedList", "taskList", "blockquote", "link", "hr", "clearFormatting", "undo", "redo",
+  "orderedList", "taskList", "blockquote", "callout", "link", "hr", "clearFormatting", "undo", "redo",
 ];
 export const DEFAULT_SELECTION_MENU = ["bold", "italic", "underline", "highlight", "color:#dc2626", "color:#15803d", "color:#2563eb", "link"];

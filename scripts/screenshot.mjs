@@ -160,6 +160,46 @@ await button("Close tray").click();
 await back();
 await button("Settings").click();
 
+// Phase 2c: both palettes, custom-colour form, the formatting sample, and every picker.
+await button("Colours").click();
+await shot("32-colours-text");
+await button("Highlight").click();
+await shot("33-colours-highlight");
+await button("+ Add a colour").click();
+await page.getByLabel("Name", { exact: true }).fill("Lavanda de muestra");
+await page.getByLabel("Colour", { exact: true }).fill("#e9d5ff");
+await shot("34-add-colour");
+await button("Cancel").click();
+await back();
+await button("Toolbar").click();
+await button("+ Add buttons").click();
+for (const group of ["Colours", "Size & font", "Lines & blocks"]) {
+  await page.getByRole("heading", { name: group, exact: true }).evaluate((element) => element.scrollIntoView({ block: "start" }));
+  await shot(`35-add-buttons-${group === "Colours" ? "colours" : group === "Size & font" ? "font" : "blocks"}`);
+}
+await button("Add Tip callout").evaluate((element) => element.scrollIntoView({ block: "start" }));
+await shot("35-add-buttons-callouts-dividers");
+for (const label of ["Typeface", "Line spacing", "Divider styles"]) await button(`Add ${label}`).click();
+await button("Done").click();
+await page.getByLabel("One row, swipe", { exact: true }).click();
+await back(); await back();
+await button("Muestra de formato").click();
+await shot("36-formatting-note");
+await page.locator('[data-callout="note"]').evaluate((element) => element.scrollIntoView({ block: "start" }));
+await shot("37-formatting-callouts");
+await page.locator('hr[data-style="dashed"]').scrollIntoViewIfNeeded();
+await shot("38-formatting-dividers");
+await page.getByLabel("Note body").locator("p").first().click();
+await page.keyboard.press("Home");
+for (const [label, slug] of [["Text colour", "text-colour"], ["Highlight colour", "highlight-colour"], ["Font size", "size"],
+  ["Typeface", "typeface"], ["Line spacing", "spacing"], ["Callout", "callout"], ["Divider styles", "divider"]]) {
+  await toolbar.getByRole("button", { name: label, exact: true }).click();
+  await shot(`39-tray-${slug}`);
+  await button("Close tray").click();
+}
+await back();
+await button("Settings").click();
+
 await back();
 await button("Vocabulario — comida").click();
 // Only this fresh browser context's fixture notebook is involved in the guard screenshots.
@@ -173,7 +213,7 @@ await shot("16-notebook-replaced");
 await page.reload({ waitUntil: "networkidle" });
 await page.getByLabel("Note body").waitFor();
 await page.evaluate(() => new Promise((resolve, reject) => {
-  const request = indexedDB.open("notes_app", 30);
+  const request = indexedDB.open("notes_app", 40);
   request.onsuccess = () => { request.result.close(); resolve(); };
   request.onerror = () => reject(request.error);
 }));

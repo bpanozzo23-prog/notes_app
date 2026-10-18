@@ -19,6 +19,12 @@ function LabelBubble({ label, anchor }) {
 
 export function ActionIcon({ action, size = 20 }) {
   const Icon = action.icon;
+  if (action.tray === "textColor" || action.tray === "highlightColor") return <span className="flex flex-col items-center" aria-hidden="true">
+    <Icon size={size} /><span className="h-1 w-5 rounded" style={{ background: action.barColor ?? "transparent" }} />
+  </span>;
+  if (action.id.startsWith("highlight:")) return <span aria-hidden="true" className="rounded px-0.5" style={{ background: action.color ?? "transparent" }}><Icon size={size} /></span>;
+  if (action.dividerStyle) return <span aria-hidden="true" className={`divider-preview divider-${action.dividerStyle}`} />;
+  if (action.calloutType) return <span aria-hidden="true" className={`callout-icon callout-${action.calloutType}`}><Icon size={size} /></span>;
   return action.id.startsWith("color:") ? <span aria-hidden="true" className="block h-5 w-5 shrink-0 rounded-full border border-gray-300"
     style={{ background: action.color ?? "linear-gradient(135deg,#fff 45%,#999 50%,#fff 55%)" }} /> : <Icon size={size} aria-hidden="true" />;
 }

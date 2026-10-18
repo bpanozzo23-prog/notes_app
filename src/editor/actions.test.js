@@ -6,8 +6,8 @@ import { extensions } from "./extensions.js";
 
 it("resolves every existing fixed action unchanged, with a group", () => {
   for (const action of actions) {
-    expect(resolveAction(action.id)).toBe(action);
-    expect(["Text", "Colours", "Lines & blocks", "Insert", "Tools"]).toContain(action.group);
+    expect(resolveAction(action.id)).toMatchObject({ id: action.id, label: action.label });
+    expect(["Text", "Colours", "Size & font", "Lines & blocks", "Insert", "Tools"]).toContain(action.group);
   }
 });
 
@@ -19,11 +19,14 @@ it("offers grouped actions with visible colours in palette order and uses rename
     { color: "#dc2626", name: "Berry", hidden: false },
   ];
   const offered = availableActions(formatting);
-  expect(offered.map((action) => action.id)).toEqual([
-    "bold", "italic", "underline", "strike", "highlight", "color:none", "color:#123456", "color:#dc2626",
-    "h1", "h2", "h3", "bulletList", "orderedList", "taskList", "blockquote", "hr", "link", "clearFormatting", "undo", "redo",
-  ]);
-  expect([...new Set(offered.map((action) => action.group))]).toEqual(["Text", "Colours", "Lines & blocks", "Insert", "Tools"]);
+  expect(offered.filter((action) => action.id.startsWith("color:")).map((action) => action.id))
+    .toEqual(["color:none", "color:#123456", "color:#dc2626"]);
+  expect(offered.map((action) => action.id)).toEqual(expect.arrayContaining([
+    "textColor", "highlightColor", "highlight", "highlight:none", "fontSize", "fontFamily",
+    "lineHeight", "callout", "callout:note", "callout:tip", "callout:warning", "callout:important",
+    "hr", "divider", "hr:thick", "hr:dashed", "hr:dotted",
+  ]));
+  expect([...new Set(offered.map((action) => action.group))]).toEqual(["Text", "Colours", "Size & font", "Lines & blocks", "Insert", "Tools"]);
   expect(resolveAction("color:#dc2626", formatting).label).toBe("Berry");
   expect(resolveAction("color:#15803d", formatting).label).toBe("Forest");
 });
@@ -42,7 +45,7 @@ it("adds Heading 3 without changing the default toolbar or the existing HTML voc
   expect(editor.state.doc.firstChild.textContent).toBe("Heading");
   editor.destroy();
 });
-it.each(["unknown", "__proto__", "constructor", "toString", "style:default-heading", "highlight:#aabbcc", "color:#abc", "color:blue", null, 4])(
+it.each(["unknown", "__proto__", "constructor", "toString", "style:default-heading", "color:#abc", "color:blue", null, 4])(
   "skips unavailable action %j", (id) => expect(resolveAction(id)).toBeNull());
 it("builds arbitrary colour actions with palette labels and recognises hex and rgb after reopening", () => {
   const action = resolveAction("color:#ABCDEF", { textColors: [{ color: "#abcdef", name: "Sky" }] });
@@ -54,4 +57,57 @@ it("builds arbitrary colour actions with palette labels and recognises hex and r
   action.run({ editor: { chain: () => chain } });
   expect(chain.setColor).toHaveBeenCalledExactlyOnceWith("#abcdef");
   expect(chain.run).toHaveBeenCalledOnce();
+});
+
+
+it("toggles a plain mark off, including after palette reorder, and uses yellow when all colours are hidden", () => {
+  const editor = new Editor({ extensions, content: "<p><mark>Hello</mark></p>" });
+  editor.commands.setTextSelection({ from: 1, to: 6 });
+  const formatting = resolveFormatting({});
+  formatting.highlightColors.reverse();
+  const action = resolveAction("highlight", formatting);
+  expect(action.isActive(editor)).toBe(true);
+  action.run({ editor });
+  expect(editor.getHTML()).toBe("<p>Hello</p>");
+  formatting.highlightColors.forEach((entry) => { entry.hidden = true; });
+  resolveAction("highlight", formatting).run({ editor });
+  expect(editor.getAttributes("highlight").color).toBe("#fde68a");
+  resolveAction("highlight:#fde68a", formatting).run({ editor });
+  expect(editor.getHTML()).toBe("<p>Hello</p>");
+  editor.destroy();
+});
+
+it("normalises highlight rgb and plain yellow, requiring the entire selection to match", () => {
+  const editor = new Editor({ extensions, content: '<p><mark data-color="rgb(253, 230, 138)">one</mark><mark>two</mark>three</p>' });
+  const yellow = resolveAction("highlight:#fde68a", resolveFormatting({}));
+  expect(yellow.label).toBe("Yellow highlight");
+  editor.commands.setTextSelection({ from: 1, to: 7 });
+  expect(yellow.isActive(editor)).toBe(true);
+  editor.commands.setTextSelection({ from: 1, to: 12 });
+  expect(yellow.isActive(editor)).toBe(false);
+  yellow.run({ editor });
+  expect(yellow.isActive(editor)).toBe(true);
+  yellow.run({ editor });
+  expect(editor.getHTML()).toBe('<p>onetwothree</p>');
+  editor.destroy();
+});
+
+it("keeps hidden/deleted pinned colours working and keeps them out of the Add sheet", () => {
+  const formatting = resolveFormatting({ textColors: [], highlightColors: [] });
+  expect(availableActions(formatting).some((action) => /^(color|highlight):#/.test(action.id))).toBe(false);
+  expect(resolveAction("color:#dc2626", formatting).label).toBe("#dc2626");
+  expect(resolveAction("highlight:#fde68a", formatting).label).toBe("#fde68a highlight");
+});
+
+it("sets the first palette highlight on a mixed plain/coloured selection instead of treating it as entirely plain", () => {
+  const formatting = resolveFormatting({});
+  formatting.highlightColors.reverse();
+  const editor = new Editor({ extensions, content: '<p><mark>one</mark><mark data-color="#bfdbfe">two</mark></p>' });
+  editor.commands.setTextSelection({ from: 1, to: 7 });
+  const action = resolveAction("highlight", formatting);
+  expect(action.isActive(editor)).toBe(false);
+  action.run({ editor });
+  expect(editor.getAttributes("highlight").color).toBe(formatting.highlightColors[0].color);
+  expect(action.isActive(editor)).toBe(true);
+  editor.destroy();
 });

@@ -1,14 +1,73 @@
 import { X } from "lucide-react";
-import ActionButton from "./ActionButton.jsx";
+import { useEditorState } from "@tiptap/react";
+import ActionButton, { ActionIcon } from "./ActionButton.jsx";
 import { ActionButtons } from "./Toolbar.jsx";
+import { resolveAction } from "./actions.js";
+import { resolveFormatting } from "./formatting.js";
+import { LINE_SPACINGS } from "./nodes/LineSpacing.js";
+import { CALLOUT_TYPES } from "./nodes/Callout.js";
+import { DIVIDER_STYLES } from "./nodes/Divider.js";
 
 function MoreTray({ ids, ...props }) {
   return <div className="flex flex-wrap gap-0.5"><ActionButtons ids={ids} {...props} /></div>;
 }
 
-// Future picker actions declare tray: "textColor", etc. and add a renderer here.
+const option = (id, label, command, isActive, previewStyle) => ({
+  id, label, kind: "toggle", isActive, previewStyle,
+  run: ({ editor }) => command(editor.chain().focus()).run(),
+});
+
+export function trayOptions(name, editor, formatting = resolveFormatting({})) {
+  if (["textColor", "highlightColor"].includes(name)) {
+    const text = name === "textColor", prefix = text ? "color" : "highlight";
+    const colors = formatting[text ? "textColors" : "highlightColors"].filter((entry) => !entry.hidden);
+    return [...colors.map(({ color }) => resolveAction(`${prefix}:${color}`, formatting)),
+      { ...resolveAction(`${prefix}:none`, formatting), label: text ? "No colour" : "No highlight" }];
+  }
+  if (name === "fontSize") return [null, 10, 12, 14, 17, 20, 24, 28].map((size) => option(
+    `size:${size}`, size ? `${size} pt` : "Normal",
+    (chain) => size ? chain.setFontSize(`${size}pt`) : chain.unsetFontSize(),
+    (editor) => (editor.getAttributes("textStyle").fontSize ?? null) === (size ? `${size}pt` : null),
+    { fontSize: size ? `${Math.min(size, 20)}pt` : undefined },
+  ));
+  if (name === "fontFamily") return [[null, "Default"], ["serif", "Serif"], ["sans-serif", "Sans-serif"], ["monospace", "Monospace"]].map(([family, label]) => option(
+    `family:${family}`, label, (chain) => family ? chain.setFontFamily(family) : chain.unsetFontFamily(),
+    (editor) => (editor.getAttributes("textStyle").fontFamily ?? null) === family, { fontFamily: family ?? undefined },
+  ));
+  if (name === "lineHeight") return [null, ...LINE_SPACINGS].map((value) => option(
+    `spacing:${value}`, value ?? "Default", (chain) => value ? chain.setLineSpacing(value) : chain.unsetLineSpacing(),
+    (editor) => editor.isActive("paragraph", { lineHeight: value }) || editor.isActive("heading", { lineHeight: value }),
+  ));
+  if (name === "callout") return [
+    ...CALLOUT_TYPES.map((type) => resolveAction(`callout:${type}`, formatting)),
+    ...(editor.isActive("callout") ? [option("callout:none", "Remove callout", (chain) => chain.unsetCallout(), () => false)] : []),
+  ];
+  if (name === "divider") return DIVIDER_STYLES.map((style) => ({
+    ...resolveAction(style === "thin" ? "hr" : `hr:${style}`, formatting),
+    label: `${style[0].toUpperCase() + style.slice(1)} divider`, dividerStyle: style,
+    isActive: (editor) => editor.isActive("horizontalRule", { dividerStyle: style }),
+  }));
+  return [];
+}
+
+function PickerTray({ name, editor, formatting, ui }) {
+  const options = trayOptions(name, editor, formatting);
+  const active = useEditorState({ editor, selector: ({ editor }) => options.map((option) => option.isActive?.(editor) ?? false) });
+  return <div className="flex flex-wrap gap-1">
+    {options.map((option, index) => <ActionButton key={option.id} compact={false} label={option.label}
+      pressed={active?.[index]} onAction={() => ui.runAction(option)}>
+      <span className="flex items-center gap-2" style={option.previewStyle}>
+        {option.icon && <ActionIcon action={option} size={18} />}{option.label}
+      </span>
+    </ActionButton>)}
+  </div>;
+}
+
 export const TRAYS = Object.freeze(Object.assign(Object.create(null), {
   more: { label: "More", render: MoreTray },
+  ...Object.fromEntries([["textColor", "Text colour"], ["highlightColor", "Highlight colour"], ["fontSize", "Font size"],
+    ["fontFamily", "Typeface"], ["lineHeight", "Line spacing"], ["callout", "Callout"], ["divider", "Divider styles"]]
+    .map(([name, label]) => [name, { label, render: PickerTray }])),
 }));
 
 export default function Tray({ name, viewportHeight, onClose, ...props }) {
@@ -21,6 +80,6 @@ export default function Tray({ name, viewportHeight, onClose, ...props }) {
       <h2 className="px-2 text-sm font-semibold">{tray.label}</h2>
       <ActionButton label="Close tray" onAction={onClose}><X size={18} aria-hidden="true" /></ActionButton>
     </div>
-    <Contents {...props} />
+    <Contents name={name} {...props} />
   </section>;
 }

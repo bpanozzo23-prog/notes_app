@@ -1,5 +1,5 @@
 import { Fragment, useState } from "react";
-import { ArrowUp, ArrowDown, EllipsisVertical } from "lucide-react";
+import ListControls, { moveEntry } from "./ListControls.jsx";
 import { availableActions, resolveAction } from "../../editor/actions.js";
 import { ActionIcon } from "../../editor/ActionButton.jsx";
 import { splitToolbar } from "../../editor/toolbarLayout.js";
@@ -27,9 +27,7 @@ export default function ActionListEditor({ preference, formatting, perRow, run, 
     return run(async () => { await setPref(preference, next); await refresh(); });
   }
   function move(index, target) {
-    const next = [...ids];
-    next.splice(target, 0, next.splice(index, 1)[0]);
-    return change(next);
+    return change(moveEntry(ids, index, target));
   }
   async function resetDefaults() {
     if (readOnly || busy) return;
@@ -48,11 +46,8 @@ export default function ActionListEditor({ preference, formatting, perRow, run, 
         <li className="flex min-w-0 items-center gap-2 py-1">
           {action && <span className="flex w-6 shrink-0 justify-center"><ActionIcon action={action} size={18} /></span>}
           <span className="min-w-0 flex-1 truncate text-sm" title={action?.label}>{action?.label ?? "Unavailable button"}</span>
-          {action ? <div className="flex shrink-0">
-            <button className="icon-button" aria-label={`Move ${action.label} up`} disabled={disabled || index === 0} onClick={() => move(index, index - 1)}><ArrowUp size={18} aria-hidden="true" /></button>
-            <button className="icon-button" aria-label={`Move ${action.label} down`} disabled={disabled || index === ids.length - 1} onClick={() => move(index, index + 1)}><ArrowDown size={18} aria-hidden="true" /></button>
-            <button className="icon-button" aria-label={`Options for ${action.label}`} disabled={disabled} onClick={() => setOptions(index)}><EllipsisVertical size={18} aria-hidden="true" /></button>
-          </div> : <button className="app-button text-sm" disabled={disabled} onClick={() => change(ids.filter((_, i) => i !== index))}>Remove</button>}
+          {action ? <ListControls label={action.label} index={index} count={ids.length} disabled={disabled}
+            onMove={(target) => move(index, target)} onOptions={() => setOptions(index)} /> : <button className="app-button text-sm" disabled={disabled} onClick={() => change(ids.filter((_, i) => i !== index))}>Remove</button>}
         </li>
       </Fragment>)}
     </ul>

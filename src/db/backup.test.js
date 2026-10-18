@@ -88,7 +88,7 @@ describe("validation failures", () => {
     expect(result.errors.length).toBeGreaterThan(0);
   });
   it.each([
-    ["format", "wrong"], ["schemaVersion", undefined], ["schemaVersion", 0], ["schemaVersion", 3],
+    ["format", "wrong"], ["schemaVersion", undefined], ["schemaVersion", 0], ["schemaVersion", 4],
     ["schemaVersion", 1.5], ["schemaVersion", "1"], ["schemaVersion", NaN],
     ["exportedAt", "yesterday"], ["appVersion", ""],
     ["notes", {}], ["folders", null], ["tombstones", "x"], ["preferences", []], ["preferences", null],
@@ -177,7 +177,7 @@ it("keeps v1 validation unchanged, including the original preference allow-list 
 it("the real 1-to-2 upgrade changes only the version, before v2 sanitisation", () => {
   const raw = backupFixture({ preferences: { toolbar: ["bold", "future"] } });
   const copy = structuredClone(raw);
-  expect(upgradeEnvelope(raw).envelope).toEqual({ ...raw, schemaVersion: 2 });
+  expect(upgradeEnvelope(raw, 2).envelope).toEqual({ ...raw, schemaVersion: 2 });
   expect(raw).toEqual(copy);
 });
 
@@ -205,7 +205,7 @@ it("v2 warns and sanitises cosmetic preferences and unknown keys without blockin
   expect(await allPrefs()).toEqual({ ...result.envelope.preferences, storagePersisted: true, notebookGeneration: expect.any(String) });
   expect((await allPrefs()).notebookGeneration).not.toBe("must-not-adopt");
   const backup = await buildBackup();
-  expect(backup.schemaVersion).toBe(2);
+  expect(backup.schemaVersion).toBe(3);
   expect(backup.preferences).not.toHaveProperty("notebookGeneration");
 });
 
@@ -216,4 +216,13 @@ it.each([
   const errors = validateBackup(backupFixture(patch)).errors;
   expect(errors.length).toBeGreaterThan(0);
   expect(validateBackup(backupFixture({ ...patch, schemaVersion: 2 })).errors).toEqual(errors);
+});
+
+
+it.each([1, 2])("imports a v%s backup at schema 3 with rows unchanged", async (version) => {
+  const raw = backupFixture({ schemaVersion: version, preferences: { toolbar: ["italic"] } });
+  expect(upgradeEnvelope(raw).envelope).toEqual({ ...raw, schemaVersion: 3 });
+  await importBackup(raw);
+  expect((await buildBackup()).notes).toEqual(raw.notes);
+  expect((await buildBackup()).preferences).toEqual(raw.preferences);
 });

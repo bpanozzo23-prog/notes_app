@@ -362,3 +362,26 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   automatic focus on the first enabled Add button scrolled past the sheet's title.
 - 2026-10-17 — Done stays in a separate footer outside the Add sheet's scrolling rows. —
   Keeps it reachable without rows peeking below or being covered by a sticky button.
+
+## Phase 2c implementation
+
+- 2026-10-17 — Empty-line Enter inside a callout lifts that line directly to the document.
+  — The installed ProseMirror default only splits the wrapper on a middle line, leaving the
+  empty paragraph inside the second callout. A narrow shortcut supplies the promised plain
+  line between callouts; first-line Backspace keeps the tested default behavior.
+- 2026-10-17 — StarterKit's automatic trailing paragraph excludes callouts, while keeping its
+  existing behavior for every Phase 1 block. — A callout already has editable content and an
+  explicit Enter exit; automatically adding another paragraph produced two empty exit lines.
+- 2026-10-17 — Callout commands lift whole touched wrappers before wrapping the top-level range,
+  using ProseMirror's position mapping to retain the selection. — This merges complete contents
+  without nesting, replacing text, or splitting one tap across undo steps.
+- 2026-10-17 — Divider attributes use `dividerStyle`, not `style`. — The step's explicit task
+  corrects the direction file: Tiptap merges a property named `style` into inline CSS.
+- 2026-10-17 — Backup upgrades accumulate and deduplicate warnings across versions. — The
+  second upgrade otherwise erased v2's warnings after sanitisation, silently hiding dropped
+  preferences from an owner importing a v1 file.
+- 2026-10-17 — Size previews stop growing at 20 pt; the actual choices still apply 24 and 28 pt.
+  — Keeps all size options usable in a tray above an open keyboard.
+- 2026-10-17 — Colours and toolbar lists share the arrow/menu controls and reorder helper; the
+  colour form uses a separate fixed footer for Cancel/Add. — Reuses the existing focus and
+  overlay behavior and leaves the form actions reachable at reduced phone height.

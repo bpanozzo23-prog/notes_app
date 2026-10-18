@@ -5,7 +5,7 @@ this one is for the owner: what was chosen, why, what it means for the app, what
 and how hard it would be to reverse ("lock-in"). Ordered by lock-in, hardest first. Updated whenever
 `DECISIONS.md` gains an entry with consequences for how the app behaves.
 
-Last updated 2026-10-17, with step 2b (§32).
+Last updated 2026-10-17, with step 2c (§33).
 
 ---
 
@@ -460,4 +460,22 @@ closes an open panel, sheet or confirmation before it leaves the screen.
 **Why:** the first thing you asked Phase 2 for. ⋯ More keeps the keyboard open and your
 selection in place, because it is a panel above the toolbar rather than a separate window.
 **Lock-in: none.** All of it is settings and app behaviour; nothing is written into notes.
+
+### 33. Step 2c: colours, sizes, callouts and dividers
+
+**Chosen:** Settings → Formatting → **Colours** lists your text colours and highlight colours
+(two tabs). Reorder them with ↑ ↓ and ⋮, **Hide** the ones you don't use, and **Add a colour**
+with the phone's colour picker; your own colours can also be deleted. The **text colour** and
+**highlight colour** buttons open a panel with your visible colours in your order. New panels
+also give **font size** (in points), **typeface** (default, serif, sans-serif, monospace) and
+**line spacing** (whole lines only). **Callout** wraps the lines you're on in a tinted box: Note,
+Tip, Warning or Important; tap it again to remove the box. Inside a callout, Enter on an empty
+line leaves it, and a callout can't be put inside a list, a quote or another callout. **Divider**
+offers thin, thick, dashed and dotted lines; tap an existing divider, then choose a style, to
+change it. Highlights and dividers from before this step look exactly as they did.
+**What you'll notice:** if you never changed the toolbar (or you tap Reset), it now includes
+the colour, highlight and size menus and Callout. A toolbar you customised in 2b is kept as it is;
+add the new buttons from Add buttons if you want them. Your notes move to schema version 3, so
+an older copy of the app opens them read-only until it updates.
+**Lock-in:** as §24: these are now written into notes' HTML.
 

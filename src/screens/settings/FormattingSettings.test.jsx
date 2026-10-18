@@ -1,3 +1,4 @@
+import ColourSettings from "./ColourSettings.jsx";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import App from "../../App.jsx";
@@ -68,7 +69,7 @@ it("saves layout, reorder, long-distance moves, removals and additions immediate
   await click("+ Add buttons");
   const sheet = within(screen.getByRole("dialog"));
   expect(document.activeElement).toBe(sheet.getByRole("heading", { name: "Text" }));
-  expect(sheet.getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent)).toEqual(["Text", "Colours", "Lines & blocks", "Insert", "Tools"]);
+  expect(sheet.getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent)).toEqual(["Text", "Colours", "Size & font", "Lines & blocks", "Insert", "Tools"]);
   expect(sheet.getByRole("button", { name: "Added Bold" }).disabled).toBe(true);
   await click("Add Heading 3", sheet);
   await values("toolbar", ["bold", "italic", "h3"]);
@@ -209,7 +210,7 @@ it("restores Settings scroll and closes the Add sheet on Back without removing i
   expect(activeEntry(window.history.state[NAVIGATION_KEY]).screen).toBe("settings");
 });
 
-it("round-trips UI choices through the existing schema-2 backup preferences", async () => {
+it("round-trips UI choices through the existing schema-3 backup preferences", async () => {
   await start();
   fireEvent.click(screen.getByRole("radio", { name: "Two rows" }));
   await values("toolbarLayout", "rows"); await idle();
@@ -217,7 +218,7 @@ it("round-trips UI choices through the existing schema-2 backup preferences", as
   await click("Add Heading 3", within(screen.getByRole("dialog")));
   await click("Done", within(screen.getByRole("dialog")));
   const backup = await buildBackup();
-  expect(backup.schemaVersion).toBe(2);
+  expect(backup.schemaVersion).toBe(3);
   expect(backup.preferences.toolbarLayout).toBe("rows");
   expect(backup.preferences.toolbar.at(-1)).toBe("h3");
   cleanup();
@@ -228,4 +229,72 @@ it("round-trips UI choices through the existing schema-2 backup preferences", as
   await notebookAccess.load();
   expect(await getPref("toolbar")).toEqual([...DEFAULT_TOOLBAR, "h3"]);
   expect(await getPref("toolbarLayout")).toBe("rows");
+});
+
+it("edits each palette immediately: reorder, hide, add, duplicate/show, delete custom and reset", async () => {
+  await start("Colours");
+  await click("Move Red down");
+  expect((await getPref("textColors"))[1].name).toBe("Red");
+  await click("Options for Red");
+  expect(within(screen.getByRole("dialog")).queryByRole("button", { name: "Delete" })).toBeNull();
+  await click("Move to bottom", within(screen.getByRole("dialog")));
+  expect((await getPref("textColors")).at(-1).name).toBe("Red");
+  await click("Options for Red");
+  await click("Move to top", within(screen.getByRole("dialog")));
+  await click("Hide Red");
+  expect((await getPref("textColors"))[0].hidden).toBe(true);
+  expect(screen.getByText("Red (hidden)")).toBeTruthy();
+  await click("+ Add a colour");
+  let sheet = within(screen.getByRole("dialog"));
+  expect(sheet.getByRole("button", { name: "Add colour" }).disabled).toBe(true);
+  fireEvent.change(sheet.getByLabelText("Name"), { target: { value: "Duplicate" } });
+  fireEvent.change(sheet.getByLabelText("Colour"), { target: { value: "#dc2626" } });
+  await click("Add colour", sheet);
+  expect(sheet.getByText("That colour is already in the list")).toBeTruthy();
+  await click("Show Red", sheet);
+  expect((await getPref("textColors"))[0].hidden).toBe(false);
+  await click("+ Add a colour");
+  sheet = within(screen.getByRole("dialog"));
+  fireEvent.change(sheet.getByLabelText("Name"), { target: { value: "  Ink  " } });
+  fireEvent.change(sheet.getByLabelText("Colour"), { target: { value: "#123456" } });
+  await click("Add colour", sheet);
+  expect((await getPref("textColors")).at(-1)).toEqual({ color: "#123456", name: "Ink", hidden: false, custom: true });
+  await click("Options for Ink");
+  await click("Delete", within(screen.getByRole("dialog")));
+  expect(screen.getByRole("dialog").textContent).toContain("Delete Ink from this palette?");
+  await click("Cancel", within(screen.getByRole("dialog")));
+  expect((await getPref("textColors")).at(-1).name).toBe("Ink");
+  await click("Options for Ink"); await click("Delete", within(screen.getByRole("dialog")));
+  await click("Delete", within(screen.getByRole("dialog")));
+  expect((await getPref("textColors")).some((entry) => entry.name === "Ink")).toBe(false);
+  await click("Highlight");
+  await click("Hide Yellow");
+  expect((await getPref("highlightColors"))[0].hidden).toBe(true);
+  await click("Reset"); await click("Reset", within(screen.getByRole("dialog")));
+  expect(await getPref("highlightColors")).toBeUndefined();
+  expect(await getPref("textColors")).toBeDefined();
+  await click("Text"); await click("Reset"); await click("Reset", within(screen.getByRole("dialog")));
+  expect(await getPref("textColors")).toBeUndefined();
+});
+
+it("keeps a failed palette write visible without changing the palette", async () => {
+  await start("Colours");
+  vi.spyOn(db.prefs, "put").mockRejectedValueOnce(new Error("Palette storage full"));
+  await click("Hide Red");
+  expect(screen.getByRole("alert").textContent).toContain("Palette storage full");
+  expect(await getPref("textColors")).toBeUndefined();
+  expect(screen.getByRole("button", { name: "Hide Red" })).toBeTruthy();
+});
+
+
+it("disables palette edits in read-only mode while allowing the two palettes to be viewed", () => {
+  const run = vi.fn();
+  render(<ColourSettings formatting={resolveFormatting({})} readOnly run={run} />);
+  for (const control of screen.getAllByRole("button")) {
+    if (["Back", "Text", "Highlight"].includes(control.getAttribute("aria-label") ?? control.textContent)) continue;
+    expect(control.disabled).toBe(true);
+  }
+  fireEvent.click(screen.getByRole("button", { name: "Highlight", exact: true }));
+  expect(screen.getByRole("button", { name: "Hide Yellow" }).disabled).toBe(true);
+  expect(run).not.toHaveBeenCalled();
 });

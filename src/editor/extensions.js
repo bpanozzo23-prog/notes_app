@@ -3,9 +3,17 @@ import { TextStyleKit } from "@tiptap/extension-text-style";
 import Highlight from "@tiptap/extension-highlight";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
+import Document from "@tiptap/extension-document";
+import Callout, { CALLOUT_TYPES } from "./nodes/Callout.js";
+import Divider, { DIVIDER_STYLES } from "./nodes/Divider.js";
+import LineSpacing, { LINE_SPACINGS } from "./nodes/LineSpacing.js";
+import { STARTER_HIGHLIGHT_COLORS } from "./formatting.js";
 
 export const extensions = [
   StarterKit.configure({
+    document: false,
+    horizontalRule: false,
+    trailingNode: { notAfter: ["callout"] },
     heading: { levels: [1, 2, 3] },
     link: {
       protocols: ["note"], openOnClick: false, autolink: false,
@@ -13,12 +21,18 @@ export const extensions = [
     },
   }),
   TextStyleKit,
-  Highlight,
+  Highlight.configure({ multicolor: true }),
+  Document.extend({ content: "(block | callout)+" }),
+  Callout, Divider, LineSpacing,
   TaskList,
   TaskItem.configure({ nested: true }),
 ];
 
 export const SUPPORTED_HTML_SAMPLES = [
+  ...STARTER_HIGHLIGHT_COLORS.map(({ color }) => `<p><mark data-color="${color}" style="background-color: ${color}; color: inherit">Highlight</mark></p>`),
+  ...LINE_SPACINGS.flatMap((value) => ["p", "h2"].map((tag) => `<${tag} style="line-height: ${value}">Spacing</${tag}>`)),
+  ...CALLOUT_TYPES.map((type) => `<div data-callout="${type}"><h2>Heading</h2><ul><li><p>Item</p></li></ul></div>`),
+  ...DIVIDER_STYLES.slice(1).map((style) => `<hr data-style="${style}">`),
   "<p>Paragraph</p>",
   "<h1>Heading one</h1>", "<h2>Heading two</h2>", "<h3>Heading three</h3>",
   "<p><strong>Bold</strong></p>", "<p><em>Italic</em></p>", "<p><u>Underline</u></p>",

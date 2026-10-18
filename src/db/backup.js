@@ -118,8 +118,11 @@ function validateV2(envelope, errors, warnings) {
   }
 }
 
-const UPGRADES = Object.freeze({ 1: (envelope) => ({ ...envelope, schemaVersion: 2 }) });
-const VALIDATORS = Object.freeze({ 1: validateV1, 2: validateV2 });
+const UPGRADES = Object.freeze({
+  1: (envelope) => ({ ...envelope, schemaVersion: 2 }),
+  2: (envelope) => ({ ...envelope, schemaVersion: 3 }),
+});
+const VALIDATORS = Object.freeze({ 1: validateV1, 2: validateV2, 3: validateV2 });
 
 export function upgradeEnvelope(envelope, targetVersion = SCHEMA_VERSION, upgrades = UPGRADES, validators = VALIDATORS) {
   let current = structuredClone(envelope);
@@ -128,8 +131,9 @@ export function upgradeEnvelope(envelope, targetVersion = SCHEMA_VERSION, upgrad
   while (true) {
     const validate = validators[current.schemaVersion];
     if (!validate) throw new Error(`Schema version ${current.schemaVersion} is not supported.`);
-    warnings = [];
-    validate(current, errors, warnings);
+    const currentWarnings = [];
+    validate(current, errors, currentWarnings);
+    warnings = [...new Set([...warnings, ...currentWarnings])];
     if (errors.length || current.schemaVersion === targetVersion) return { envelope: current, errors, warnings };
     const upgrade = upgrades[current.schemaVersion];
     if (!upgrade) throw new Error(`No upgrade from schema version ${current.schemaVersion}.`);

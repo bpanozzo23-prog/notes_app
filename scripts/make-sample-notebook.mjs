@@ -18,6 +18,9 @@ const folders = [
 ];
 
 const notes = [
+  { n: 13, title: "Muestra de formato", folder: 1, tags: ["test"], created: 17, updated: 17,
+    html: `<h2>Colores y letras</h2><p><mark data-color="#fde68a" style="background-color: #fde68a; color: inherit">Amarillo</mark> · <mark data-color="#bfdbfe" style="background-color: #bfdbfe; color: inherit">Azul</mark> · <mark data-color="#a7f3d0" style="background-color: #a7f3d0; color: inherit">Verde</mark> · <mark>Resaltado clásico</mark></p><p><span style="font-size: 12pt">Doce puntos</span> · <span style="font-size: 17pt">Diecisiete</span> · <span style="font-size: 24pt">Veinticuatro</span></p><p><span style="font-family: serif">Una frase en serif</span> · <span style="font-family: monospace">Una frase monoespaciada</span></p><p style="line-height: 1.5">Un poco de espacio para leer estas palabras de ejemplo con calma.</p><div data-callout="note"><h3>Recordatorio</h3><p>Estas son palabras de muestra.</p></div><div data-callout="tip"><p>Practica un poco cada día:</p><ul><li><p>Leer una página.</p></li><li><p>Escribir una frase.</p></li></ul></div><div data-callout="warning"><p>Revisa los acentos antes de terminar.</p></div><div data-callout="important"><p>Guarda una copia de tus notas.</p></div><p>Línea fina</p><hr><p>Línea gruesa</p><hr data-style="thick"><p>Línea discontinua</p><hr data-style="dashed"><p>Línea de puntos</p><hr data-style="dotted"><p>Fin de la muestra.</p>` },
+
   { n: 1, title: "Vocabulario — comida", folder: 1, tags: ["spanish", "vocab"], pinned: true, created: 1, updated: 16,
     html: `<h2>Frutas y verduras</h2><ul><li><p><strong>la manzana</strong> — apple</p></li><li><p><strong>el plátano</strong> — banana</p></li><li><p><strong>la zanahoria</strong> — carrot</p></li><li><p><strong>el pimiento</strong> — pepper (the vegetable)</p></li></ul><h2>En el restaurante</h2><ul><li><p><em>la cuenta, por favor</em> — the bill, please</p></li><li><p><em>¿Qué me recomienda?</em> — what do you recommend?</p></li><li><p><span style="color: rgb(21, 128, 61)">¡Buen provecho!</span> — enjoy your meal</p></li></ul><p>Ver también ${link(2, "Gramática — ser y estar")} y ${link(3, "Frases útiles")}.</p>` },
   { n: 2, title: "Gramática — ser y estar", folder: 1, tags: ["spanish", "grammar"], created: 2, updated: 15,
@@ -45,7 +48,7 @@ const notes = [
 ];
 
 const envelope = {
-  format: "notes_app-backup", schemaVersion: 2, exportedAt: day(17, 8), appVersion: "sample",
+  format: "notes_app-backup", schemaVersion: 3, exportedAt: day(17, 8), appVersion: "sample",
   notes: notes.map((note) => ({
     id: id(note.n), title: note.title, html: note.html, text: htmlToText(note.html),
     folderId: note.folder ? folderId(note.folder) : null, tags: note.tags, linkedIds: extractNoteLinks(note.html),

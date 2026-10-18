@@ -18,16 +18,16 @@ const rows = () => Promise.all([db.notes.toArray(), db.folders.toArray(), db.tom
 beforeEach(resetDatabase);
 afterEach(() => { for (const other of connections.splice(0)) other.close(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
-it("opens a seeded v1 database at v2 without rewriting any rows", async () => {
+it.each([1, 2])("opens a seeded v%s database at v3 without rewriting any rows", async (version) => {
   await db.delete();
-  const old = connection(1);
+  const old = connection(version);
   await old.open();
   const seed = [[noteFixture({ folderId: "f", tags: ["tag"], rev: 9 })], [{ id: "f", name: "Folder", position: 4 }],
     [{ id: "gone", purgedAt: AT }], [{ key: "private", value: "fixture" }, { key: "toolbar", value: ["italic"] }]];
   for (const [index, table] of ["notes", "folders", "tombstones", "prefs"].entries()) await old.table(table).bulkAdd(seed[index]);
   old.close();
   await notebookAccess.load();
-  expect(db.backendDB().version).toBe(20);
+  expect(db.backendDB().version).toBe(30);
   expect(await rows()).toEqual(seed);
 });
 
@@ -43,13 +43,13 @@ const writers = [
 
 it("detects Dexie's newer-database fallback and refuses every writer and export", async () => {
   db.close();
-  const newer = connection(3);
+  const newer = connection(4);
   await newer.open();
   await newer.notes.add(noteFixture());
   newer.close();
   await notebookAccess.load();
-  expect(db.verno).toBe(2); // Dexie 4.4.6 does NOT update verno for an explicit schema.
-  expect(db.backendDB().version / 10).toBe(3);
+  expect(db.verno).toBe(3); // Dexie 4.4.6 does NOT update verno for an explicit schema.
+  expect(db.backendDB().version / 10).toBe(4);
   expect(notebookAccess.getSnapshot().readOnly).toBe(true);
   const before = await rows();
   for (const [, write] of writers) await expect(write()).rejects.toBeInstanceOf(ReadOnlyNotebookError);
@@ -57,7 +57,7 @@ it("detects Dexie's newer-database fallback and refuses every writer and export"
 });
 
 it("adopts an import only in the importing window; stale note, purge, folder and preference writes all fail", async () => {
-  const other = connection(2);
+  const other = connection(3);
   const stale = createNotebookAccess(other);
   await stale.load(); // Remembers the initial null generation.
   await setPref("storagePersisted", true);
@@ -97,7 +97,7 @@ it("suppresses Dexie's default close synchronously and closes only after a real 
   const unsubscribe = notebookAccess.subscribe(() => {
     if (notebookAccess.getSnapshot().versionChange === "pending") closing = notebookAccess.flushAndClose(flush);
   });
-  const newer = connection(3);
+  const newer = connection(4);
   const opening = newer.open();
   await vi.waitFor(() => expect(flush).toHaveBeenCalledOnce());
   expect(db.isOpen()).toBe(true);
@@ -110,7 +110,7 @@ it("suppresses Dexie's default close synchronously and closes only after a real 
 });
 
 it("leaves the connection open after a failed flush, then closes after retry", async () => {
-  expect(db.on("versionchange").fire({ oldVersion: 20, newVersion: 30 })).toBe(false);
+  expect(db.on("versionchange").fire({ oldVersion: 30, newVersion: 40 })).toBe(false);
   const flush = vi.fn().mockRejectedValueOnce(new Error("Disk full")).mockResolvedValueOnce(undefined);
   await expect(notebookAccess.flushAndClose(flush)).rejects.toThrow("Disk full");
   expect(db.isOpen()).toBe(true);
@@ -124,7 +124,7 @@ it("does not clear a versionchange that arrives while the boot generation is bei
   const get = prefs.get.bind(prefs);
   vi.spyOn(prefs, "get").mockImplementationOnce(async (key) => {
     const row = await get(key);
-    db.on("versionchange").fire({ oldVersion: 20, newVersion: 30 });
+    db.on("versionchange").fire({ oldVersion: 30, newVersion: 40 });
     return row;
   });
   await notebookAccess.load();

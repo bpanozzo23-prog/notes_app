@@ -47,8 +47,13 @@ LLM can read. The code may become public; the notes never are.
 - **Phase 2b — deployed 2026-10-17 (0.2.1).** Settings → Formatting → Toolbar and Selection
   pop-up: add, remove and reorder buttons, choose one swiping row, two rows, or one row + ⋯ More,
   with a live preview. Long-press any formatting button to see its name. Android Back closes an
-  open panel or dialog before leaving the screen. Owner phone check pending. Next: 2c, colours
-  and new formatting.
+  open panel or dialog before leaving the screen. Owner phone check pending.
+- **Phase 2c — committed 2026-10-17 (0.2.2, schema 3), released after the owner's 2b check and a
+  fresh backup.** Colour menus in the owner's order (Settings → Formatting → Colours: reorder,
+  hide, add your own), highlights in several colours, font size, typeface and line spacing,
+  four callout types (Note, Tip, Warning, Important) and four divider styles. The default
+  toolbar gains the colour, highlight and size menus and Callout (a customised toolbar is kept).
+  Next: 2d, named styles and the format painter.
 
 ## Running it
 
