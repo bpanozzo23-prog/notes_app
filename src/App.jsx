@@ -20,10 +20,18 @@ import StyleSettings from "./screens/settings/StyleSettings.jsx";
 import ColourSettings from "./screens/settings/ColourSettings.jsx";
 import PopupSettings from "./screens/settings/PopupSettings.jsx";
 
+import ClaudeSettings from "./screens/settings/ClaudeSettings.jsx";
+import { claudeSession } from "./claude/session.js";
+import { getClaudeStatus } from "./claude/prefs.js";
+import { loadClaudeSdk } from "./claude/client.js";
+
 export default function App() {
   const [queue] = useState(() => new SaveQueue({ save: updateNote }));
   const status = useSyncExternalStore(queue.subscribe, queue.getSnapshot);
   const access = useSyncExternalStore(notebookAccess.subscribe, notebookAccess.getSnapshot);
+  const claude = useSyncExternalStore(claudeSession.subscribe, claudeSession.getSnapshot);
+  const claudeHasContent = claude.conversation !== null || claude.proposal !== null;
+  const claudeBusy = claude.request !== null;
   const notebook = useNotebook();
   const formatting = useMemo(() => resolveFormatting(notebook.prefs), [notebook.prefs]);
   const { refresh } = notebook;
@@ -38,6 +46,7 @@ export default function App() {
   const [waitingForReload, setWaitingForReload] = useState(false);
   const [workerReady, setWorkerReady] = useState(false);
   const activatedWorker = useRef(false);
+  const explicitReload = useRef(false);
   const [registrationError, setRegistrationError] = useState("");
   const [nav] = useState(() => createNavigationController({
     prepare: async () => {
@@ -72,6 +81,7 @@ export default function App() {
           catch (error) { setCleanupError(error.message || "Image cleanup failed."); }
         }
         nav.restore(await refresh());
+        void getClaudeStatus().then((status) => { if (status.ready) return loadClaudeSdk(); }).catch(() => {});
         setReady(true);
       } catch (error) { setBootError(error.message || String(error)); }
     }, { captureScroll: false });
@@ -112,13 +122,13 @@ export default function App() {
 
   // Consume once; a failed flush stays visible until an explicit retry, never a reload loop.
   useEffect(() => {
-    if (!workerReady || busy || access.versionChange || access.replaced) return;
+    if (!workerReady || busy || access.versionChange || access.replaced || claudeBusy || (claudeHasContent && !explicitReload.current)) return;
     setWorkerReady(false);
     void nav.run(async () => {
-      try { await queue.flush(); window.location.reload(); }
-      finally { setWaitingForReload(false); }
+      try { await queue.flush(); if (!claudeSession.isBusy() && (!claudeSession.hasContent() || explicitReload.current)) window.location.reload(); }
+      finally { explicitReload.current = false; setWaitingForReload(false); }
     });
-  }, [workerReady, busy, nav, queue, access.versionChange, access.replaced]);
+  }, [workerReady, busy, nav, queue, access.versionChange, access.replaced, claudeBusy, claudeHasContent]);
 
   function run(task) {
     setMessage(""); setError("");
@@ -145,21 +155,24 @@ export default function App() {
     if (success && activeEntry(nav.current).screen === "note") nav.back();
   }
   const saveBlocksReload = ["pending", "saving", "error"].includes(status);
-  const reloadReason = status === "error" ? "Save failed. Retry save before reloading." : saveBlocksReload ? "Waiting for your notes to save." : "";
+  const reloadReason = [status === "error" ? "Save failed. Retry save before reloading." : saveBlocksReload ? "Waiting for your notes to save." : "",
+    claudeBusy ? "Waiting for Claude's answer." : ""].filter(Boolean).join(" ");
   const updateState = registrationError ? `Offline setup: ${registrationError}` : needRefresh || activatedWorker.current
     ? `Update available.${reloadReason ? ` ${reloadReason}` : " Ready to reload."}` : offlineReady ? "Ready to work offline" : "No update waiting.";
   async function reload() {
     // Check the queue itself as well as the rendered button, in case a keystroke just arrived.
-    if (queue.status !== "idle") return;
+    if (queue.status !== "idle" || claudeSession.isBusy()) return;
     await run(async () => {
       await queue.flush();
+      if (claudeSession.isBusy()) return;
       if (activatedWorker.current) { window.location.reload(); return; }
+      explicitReload.current = true;
       setWaitingForReload(true);
       try { await updateServiceWorker(true); }
-      catch (error) { setWaitingForReload(false); throw error; }
+      catch (error) { explicitReload.current = false; setWaitingForReload(false); throw error; }
     });
   }
-  const locked = busy || !ready || waitingForReload || workerReady || !!access.versionChange || access.replaced;
+  const locked = busy || !ready || waitingForReload || (workerReady && !claudeHasContent && !claudeBusy) || !!access.versionChange || access.replaced;
   const shared = { busy: locked, readOnly: access.readOnly, onBack: back, run, refresh, error };
   const guardMessage = access.replaced ? new NotebookReplacedError().message : access.readOnly ? new ReadOnlyNotebookError().message
     : access.versionChange === "closed" ? DATABASE_UPDATED : "";
@@ -174,7 +187,7 @@ export default function App() {
       <p className="mt-1 text-sm">{bootError}</p>
     </div>}
     {(needRefresh || activatedWorker.current) && <aside aria-label="App update" className="border-b border-[var(--color-line)] bg-blue-50 px-4 py-2 text-sm">
-      <div className="flex items-center justify-between gap-2"><span>Update available —</span><button className="min-h-11 underline" disabled={locked || saveBlocksReload} onClick={reload}>Reload</button></div>
+      <div className="flex items-center justify-between gap-2"><span>Update available —</span><button className="min-h-11 underline" disabled={locked || saveBlocksReload || claudeBusy} onClick={reload}>{claudeHasContent ? "Reload (clears Claude's conversation)" : "Reload"}</button></div>
       {reloadReason && <p className="text-xs">{reloadReason}</p>}
       {waitingForReload && <p className="text-xs">Reloading…</p>}
     </aside>}
@@ -192,6 +205,7 @@ export default function App() {
       {route.screen === "folders" && <Folders {...notebook} {...shared} />}
       {route.screen === "trash" && <Trash trash={notebook.trash} {...shared} />}
       {route.screen === "settings" && <Settings cleanupError={cleanupError} {...shared} notebook={notebook} queue={queue} onOpen={open} setMessage={setMessage} updateState={updateState} />}
+      {route.screen === "settings-claude" && <ClaudeSettings {...shared} />}
       {route.screen === "settings-toolbar" && <ToolbarSettings {...shared} formatting={formatting} />}
       {route.screen === "settings-styles" && <StyleSettings {...shared} formatting={formatting} />}
       {route.screen === "settings-colours" && <ColourSettings {...shared} formatting={formatting} />}

@@ -546,3 +546,17 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   block service workers, route Anthropic's address fail-closed before navigation, and wrap `fetch`
   in an init script to release fixture chunks step by step. — Codex: a fulfilled route body cannot
   show a mid-stream state or test Cancel.
+
+## Phase 3a implementation
+
+- 2026-10-18 — Saving a key and turning Claude on share one guarded transaction; removing the key and turning it off do too. — A storage failure must not leave half of a settings action applied.
+- 2026-10-18 — Session tokens are opaque identity objects carrying the notebook generation, and remain current after a request ends until the next request or invalidation. — Completed answers and proposal review can keep using the same identity; late callbacks from earlier requests cannot write into a later one.
+- 2026-10-18 — Cancel aborts and invalidates the token but keeps content already received; New question, replacement and versionchange clear content as well. — Step 3b needs partial answers for its Stopped display, while a replaced notebook makes the whole answer obsolete. The step 3a task explicitly requires versionchange invalidation, which takes precedence over the direction file's more general running-request failure row.
+- 2026-10-18 — SDK logging is explicitly off; status-less SSE `overloaded_error` and `api_error` become the fixed busy sentence, and a failed SDK preload can be retried. — Streaming errors arrive after HTTP 200, and neither SDK diagnostics nor a transient chunk-load failure should leak credentials or permanently disable the feature.
+- 2026-10-18 — An explicit Reload remembers the owner's choice through the worker activation callback; automatic activation still waits for an empty, idle Claude session. — Otherwise the conversation-preservation guard also prevents the reload the owner deliberately requested; a failed final save still retains the answer.
+- 2026-10-18 — Screenshot streams use a serializable fixture-only fetch installer with one-event release controls; shots 62–68 run before the existing destructive database-guard shots. — Later Claude screenshots need reproducible partial streams, and the guard shots deliberately leave the notebook read-only.
+- 2026-10-18 — Test-key results also carry the screen's settings revision; changing the saved key or on/off state drops the old result without cancelling the request. — A result for an earlier key must never verify a replacement key, while navigation and settings remain usable during the request.
+- 2026-10-18 — Review fixes: the key field has a visible label (its placeholder disappears once
+  typing starts); a malformed `claudeSpend` record restarts the month's total instead of throwing;
+  `enforced_spend_limit_reached` is recognised at either level of the error body. — Found reading
+  the diff and the 375–412 px screenshots (62–68).

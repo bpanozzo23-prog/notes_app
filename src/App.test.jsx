@@ -3,6 +3,8 @@ import Dexie from "dexie";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import App from "./App.jsx";
+import { claudeSession } from "./claude/session.js";
+import { SaveQueue } from "./lib/saveQueue.js";
 import { db, getPref, setPref, DATABASE_UPDATED } from "./db/db.js";
 import * as filesDb from "./db/files.js";
 import * as imageProcessing from "./lib/images.js";
@@ -28,6 +30,7 @@ vi.mock("virtual:pwa-register/react", async () => {
 });
 let persist;
 beforeEach(async () => {
+  claudeSession.clearSession();
   await resetDatabase();
   vi.clearAllMocks();
   window.history.replaceState(null, "");
@@ -40,6 +43,7 @@ beforeEach(async () => {
 });
 afterEach(async () => {
   cleanup();
+  claudeSession.clearSession();
   // Let unmount's flush finish before the next test deletes the database.
   await act(async () => { await new Promise((resolve) => setTimeout(resolve, 10)); });
   vi.restoreAllMocks();
@@ -740,4 +744,62 @@ it.each(["paste", "drop"])("%s handles image files at the target position and pr
   if (kind === "drop") expect(editor.getHTML().indexOf("First")).toBeLessThan(editor.getHTML().indexOf("<img"));
   else expect(editor.getHTML().indexOf("<img")).toBeLessThan(editor.getHTML().indexOf("First"));
   await back(); expect((await getNote(note.id)).html).toContain("<img");
+});
+
+it("disables update Reload during a Claude request while keeping navigation usable", async () => {
+  pwa.needRefresh = true;
+  await start();
+  let request;
+  act(() => { request = claudeSession.beginRequest("test-key"); });
+  expect(screen.getByRole("button", { name: "Reload", exact: true }).disabled).toBe(true);
+  expect(screen.getByText("Waiting for Claude's answer.")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Settings", exact: true }).disabled).toBe(false);
+  act(() => claudeSession.endRequest(request.token));
+  expect(screen.getByRole("button", { name: "Reload", exact: true }).disabled).toBe(false);
+});
+it.each(["conversation", "proposal"])("keeps a %s across both update paths and labels explicit Reload", async (kind) => {
+  pwa.needRefresh = true;
+  await start();
+  act(() => {
+    const request = claudeSession.beginRequest("question");
+    claudeSession[kind === "conversation" ? "setConversation" : "setProposal"](request.token, { text: "Made-up answer" });
+    claudeSession.endRequest(request.token);
+  });
+  const flush = vi.spyOn(SaveQueue.prototype, "flush");
+  expect(screen.getByRole("button", { name: "Reload (clears Claude's conversation)" }).disabled).toBe(false);
+  expect(pwa.update).not.toHaveBeenCalled();
+  act(() => pwa.options.onNeedReload());
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
+  expect(flush).not.toHaveBeenCalled();
+  expect(document.querySelector("main > div[aria-busy]").getAttribute("aria-busy")).toBe("false");
+  await settings();
+  expect(screen.getByRole("heading", { name: "Settings", exact: true })).toBeTruthy();
+  expect(claudeSession.hasContent()).toBe(true);
+});
+it("waits for a request activated from another tab and preserves its completed answer", async () => {
+  await start();
+  let request;
+  act(() => { request = claudeSession.beginRequest("question"); pwa.options.onNeedReload(); });
+  const flush = vi.spyOn(SaveQueue.prototype, "flush");
+  expect(screen.getByRole("button", { name: "Reload", exact: true }).disabled).toBe(true);
+  expect(document.querySelector("main > div[aria-busy]").getAttribute("aria-busy")).toBe("false");
+  act(() => { claudeSession.setConversation(request.token, { text: "Fixture" }); claudeSession.endRequest(request.token); });
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
+  expect(flush).not.toHaveBeenCalled();
+  expect(screen.getByRole("button", { name: "Reload (clears Claude's conversation)" }).disabled).toBe(false);
+});
+it("honours explicit Reload with content through the activation callback, retaining content if the final flush fails", async () => {
+  pwa.needRefresh = true;
+  await start();
+  act(() => {
+    const request = claudeSession.beginRequest("question");
+    claudeSession.setConversation(request.token, { text: "Fixture" }); claudeSession.endRequest(request.token);
+  });
+  const flush = vi.spyOn(SaveQueue.prototype, "flush").mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error("Fixture final flush failure"));
+  pwa.update.mockImplementationOnce(async () => pwa.options.onNeedReload());
+  fireEvent.click(screen.getByRole("button", { name: "Reload (clears Claude's conversation)" }));
+  await screen.findByText("Fixture final flush failure");
+  expect(flush).toHaveBeenCalledTimes(2);
+  expect(pwa.update).toHaveBeenCalledWith(true);
+  expect(claudeSession.hasContent()).toBe(true);
 });

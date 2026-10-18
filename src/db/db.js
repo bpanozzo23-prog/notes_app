@@ -40,6 +40,7 @@ export function createNotebookAccess(database) {
   });
   return {
     getSnapshot: () => state,
+    getGeneration: () => generation,
     subscribe: (listener) => { listeners.add(listener); return () => listeners.delete(listener); },
     async load() {
       generation = undefined;

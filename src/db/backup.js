@@ -8,11 +8,14 @@ import { IMAGE_TYPES, MAX_IMAGE_BYTES } from "./files.js";
 import { toBase64, fromBase64, base64Size } from "../lib/base64.js";
 import { clearFileUrls } from "../editor/fileUrls.js";
 
+import { claudeApiKey, claudeEnabled, claudeSpend, claudeLastChange } from "../claude/prefs.js";
+import { claudeSession } from "../claude/session.js";
+
 export const COMFORTABLE_BACKUP_BYTES = 150 * 1024 * 1024;
 const V1_EXPORTED_PREFS = Object.freeze(["lastBackupAt", "toolbar"]);
 export const EXPORTED_PREFS = Object.freeze(["lastBackupAt", ...FORMATTING_KEYS]);
 // Device-local preferences that older backups contained: accepted with a warning, never restored.
-export const IGNORED_PREFS = Object.freeze(["storagePersisted"]);
+export const IGNORED_PREFS = Object.freeze(["storagePersisted", claudeEnabled, claudeSpend, claudeLastChange]);
 export const BACKUP_FORMAT = "notes_app-backup";
 
 export async function buildBackup() {
@@ -197,6 +200,9 @@ export function validateBackup(raw) {
   try {
     const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
     if (!isObject(parsed)) throw new Error("The file is not a backup envelope.");
+    if (isObject(parsed.preferences) && Object.hasOwn(parsed.preferences, claudeApiKey)) {
+      errors.push("This file contains an Anthropic API key, so it was not made by this app's export. Nothing was imported.");
+    }
     for (const key of ["notes", "folders", "tombstones"]) {
       summary[key] = Array.isArray(parsed[key]) ? parsed[key].length : 0;
     }
@@ -230,7 +236,7 @@ export async function importBackup(envelope) {
   await writeTransaction([db.notes, db.folders, db.tombstones, db.prefs, db.files, db.fileData], async () => {
     // Only the exportable preferences are replaced: device-local ones such as a future API key
     // are not in any backup and must survive a restore.
-    await Promise.all([db.files.clear(), db.fileData.clear(), db.notes.clear(), db.folders.clear(), db.tombstones.clear(), db.prefs.bulkDelete([...EXPORTED_PREFS])]);
+    await Promise.all([db.files.clear(), db.fileData.clear(), db.notes.clear(), db.folders.clear(), db.tombstones.clear(), db.prefs.bulkDelete([...EXPORTED_PREFS, claudeLastChange])]);
     await db.notes.bulkAdd(notes);
     await db.folders.bulkAdd(clean.folders);
     await db.tombstones.bulkAdd(clean.tombstones);
@@ -244,6 +250,7 @@ export async function importBackup(envelope) {
   });
   clearFileUrls();
   notebookAccess.adopt(generation);
+  claudeSession.notebookReplaced();
   announceReplacement(generation);
   return checked.summary;
 }

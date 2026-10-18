@@ -226,3 +226,28 @@ it.each([1, 2, 3])("imports a v%s backup at schema 4 with rows unchanged", async
   expect((await buildBackup()).notes).toEqual(raw.notes);
   expect((await buildBackup()).preferences).toEqual(raw.preferences);
 });
+
+it.each([1, 2, 3, 4, 5, undefined])("refuses a key before upgrading or checking version %s", (schemaVersion) => {
+  const checked = validateBackup(backupFixture({ schemaVersion, files: [], preferences: { claudeApiKey: "sk-ant-FAKE" } }));
+  expect(checked.ok).toBe(false);
+  expect(checked.envelope).toBeNull();
+  expect(checked.errors).toContain("This file contains an Anthropic API key, so it was not made by this app's export. Nothing was imported.");
+});
+it.each([1, 2, 3, 4])("warns and ignores other Claude preferences from v%s", async (schemaVersion) => {
+  const preferences = { claudeEnabled: true, claudeSpend: { dollars: 99 }, claudeLastChange: { fake: true } };
+  const checked = validateBackup(backupFixture({ schemaVersion, files: [], preferences }));
+  expect(checked.ok).toBe(true);
+  for (const key of Object.keys(preferences)) expect(checked.warnings).toContain(`Preference ${key} is specific to the device it was exported from and will be ignored.`);
+  expect(checked.envelope.preferences).toEqual({});
+  await importBackup(checked.envelope);
+  expect(await allPrefs()).toEqual({ notebookGeneration: expect.any(String) });
+});
+it("exports safely with a stored key; import deletes Undo and keeps local credentials and spend", async () => {
+  const preferences = { claudeApiKey: "sk-ant-FAKE", claudeEnabled: true, claudeSpend: { month: "2026-10", dollars: 1, counted: [] }, claudeLastChange: { fake: true } };
+  for (const [key, value] of Object.entries(preferences)) await setPref(key, value);
+  const before = await buildBackup();
+  expect(before.preferences).toEqual({});
+  expect(JSON.stringify(before)).not.toContain("sk-ant-FAKE");
+  await importBackup(backupFixture());
+  expect(await allPrefs()).toEqual({ claudeApiKey: preferences.claudeApiKey, claudeEnabled: true, claudeSpend: preferences.claudeSpend, notebookGeneration: expect.any(String) });
+});

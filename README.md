@@ -82,7 +82,11 @@ LLM can read. The code may become public; the notes never are.
   Opus 5.5 with the owner's own key on this device, off by default. Seven steps: 3a settings and
   the request layer, 3b questions across the notebook with cited sources, 3c clean up one note,
   3d titles/tags/folders, 3e links between notes, 3f merge and split, 3g closeout. No schema
-  change. 3a next.
+  change.
+- **Phase 3a — committed 2026-10-18 (0.3.0).** Settings → Claude: spend-limit acknowledgement,
+  API key stored on this phone only, Test key (free), Turn off, Remove key; backups refuse a key;
+  the request layer and test harness for later steps. Nothing is sent except Test key. Owner
+  phone check pending.
 
 ## Running it
 

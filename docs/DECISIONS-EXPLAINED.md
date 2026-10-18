@@ -5,7 +5,7 @@ this one is for the owner: what was chosen, why, what it means for the app, what
 and how hard it would be to reverse ("lock-in"). Ordered by lock-in, hardest first. Updated whenever
 `DECISIONS.md` gains an entry with consequences for how the app behaves.
 
-Last updated 2026-10-18, when Phase 3 was planned and approved (§38–50).
+Last updated 2026-10-18, at step 3a (§51).
 
 ---
 
@@ -784,3 +784,22 @@ than Claude's usual formatting.
   expensive.
 - **What Claude may not do:** delete notes or folders, rename folders, or touch your toolbar,
   colours or styles.
+
+### 51. Step 3a: turning Claude on
+
+**Chosen:** Settings has a new **Claude** row (Off or On). Its screen explains what Claude does
+and the risk of keeping the key in the browser. To turn Claude on you tick "I have set a monthly
+spend limit in the Anthropic console" (a link takes you there), paste your key into the
+**Anthropic API key** field, and tap **Save key and turn on**. The field empties itself and the
+key is never shown again. When Claude is on: **Test key** checks the key with Anthropic's free
+token counter ("The key works.", "Anthropic rejected this key." or "Couldn't check the key: …");
+**Turn off** keeps the key, so turning on again needs only the tick; **Remove key** deletes it
+after a confirmation. A running total for this month on this phone starts at $0.00.
+**Behind the scenes:** the app now has the code that talks to Anthropic and turns its errors into
+plain sentences, and the rules that keep the key out of backups, the screen and logs (tests plant
+a fake key everywhere it could leak and check it never appears). An app update can no longer
+reload over a Claude conversation (there are none yet; they arrive in 3b). A backup file that
+contains a key is refused.
+**What you'll notice:** only the new Settings screen; nothing is sent to Anthropic except Test
+key, which costs nothing. App version 0.3.0; schema version stays 4.
+**Lock-in: none** beyond §38.

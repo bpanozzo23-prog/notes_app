@@ -9,6 +9,8 @@ import { makePng } from "./image-fixture.mjs";
 import { mkdirSync, writeFileSync, unlinkSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium, devices } from "playwright";
+import { sseFrames } from "../src/claude/fixtures/responses.js";
+import { installSteppedClaudeFetch } from "../src/claude/fixtures/browser.js";
 
 const out = process.argv[2] ?? "private-data/shots";
 const url = process.argv[3] ?? "http://localhost:5174/notes_app/";
@@ -21,7 +23,22 @@ mkdirSync(out, { recursive: true });
 
 const browser = await chromium.launch();
 // Pixel 7 is the closest built-in profile to the owner's S25 Ultra: 412 px wide, 2.6x, touch.
-const context = await browser.newContext({ ...devices["Pixel 7"], viewport, locale: "en-GB" });
+const context = await browser.newContext({ ...devices["Pixel 7"], viewport, locale: "en-GB", serviceWorkers: "block" });
+const unexpectedAnthropic = [];
+await context.route("https://api.anthropic.com/**", async (route) => {
+  const request = route.request();
+  const path = new URL(request.url()).pathname;
+  if (request.method() === "POST" && path === "/v1/messages/count_tokens") {
+    const rejected = request.headers()["x-api-key"] === "sk-ant-FAKE-REJECTED";
+    await route.fulfill({ status: rejected ? 401 : 200, contentType: "application/json", body: JSON.stringify(rejected
+      ? { type: "error", error: { type: "authentication_error", message: "Made-up rejected key" } }
+      : { input_tokens: 8 }) });
+  } else {
+    unexpectedAnthropic.push(`${request.method()} ${path}`);
+    await route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ type: "error", error: { type: "api_error", message: "Unexpected fixture request" } }) });
+  }
+});
+await context.addInitScript(installSteppedClaudeFetch, sseFrames());
 const page = await context.newPage();
 page.on("pageerror", (error) => console.log("pageerror:", error.message));
 page.on("console", (message) => { if (["error", "warning"].includes(message.type())) console.log(`console.${message.type()}:`, message.text()); });
@@ -39,6 +56,34 @@ const checkPopup = async () => {
 };
 
 await page.goto(url, { waitUntil: "networkidle" });
+// Non-screenshot smoke check: prove the in-page wrapper remains a stepped stream.
+await page.evaluate(() => {
+  window.__claudeSmoke = { text: "", done: false, error: false };
+  void (async () => {
+    const response = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", body: JSON.stringify({ stream: true }) });
+    const reader = response.body.getReader(), decoder = new TextDecoder();
+    let pending = "";
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      pending += decoder.decode(value, { stream: true });
+      let boundary;
+      while ((boundary = pending.indexOf("\n\n")) >= 0) {
+        const frame = pending.slice(0, boundary); pending = pending.slice(boundary + 2);
+        const data = frame.split("\n").find((line) => line.startsWith("data: "));
+        const event = JSON.parse(data.slice(6));
+        if (event.delta?.type === "text_delta") window.__claudeSmoke.text += event.delta.text;
+      }
+    }
+    window.__claudeSmoke.done = true;
+  })().catch(() => { window.__claudeSmoke.error = true; });
+});
+await page.evaluate(() => { for (let i = 0; i < 3; i++) window.__claudeStreams.at(-1).release(); });
+await page.waitForFunction(() => window.__claudeSmoke.text === "Café " && !window.__claudeSmoke.done);
+await page.evaluate(() => window.__claudeStreams.at(-1).release());
+await page.waitForFunction(() => window.__claudeSmoke.text === "Café opens on Sunday." && !window.__claudeSmoke.done);
+await page.evaluate(() => { while (window.__claudeStreams.at(-1).release()) { /* release remaining events */ } });
+await page.waitForFunction(() => window.__claudeSmoke.done && !window.__claudeSmoke.error);
 await shot("01-list-empty");
 
 // Import the sample notebook the way the owner would (the safety download is accepted silently).
@@ -305,6 +350,31 @@ await back();
 await button("Settings").click();
 await page.getByText(/^Images: 2,/).scrollIntoViewIfNeeded();
 await shot("60-settings-images");
+// Phase 3a settings, before the destructive database-guard shots below.
+await page.evaluate(() => window.scrollTo(0, 0));
+await shot("62-settings-claude-row");
+await button("Claude Off").click();
+await shot("63-claude-off");
+await page.getByRole("checkbox", { name: "I have set a monthly spend limit in the Anthropic console" }).check();
+await page.getByLabel("Anthropic API key", { exact: true }).fill("sk-ant-FAKE-KEY-FOR-SCREENSHOTS");
+await shot("64-claude-acknowledged");
+await button("Save key and turn on").click();
+await page.getByText("On · key saved on this phone", { exact: true }).waitFor();
+await shot("65-claude-on");
+await button("Test key").click();
+await page.getByText("The key works.", { exact: true }).waitFor();
+await shot("66-claude-key-works");
+await button("Remove key").click();
+await shot("67-claude-remove-key");
+await page.getByRole("dialog").getByRole("button", { name: "Remove key", exact: true }).click();
+await page.getByRole("checkbox", { name: "I have set a monthly spend limit in the Anthropic console" }).check();
+await page.getByLabel("Anthropic API key", { exact: true }).fill("sk-ant-FAKE-REJECTED");
+await button("Save key and turn on").click();
+await page.getByText("On · key saved on this phone", { exact: true }).waitFor();
+await button("Test key").click();
+await page.getByText("Anthropic rejected this key.", { exact: true }).waitFor();
+await shot("68-claude-key-rejected");
+await back();
 await back();
 await button("Vocabulario — comida").click();
 // Only this fresh browser context's fixture notebook is involved in the guard screenshots.
@@ -332,3 +402,4 @@ await button("Settings").click();
 await shot("19-read-only-settings");
 
 await browser.close();
+if (unexpectedAnthropic.length) throw new Error(`Unexpected request to Anthropic: ${unexpectedAnthropic.join(", ")}`);

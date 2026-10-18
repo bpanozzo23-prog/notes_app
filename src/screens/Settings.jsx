@@ -8,6 +8,7 @@ import { APP_VERSION, SCHEMA_VERSION } from "../version.js";
 import ScreenHeader from "../components/ScreenHeader.jsx";
 import { requestPersistence } from "../lib/persistence.js";
 import Confirm from "../components/Confirm.jsx";
+import { useClaudeStatus } from "../claude/prefs.js";
 import { ChevronRight } from "lucide-react";
 
 // Small images show in KB rather than "0.0 MB"; a phone's quota reads better in GB.
@@ -19,6 +20,7 @@ export function formatSize(bytes) {
 const imageCount = (count) => `${count} ${count === 1 ? "image" : "images"}`;
 
 export default function Settings({ cleanupError, notebook, queue, run, busy, readOnly, onBack, onOpen, setMessage, updateState, error }) {
+  const claude = useClaudeStatus(notebook.prefs);
   const [preview, setPreview] = useState(null);
   const [confirmImport, setConfirmImport] = useState(false);
   const { notes, trash, folders, prefs, persisted, refresh } = notebook;
@@ -60,6 +62,12 @@ export default function Settings({ cleanupError, notebook, queue, run, busy, rea
               {label}<ChevronRight size={18} aria-hidden="true" />
             </button>)}
         </div>
+      </section>
+      <section>
+        <h2 className="mb-2 font-semibold">Claude</h2>
+        <button className="flex min-h-11 w-full items-center justify-between py-2 text-left" aria-label={`Claude ${claude.ready ? "On" : "Off"}`} disabled={busy} onClick={() => onOpen({ screen: "settings-claude" })}>
+          <span>Claude</span><span className="ml-auto mr-2 text-sm text-[var(--color-muted)]">{claude.ready ? "On" : "Off"}</span><ChevronRight size={18} aria-hidden="true" />
+        </button>
       </section>
       <div className="space-y-2">
         <h2 className="font-semibold">Backup</h2>
