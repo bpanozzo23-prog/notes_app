@@ -12,6 +12,7 @@ const stores = {
 db.version(1).stores(stores);
 db.version(2).stores(stores);
 db.version(3).stores(stores);
+db.version(4).stores({ ...stores, files: "id, unusedSince", fileData: "id" });
 
 export class ReadOnlyNotebookError extends Error {
   constructor() { super("This notebook was updated by a newer version of the app. Reload to update."); this.name = "ReadOnlyNotebookError"; }

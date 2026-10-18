@@ -34,3 +34,8 @@ describe("note links", () => {
     expect(htmlToText(cleaned)).toBe(htmlToText(html));
   });
 });
+
+it("extracts safe, decoded, unique image references in document order", async () => {
+  const { extractFileIds } = await import("./text.js");
+  expect(extractFileIds(`<img data-file="a&amp;b"><IMG DATA-FILE='two'><img data-file=a&amp;b><a data-file="not-image">X</a><img src="https://example.com"><img data-file="bad&#10;id"><img data-file=" "><img data-file="${"x".repeat(513)}"><img data-file="first" data-file="second">`)).toEqual(["a&b", "two", "first"]);
+});

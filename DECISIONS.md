@@ -411,3 +411,51 @@ Append-only. One dated line per decision: what was decided, then why, after the 
 - 2026-10-17 — The owner verified 2b on the published app (layouts, ⋯ More with the keyboard
   open, Back closing overlays, long-press labels, pop-up settings, export/import of the
   toolbar): "2b checks out on my end."
+
+## Phase 2e implementation
+
+- 2026-10-17 — Cleanup reads and writes one file row at a time inside its guarded transaction,
+  changing only `unusedSince`; it does not use Dexie's collection `modify`. — A fixture test
+  reproduced `modify` deep-cloning an ArrayBuffer into an empty object across realms. The
+  regression test compares the bytes as well as the mark, so cleanup cannot silently erase them.
+- 2026-10-17 — Each mounted note has one serial image-processing lane; each picker, paste or
+  drop batch has its own mapped position marker, advanced after each successful image. The
+  picker reserves its position when opened and removes it on cancellation. — Typing can continue
+  during processing, multiple batches retain their destinations, and navigation waits for their
+  edits without cancelling them just because the screen becomes busy.
+- 2026-10-17 — JPEG headers also supply EXIF orientation when available, so bitmap resize
+  requests use the displayed axes for rotated camera photos. The bitmap's actual dimensions
+  still determine the final canvas size. — A quarter-turn photo must stay upright and preserve
+  its proportions whether or not the browser honours bitmap resizing.
+- 2026-10-17 — Image failures appear beside the toolbar with Dismiss and are also passed to
+  the screen message, so a failure while Back waits remains visible after navigation. Unexpected
+  decoder/storage details become the safe image error; quota failures get the specific storage
+  message. — Each failed file remains independent of the rest of a batch and of text saves.
+- 2026-10-17 — The image viewer uses the existing full-screen Dialog with an optional full-width
+  body; its controls stay outside the scrolling image area. The URL cache shares pending reads
+  and refuses to create a URL for a released or cleared read. — Keeps Back/Escape/focus behaviour
+  shared with existing overlays and avoids leaking late object URLs.
+- 2026-10-17 — Backup validation checks canonical base64 padding and trailing bits without
+  decoding; file objects remain shared during upgrades. Downloads serialize the envelope and
+  each image separately; restore decodes and writes one image at a time in the transaction.
+  — Limits peak extra memory while retaining the one-file safety backup and atomic replacement.
+- 2026-10-17 — The task's explicit backup dimension limit is 10,000 per axis; new insertions
+  still shrink to 2,560 on the long edge. Sizes shown in MB use 1,024 × 1,024 bytes and the
+  provisional comfortable-backup threshold is 150 MB. — The task is more specific than the
+  direction file's shared-limits wording; the threshold awaits the owner's phone measurement.
+- 2026-10-17 — A shared Node PNG generator supplies the public sample landscape, temporary
+  screenshot input and 320 × 320 noise images for measurement (about 300 KB each). — Generated
+  pixels only, with measurement backups kept under the ignored `private-data/image-backups/`.
+- 2026-10-17 — The viewer body fills the space above its fixed footer and Actual size has a
+  visible pressed state. Screenshot steps scroll the image and import preview into view at
+  reduced height. — Inspection at 412 × 839, 375 × 667 and 375 × 450 caught unused space below
+  the first viewer footer and off-screen preview counts; all three 69-screen runs then passed.
+- 2026-10-17 — Unreleased schema 4 splits image metadata into `files` (indexed by
+  `unusedSince`) and bytes into `fileData`, refining the direction file's single file-row shape
+  and the earlier cleanup choice above. — Boot cleanup and Settings must never read image
+  bytes; index keys identify marks and expiry, and only changing metadata rows are read/written.
+  Creation, cleanup deletion and import keep both tables together in guarded transactions;
+  display/export read both in one transaction and treat either missing half as a missing image.
+  The v4 backup envelope stays unchanged.
+- 2026-10-17 — Settings and the import preview show sizes under 1 MB in KB and quotas over
+  1 GB in GB, and say "1 image". — Review fix: the screenshots showed "Images: 2, 0.0 MB".

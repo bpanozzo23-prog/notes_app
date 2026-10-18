@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { afterEach, beforeEach, expect, it } from "vitest";
 import { validateBackup, buildBackup, importBackup } from "./backup.js";
-import { extractNoteLinks, htmlToText } from "../lib/text.js";
+import { extractFileIds, extractNoteLinks, htmlToText } from "../lib/text.js";
 
 // public/sample-notebook.json is what `npm run shots` imports and what the owner can import to
 // try the app. It must keep validating as the schema evolves (regenerate it with the script).
@@ -17,6 +17,12 @@ it("the sample notebook imports cleanly and its derived fields are current", () 
   for (const note of result.envelope.notes) {
     expect(note.text).toBe(htmlToText(note.html));
     expect(note.linkedIds).toEqual(extractNoteLinks(note.html));
+  }
+  expect(result.envelope.schemaVersion).toBe(4);
+  for (const note of result.envelope.notes) for (const id of extractFileIds(note.html)) {
+    const image = result.envelope.files.find((file) => file.id === id);
+    expect(image).toBeDefined();
+    expect(Buffer.from(image.data, "base64").length).toBe(image.size);
   }
   const ids = new Set(result.envelope.notes.map((note) => note.id));
   for (const note of result.envelope.notes) for (const target of note.linkedIds) expect(ids.has(target)).toBe(true);
@@ -42,7 +48,7 @@ it("preserves every formatting-note value through editor, save, reopen, backup, 
   const reopened = open((await db.notes.get(note.id)).html);
   expect(reopened.getHTML()).toBe(original);
   const backup = await buildBackup();
-  expect(backup.schemaVersion).toBe(3);
+  expect(backup.schemaVersion).toBe(4);
   expect(backup.preferences.namedStyles).toEqual(sample.preferences.namedStyles);
   await db.notes.clear();
   await importBackup(backup);
@@ -56,4 +62,20 @@ it("preserves every formatting-note value through editor, save, reopen, backup, 
   expect([...body.querySelectorAll('[data-callout]')].map((node) => node.dataset.callout)).toEqual(["note", "tip", "warning", "important"]);
   expect([...body.querySelectorAll('hr')].map((node) => node.dataset.style ?? "thin")).toEqual(["thin", "thick", "dashed", "dotted"]);
   expect(htmlToText(restored)).not.toMatch(/ℹ|💡|⚠|❗/);
+});
+
+it("keeps image dimensions, reference and identical bytes through editor/save/restore", async () => {
+  const sample = JSON.parse(file); await importBackup(sample);
+  const note = sample.notes.find((note) => note.title === "Captura de ejemplo");
+  const before = sample.files[0];
+  const html = open(note.html).getHTML();
+  expect(html).not.toMatch(/src=|blob:/);
+  await updateNote(note.id, { html });
+  const backup = await buildBackup(); await importBackup(backup);
+  const restored = open((await db.notes.get(note.id)).html).getHTML();
+  const element = document.createElement("div"); element.innerHTML = restored;
+  expect(element.querySelector("img").getAttribute("data-file")).toBe(before.id);
+  expect(element.querySelector("img").getAttribute("width")).toBe("480");
+  expect(element.querySelector("img").getAttribute("height")).toBe("270");
+  expect(Buffer.from((await db.fileData.get(before.id)).bytes).equals(Buffer.from(before.data, "base64"))).toBe(true);
 });

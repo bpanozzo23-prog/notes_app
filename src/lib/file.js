@@ -1,5 +1,14 @@
+export function jsonBlob(obj) {
+  if (!Array.isArray(obj.files)) return new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" });
+  const { files, ...envelope } = obj;
+  const parts = [JSON.stringify(envelope).slice(0, -1), ',"files":['];
+  files.forEach((file, index) => { if (index) parts.push(","); parts.push(JSON.stringify(file)); });
+  parts.push("]}");
+  return new Blob(parts, { type: "application/json" });
+}
+
 export function downloadJson(obj, filename) {
-  const url = URL.createObjectURL(new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" }));
+  const url = URL.createObjectURL(jsonBlob(obj));
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.download = filename;

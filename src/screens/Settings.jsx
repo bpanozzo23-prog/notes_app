@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { buildBackup, backupFilename, importBackup, validateBackup } from "../db/backup.js";
+import { useEffect, useState } from "react";
+import { COMFORTABLE_BACKUP_BYTES, buildBackup, backupFilename, importBackup, validateBackup } from "../db/backup.js";
+import { fileStats } from "../db/files.js";
 import { setPref } from "../db/db.js";
 import { downloadJson, readFileAsText } from "../lib/file.js";
 import { nowIso } from "../lib/dates.js";
@@ -9,10 +10,26 @@ import { requestPersistence } from "../lib/persistence.js";
 import Confirm from "../components/Confirm.jsx";
 import { ChevronRight } from "lucide-react";
 
-export default function Settings({ notebook, queue, run, busy, readOnly, onBack, onOpen, setMessage, updateState, error }) {
+// Small images show in KB rather than "0.0 MB"; a phone's quota reads better in GB.
+export function formatSize(bytes) {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+  return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
+}
+const imageCount = (count) => `${count} ${count === 1 ? "image" : "images"}`;
+
+export default function Settings({ cleanupError, notebook, queue, run, busy, readOnly, onBack, onOpen, setMessage, updateState, error }) {
   const [preview, setPreview] = useState(null);
   const [confirmImport, setConfirmImport] = useState(false);
   const { notes, trash, folders, prefs, persisted, refresh } = notebook;
+  const [images, setImages] = useState(null), [storage, setStorage] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    fileStats().then((stats) => { if (alive) setImages(stats); }).catch(() => {});
+    navigator.storage?.estimate?.().then((estimate) => { if (alive) setStorage(estimate); }).catch(() => {});
+    return () => { alive = false; };
+  }, [notes, trash]);
+  const backupBytes = (images?.base64Bytes ?? 0) + new Blob([JSON.stringify([...notes, ...trash])]).size;
   async function exportFile() {
     await queue.flush();
     downloadJson(await buildBackup(), backupFilename());
@@ -65,6 +82,7 @@ export default function Settings({ notebook, queue, run, busy, readOnly, onBack,
         {preview && <div className="space-y-2 rounded border border-[var(--color-line)] p-3 text-sm">
           <p className="break-all">{preview.name}</p>
           <p>{preview.result.summary.notes} notes ({preview.result.summary.trashed} in Trash), {preview.result.summary.folders} folders, {preview.result.summary.tombstones} deletion records.</p>
+          <p>{imageCount(preview.result.summary.images)} ({formatSize(preview.result.summary.imageBytes)})</p>
           {preview.result.summary.willUpgrade && <p>This file will be upgraded to the current format.</p>}
           {preview.result.errors.map((error, index) => <p role="alert" className="text-red-700" key={index}>{error}</p>)}
           {preview.result.warnings.map((warning, index) => <p className="text-amber-800" key={index}>{warning}</p>)}
@@ -73,6 +91,10 @@ export default function Settings({ notebook, queue, run, busy, readOnly, onBack,
       </div>
       <div className="space-y-2 text-sm">
         <h2 className="font-semibold">App</h2>
+        {images && <p>Images: {images.count}, {formatSize(images.bytes)}</p>}
+        {Number.isFinite(storage?.usage) && Number.isFinite(storage?.quota) && <p>Storage used: {formatSize(storage.usage)} of about {formatSize(storage.quota)} available</p>}
+        {backupBytes > COMFORTABLE_BACKUP_BYTES && <p>Your backup is getting large (about {formatSize(backupBytes)}). Exports and imports may be slow on the phone.</p>}
+        {cleanupError && <p role="alert">Image cleanup: {cleanupError}</p>}
         <p>App version: {APP_VERSION} · Schema version: {SCHEMA_VERSION}</p>
         <p>Persistent storage: {persisted === "unavailable" ? "Unavailable in this browser" : persisted === undefined ? "Not requested yet" : persisted ? "Granted" : "Not granted"}</p>
         <p>{updateState}</p>

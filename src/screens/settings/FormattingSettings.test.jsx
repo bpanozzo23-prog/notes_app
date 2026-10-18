@@ -210,7 +210,7 @@ it("restores Settings scroll and closes the Add sheet on Back without removing i
   expect(activeEntry(window.history.state[NAVIGATION_KEY]).screen).toBe("settings");
 });
 
-it("round-trips UI choices through the existing schema-3 backup preferences", async () => {
+it("round-trips UI choices through the existing schema-4 backup preferences", async () => {
   await start();
   fireEvent.click(screen.getByRole("radio", { name: "Two rows" }));
   await values("toolbarLayout", "rows"); await idle();
@@ -218,7 +218,7 @@ it("round-trips UI choices through the existing schema-3 backup preferences", as
   await click("Add Heading 3", within(screen.getByRole("dialog")));
   await click("Done", within(screen.getByRole("dialog")));
   const backup = await buildBackup();
-  expect(backup.schemaVersion).toBe(3);
+  expect(backup.schemaVersion).toBe(4);
   expect(backup.preferences.toolbarLayout).toBe("rows");
   expect(backup.preferences.toolbar.at(-1)).toBe("h3");
   cleanup();

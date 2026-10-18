@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useRegisterSW } from "virtual:pwa-register/react";
 import { createNote, purgeExpired, trashNote, updateNote } from "./db/notes.js";
+import { cleanupFiles } from "./db/files.js";
 import { SaveQueue } from "./lib/saveQueue.js";
 import { requestPersistence } from "./lib/persistence.js";
 import useNotebook from "./lib/useNotebook.js";
@@ -29,6 +30,7 @@ export default function App() {
   const [navigation, setNavigation] = useState(initialNavigation);
   const [busy, setBusy] = useState(true);
   const [ready, setReady] = useState(false);
+  const [cleanupError, setCleanupError] = useState(null);
   const [bootError, setBootError] = useState(null);
   const [databaseUpdateError, setDatabaseUpdateError] = useState(null);
   const [message, setMessage] = useState("");
@@ -64,7 +66,11 @@ export default function App() {
     void nav.run(async () => {
       try {
         await notebookAccess.load();
-        if (!notebookAccess.getSnapshot().readOnly) await purgeExpired();
+        if (!notebookAccess.getSnapshot().readOnly) {
+          await purgeExpired();
+          try { await cleanupFiles(); setCleanupError(null); }
+          catch (error) { setCleanupError(error.message || "Image cleanup failed."); }
+        }
         nav.restore(await refresh());
         setReady(true);
       } catch (error) { setBootError(error.message || String(error)); }
@@ -181,11 +187,11 @@ export default function App() {
     {message && <p role="status" className="mx-4 my-3 text-sm">{message}</p>}
     {ready && <div className="flex flex-1 flex-col" inert={locked} aria-busy={locked}>
       {route.screen === "list" && <NotesList key={route.key} {...notebook} busy={locked} readOnly={access.readOnly} trashCount={notebook.trash.length} filter={route.filter} query={route.query} onQuery={nav.setQuery} onFilter={nav.setFilter} onOpen={open} onNew={() => run(newNote)} />}
-      {route.screen === "note" && selected && <Note key={route.key} {...shared} initialNote={selected} notes={notebook.notes} folders={notebook.folders} queue={queue} status={status} onDelete={deleteNote} onOpenNote={openNote}
+      {route.screen === "note" && selected && <Note key={route.key} {...shared} onImageError={setMessage} initialNote={selected} notes={notebook.notes} folders={notebook.folders} queue={queue} status={status} onDelete={deleteNote} onOpenNote={openNote}
         formatting={formatting} />}
       {route.screen === "folders" && <Folders {...notebook} {...shared} />}
       {route.screen === "trash" && <Trash trash={notebook.trash} {...shared} />}
-      {route.screen === "settings" && <Settings {...shared} notebook={notebook} queue={queue} onOpen={open} setMessage={setMessage} updateState={updateState} />}
+      {route.screen === "settings" && <Settings cleanupError={cleanupError} {...shared} notebook={notebook} queue={queue} onOpen={open} setMessage={setMessage} updateState={updateState} />}
       {route.screen === "settings-toolbar" && <ToolbarSettings {...shared} formatting={formatting} />}
       {route.screen === "settings-styles" && <StyleSettings {...shared} formatting={formatting} />}
       {route.screen === "settings-colours" && <ColourSettings {...shared} formatting={formatting} />}

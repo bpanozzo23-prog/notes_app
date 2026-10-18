@@ -1,3 +1,5 @@
+import { isSafeId } from "./ids.js";
+
 const ENTITIES = { amp: "&", lt: "<", gt: ">", quot: '"', "#39": "'", nbsp: " " };
 
 function decodeEntities(text) {
@@ -51,4 +53,17 @@ export function normalize(text) {
 
 export function firstLine(text) {
   return text.split(/\r?\n/).find((line) => line.trim())?.trim() ?? "";
+}
+
+export function extractFileIds(html) {
+  const ids = new Set();
+  for (const [tag] of html.matchAll(/<img\b(?:[^>"']|"[^"]*"|'[^']*')*>/gi)) {
+    for (const attr of tag.matchAll(ATTRIBUTE)) {
+      if (attr[1].toLowerCase() !== "data-file") continue;
+      const id = decodeEntities(attr[2] ?? attr[3] ?? attr[4] ?? "");
+      if (isSafeId(id)) ids.add(id);
+      break; // HTML uses the first occurrence of a duplicate attribute.
+    }
+  }
+  return [...ids];
 }

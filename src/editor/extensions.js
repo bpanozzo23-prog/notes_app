@@ -1,3 +1,5 @@
+import Image from "./nodes/Image.js";
+import { ImagePlaceholders } from "./imageInsertion.js";
 import StarterKit from "@tiptap/starter-kit";
 import { TextStyleKit } from "@tiptap/extension-text-style";
 import Highlight from "@tiptap/extension-highlight";
@@ -23,12 +25,13 @@ export const extensions = [
   TextStyleKit,
   Highlight.configure({ multicolor: true }),
   Document.extend({ content: "(block | callout)+" }),
-  Callout, Divider, LineSpacing,
+  Callout, Divider, LineSpacing, Image, ImagePlaceholders,
   TaskList,
   TaskItem.configure({ nested: true }),
 ];
 
 export const SUPPORTED_HTML_SAMPLES = [
+  '<img data-file="sample-image" width="480" height="270" alt="">',
   ...STARTER_HIGHLIGHT_COLORS.map(({ color }) => `<p><mark data-color="${color}" style="background-color: ${color}; color: inherit">Highlight</mark></p>`),
   ...LINE_SPACINGS.flatMap((value) => ["p", "h2"].map((tag) => `<${tag} style="line-height: ${value}">Spacing</${tag}>`)),
   ...CALLOUT_TYPES.map((type) => `<div data-callout="${type}"><h2>Heading</h2><ul><li><p>Item</p></li></ul></div>`),

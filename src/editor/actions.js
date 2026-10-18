@@ -1,5 +1,5 @@
 import {
-  Bold, Italic, Underline, Strikethrough, Highlighter, Heading1, Heading2, Heading3, List,
+  ImagePlus, Bold, Italic, Underline, Strikethrough, Highlighter, Heading1, Heading2, Heading3, List,
   ListOrdered, ListChecks, Quote, Minus, Undo2, Redo2, Eraser, Link, Circle,
   Paintbrush, PaintRoller, Baseline, ALargeSmall, CaseSensitive, ListCollapse, MessageSquare, Info, Lightbulb, TriangleAlert, CircleAlert, SeparatorHorizontal,
 } from "lucide-react";
@@ -43,6 +43,7 @@ const calloutIcons = { note: Info, tip: Lightbulb, warning: TriangleAlert, impor
 const title = (value) => value[0].toUpperCase() + value.slice(1);
 
 export const actions = [
+  { id: "image", label: "Image", icon: ImagePlus, group: "Insert", kind: "picker", run: ({ ui }) => ui?.openImagePicker?.() },
   picker("styles", "Named styles", Paintbrush, "Named styles"),
   { id: "painter", label: "Format painter", icon: PaintRoller, group: "Tools", kind: "toggle",
     run: ({ ui }) => ui?.togglePainter?.() },
@@ -127,7 +128,7 @@ export function availableActions(formatting) {
     "h1", "h2", "h3", "bulletList", "orderedList", "taskList", "blockquote", "callout",
     ...Object.keys(calloutIcons).map((type) => `callout:${type}`), "hr", "divider", "hr:thick", "hr:dashed", "hr:dotted", "lineHeight",
     "styles", ...(formatting?.namedStyles ?? []).map((style) => `style:${style.id}`),
-    "link", "painter", "clearFormatting", "undo", "redo",
+    "link", "image", "painter", "clearFormatting", "undo", "redo",
   ].map((id) => resolveAction(id, formatting));
 }
 

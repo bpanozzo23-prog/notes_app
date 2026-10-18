@@ -5,7 +5,8 @@
 // (the dev server; pass https://bpanozzo23-prog.github.io/notes_app/ for the published app).
 // Storage is fresh on every run; the made-up public/sample-notebook.json is imported through
 // the app's own Settings → Import flow. Nothing from the owner's notes is involved.
-import { mkdirSync } from "node:fs";
+import { makePng } from "./image-fixture.mjs";
+import { mkdirSync, writeFileSync, unlinkSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium, devices } from "playwright";
 
@@ -43,6 +44,9 @@ await shot("01-list-empty");
 // Import the sample notebook the way the owner would (the safety download is accepted silently).
 await button("Settings").click();
 await page.getByLabel("Import backup").setInputFiles(sample);
+await page.getByText(/^1 images/).waitFor();
+await page.getByText(/^1 images/).evaluate((element) => element.parentElement.scrollIntoView({ block: "center" }));
+await shot("54-import-image-preview");
 await button("Replace notebook").click();
 await shot("02-import-confirm");
 const download = page.waitForEvent("download");
@@ -259,6 +263,45 @@ await shot("53-edit-style-options");
 await button("Cancel").click();
 await back();
 
+// Phase 2e: generated image, node selection, viewer and the real hidden picker input.
+await button("Toolbar").click();
+await button("+ Add buttons").click();
+await button("Add Image").click();
+await button("Done").click();
+await back(); await back();
+await button("Captura de ejemplo").click();
+await page.locator(".note-image img").waitFor({ state: "visible" });
+await page.locator(".note-image").evaluate((element) => element.scrollIntoView({ block: "center" }));
+await shot("55-image-note");
+await page.locator(".note-image").click();
+await button("View").waitFor();
+await shot("56-image-selected");
+await checkPopup();
+await button("View").click();
+await page.locator(".image-viewer img").waitFor({ state: "visible" });
+await shot("57-image-viewer-fit");
+await button("Actual size").click();
+await shot("58-image-viewer-actual");
+// Android Back shares this overlay path; it must close the viewer without leaving the note.
+await page.evaluate(() => history.back());
+await page.getByRole("dialog").waitFor({ state: "hidden" });
+await page.waitForFunction(() => history.state.notesNavigation.stack.at(-1).screen === "note");
+const imagePath = `private-data/phase-2e-generated-upload-${viewport.width}-${viewport.height}.png`;
+writeFileSync(imagePath, makePng(720, 405));
+await page.getByLabel("Note body").locator("p").last().click();
+await page.keyboard.press("End");
+await toolbar.getByRole("button", { name: "Image", exact: true }).click();
+try {
+  await page.getByLabel("Add images").setInputFiles(imagePath);
+  await page.waitForFunction(() => document.querySelectorAll(".note-image").length === 2 &&
+    [...document.querySelectorAll(".note-image img")].every((img) => img.complete && img.naturalWidth > 0));
+} finally { unlinkSync(imagePath); }
+await page.locator(".note-image").last().evaluate((element) => element.scrollIntoView({ block: "center" }));
+await shot("59-image-inserted");
+await back();
+await button("Settings").click();
+await page.getByText(/^Images: 2,/).scrollIntoViewIfNeeded();
+await shot("60-settings-images");
 await back();
 await button("Vocabulario — comida").click();
 // Only this fresh browser context's fixture notebook is involved in the guard screenshots.
@@ -272,7 +315,7 @@ await shot("16-notebook-replaced");
 await page.reload({ waitUntil: "networkidle" });
 await page.getByLabel("Note body").waitFor();
 await page.evaluate(() => new Promise((resolve, reject) => {
-  const request = indexedDB.open("notes_app", 40);
+  const request = indexedDB.open("notes_app", 50);
   request.onsuccess = () => { request.result.close(); resolve(); };
   request.onerror = () => reject(request.error);
 }));

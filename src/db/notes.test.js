@@ -9,7 +9,7 @@ afterEach(() => vi.useRealTimers());
 function clock(at = AT) { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(new Date(at)); }
 
 it("declares only the approved stores and indexes", () => {
-  expect(db.tables.map((table) => table.name).sort()).toEqual(["folders", "notes", "prefs", "tombstones"]);
+  expect(db.tables.map((table) => table.name).sort()).toEqual(["fileData", "files", "folders", "notes", "prefs", "tombstones"]);
   expect(db.notes.schema.indexes.map((index) => index.src)).toEqual(["updatedAt", "deletedAt", "*tags", "*linkedIds"]);
 });
 it("creates a complete note and derives text and outgoing links", async () => {

@@ -12,6 +12,7 @@ export class SaveQueue {
     this.entries = new Map();
     this.listeners = new Set();
     this.beforeFlushHooks = new Set();
+    this.operations = new Set();
     this.flushing = null;
   }
 
@@ -22,7 +23,19 @@ export class SaveQueue {
     return () => this.beforeFlushHooks.delete(fn);
   }
 
+  track(promise) {
+    // The caller reports the operation's failure. It must not strand unrelated note saves.
+    const settled = Promise.resolve(promise).catch(() => {}).finally(() => {
+      this.operations.delete(settled);
+      this.emit();
+    });
+    this.operations.add(settled);
+    this.emit();
+    return settled;
+  }
+
   get status() {
+    if (this.operations.size) return "pending";
     if (this.blocked && this.entries.size) return "error";
     if ([...this.entries.values()].some((entry) => entry.error)) return "error";
     if ([...this.entries.values()].some((entry) => entry.running)) return "saving";
@@ -119,8 +132,10 @@ export class SaveQueue {
     if (this.flushing) return this.flushing;
     this.flushing = Promise.resolve().then(async () => {
       if (this.blocked) throw this.blocked;
-      for (const hook of this.beforeFlushHooks) hook();
-      while (this.entries.size) {
+      for (const hook of this.beforeFlushHooks) await hook();
+      while (this.operations.size || this.entries.size) {
+        if (this.blocked) throw this.blocked;
+        while (this.operations.size) await Promise.all([...this.operations]);
         if (this.blocked) throw this.blocked;
         await Promise.all([...this.entries.values()].map((entry) => this.start(entry)));
         // Reject so navigation/export/import cannot claim success with unsaved data.

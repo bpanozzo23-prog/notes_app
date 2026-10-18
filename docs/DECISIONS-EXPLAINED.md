@@ -5,7 +5,7 @@ this one is for the owner: what was chosen, why, what it means for the app, what
 and how hard it would be to reverse ("lock-in"). Ordered by lock-in, hardest first. Updated whenever
 `DECISIONS.md` gains an entry with consequences for how the app behaves.
 
-Last updated 2026-10-17, with step 2d (§34).
+Last updated 2026-10-18, with step 2e (§35).
 
 ---
 
@@ -497,4 +497,25 @@ applies once and switches off. Cancel or tapping the painter with nothing select
 starts with the "Heading" example (17 pt, bold, underline, green, as a heading). If you never
 customised the toolbar, Styles and the painter appear after the size button.
 **Lock-in:** as §25 and §28: styles are snapshots, and applying one replaces the earlier look.
+
+### 35. Step 2e: images
+
+**Chosen:** add a picture with the **Image** button (add it from Toolbar → Add buttons; the
+phone offers the camera, the gallery or files), by pasting one, or on a computer by dropping
+one. The app shrinks it (at most 2,560 pixels on the long side), keeps it in the app's own
+storage, and the note holds only a reference to it. While it works you see "Adding image…";
+you can keep typing, and Back or an update waits until the picture is in place and saved. Tap
+an image to select it: **View** opens it full screen (fit, or actual size you can scroll), and
+**Delete** removes it from the note (Undo brings it back while the note is open). An image no
+note uses any more is kept for 30 days, then deleted when the app starts. Backups include the
+images your notes use, inside the same single file. Settings shows how many images you have,
+their size, and how much storage the app uses.
+**What changed during review:** each image's small details (size, dates) are kept apart from
+the picture itself, so starting the app and opening Settings never read the pictures. Without
+this, a few hundred images would have slowed every start.
+**What you'll notice:** pasting from the Samsung Keyboard or Gboard clipboard may or may not
+reach the app, depending on Chrome; the Image button always works. Pictures from web pages
+pasted as part of text are dropped (the app never downloads anything). Your notes move to
+schema version 4.
+**Lock-in:** as §20, §21, §23 and §26.
 

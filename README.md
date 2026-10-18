@@ -57,7 +57,16 @@ LLM can read. The code may become public; the notes never are.
   lists them, each tap applies a snapshot of its look (with no selection, to the whole line);
   Settings → Formatting → Named styles creates, edits, reorders and deletes them, and any style
   can be its own toolbar button. "Save this look as a style" starts one from the text at the
-  cursor. Format painter: copy a look, select text, tap Apply format. Next: 2e, images.
+  cursor. Format painter: copy a look, select text, tap Apply format.
+- **Phase 2c and 2d — deployed together 2026-10-18 (0.2.3, schema 3).** Owner phone check pending.
+- **Phase 2e — committed 2026-10-18 (0.2.4, schema 4), released after the owner's 2c/2d check
+  and a fresh backup.** Images from the camera, gallery, paste or drop, shrunk to at most
+  2,560 px (WebP, or JPEG where WebP can't be made), stored once in their own tables and
+  referenced from the note by id; tap an image for View (full screen, fit or actual size) and
+  Delete. Images unused by any note are deleted after 30 days. Backups carry the images notes
+  use, as text inside the same JSON file. Settings shows image count, size and storage. The
+  comfortable backup size is being measured on the phone with generated 100- and 300-image
+  backups (about 40 and 118 MB). Next: 2f, closeout review.
 
 ## Running it
 

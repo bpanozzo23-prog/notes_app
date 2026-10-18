@@ -1,10 +1,14 @@
 import { db, allPrefs, notebookAccess, writeTransaction, announceReplacement } from "./db.js";
 import { APP_VERSION, SCHEMA_VERSION } from "../version.js";
 import { nowIso } from "../lib/dates.js";
-import { extractNoteLinks, htmlToText } from "../lib/text.js";
+import { extractFileIds, extractNoteLinks, htmlToText } from "../lib/text.js";
 import { isSafeId, newId } from "../lib/ids.js";
 import { FORMATTING_KEYS, sanitizePreference } from "../editor/formatting.js";
+import { IMAGE_TYPES, MAX_IMAGE_BYTES } from "./files.js";
+import { toBase64, fromBase64, base64Size } from "../lib/base64.js";
+import { clearFileUrls } from "../editor/fileUrls.js";
 
+export const COMFORTABLE_BACKUP_BYTES = 150 * 1024 * 1024;
 const V1_EXPORTED_PREFS = Object.freeze(["lastBackupAt", "toolbar"]);
 export const EXPORTED_PREFS = Object.freeze(["lastBackupAt", ...FORMATTING_KEYS]);
 // Device-local preferences that older backups contained: accepted with a warning, never restored.
@@ -12,14 +16,24 @@ export const IGNORED_PREFS = Object.freeze(["storagePersisted"]);
 export const BACKUP_FORMAT = "notes_app-backup";
 
 export async function buildBackup() {
-  return db.transaction("r", db.notes, db.folders, db.tombstones, db.prefs, async () => {
+  return db.transaction("r", db.notes, db.folders, db.tombstones, db.prefs, db.files, db.fileData, async () => {
     await notebookAccess.check();
     const [notes, folders, tombstones, prefs] = await Promise.all([
       db.notes.toArray(), db.folders.toArray(), db.tombstones.toArray(), allPrefs(),
     ]);
+    const referenced = new Set(notes.flatMap((note) => extractFileIds(note.html)));
+    const files = [];
+    for (const fileId of referenced) {
+      const file = await db.files.get(fileId);
+      const data = file && await db.fileData.get(fileId);
+      // Keep the note's reference so validation reports either missing half alike.
+      if (!file || !data) continue;
+      const { id, type, size, width, height, createdAt } = file;
+      files.push({ id, type, size, width, height, createdAt, data: toBase64(data.bytes) });
+    }
     const envelope = {
       format: BACKUP_FORMAT, schemaVersion: SCHEMA_VERSION, exportedAt: nowIso(), appVersion: APP_VERSION,
-      notes, folders, tombstones,
+      notes, folders, tombstones, files,
       preferences: Object.fromEntries(EXPORTED_PREFS.filter((key) => Object.hasOwn(prefs, key)).map((key) => [key, prefs[key]])),
     };
     const result = validateBackup(envelope);
@@ -118,14 +132,47 @@ function validateV2(envelope, errors, warnings) {
   }
 }
 
+function validateV4(envelope, errors, warnings) {
+  validateV2(envelope, errors, warnings);
+  // Derive references before inspecting files; stored projections are never authoritative.
+  const references = new Map();
+  for (const note of Array.isArray(envelope.notes) ? envelope.notes : []) {
+    if (typeof note?.html === "string") references.set(note.id, extractFileIds(note.html));
+  }
+  const referenced = new Set([...references.values()].flat());
+  if (!Array.isArray(envelope.files)) { errors.push("files must be an array."); return; }
+  const seen = new Set([envelope.notes, envelope.folders, envelope.tombstones].flatMap((rows) => Array.isArray(rows) ? rows.map((row) => row?.id) : []));
+  const fileIds = new Set();
+  for (const [index, file] of envelope.files.entries()) {
+    const where = `files[${index}]`;
+    if (!isObject(file)) { errors.push(`${where} must be an object.`); continue; }
+    if (!isId(file.id)) errors.push(`${where}.id must be a safe id.`);
+    else if (seen.has(file.id)) errors.push(`Duplicate id: ${file.id}.`);
+    else seen.add(file.id);
+    fileIds.add(file.id);
+    if (!IMAGE_TYPES.includes(file.type)) errors.push(`${where}.type is not supported.`);
+    const size = base64Size(file.data);
+    if (size === null) errors.push(`${where}.data must be valid base64.`);
+    if (!Number.isSafeInteger(file.size) || file.size <= 0 || file.size > MAX_IMAGE_BYTES || size !== file.size) errors.push(`${where}.size must match the image data and be at most 10 MB.`);
+    for (const key of ["width", "height"]) if (!Number.isInteger(file[key]) || file[key] <= 0 || file[key] > 10000) errors.push(`${where}.${key} must be a positive integer at most 10,000.`);
+    if (!isDate(file.createdAt)) errors.push(`${where}.createdAt must be an ISO UTC timestamp.`);
+    if (!referenced.has(file.id)) warnings.push(`Image ${file.id} is not used by any note and will be skipped.`);
+  }
+  for (const [note, ids] of references) if (ids.some((id) => !fileIds.has(id))) warnings.push(`Note ${note} shows a missing image.`);
+  envelope.files = envelope.files.filter((file) => isObject(file) && referenced.has(file.id));
+}
+
 const UPGRADES = Object.freeze({
   1: (envelope) => ({ ...envelope, schemaVersion: 2 }),
   2: (envelope) => ({ ...envelope, schemaVersion: 3 }),
+  3: (envelope) => ({ ...envelope, schemaVersion: 4, files: [] }),
 });
-const VALIDATORS = Object.freeze({ 1: validateV1, 2: validateV2, 3: validateV2 });
+const VALIDATORS = Object.freeze({ 1: validateV1, 2: validateV2, 3: validateV2, 4: validateV4 });
 
 export function upgradeEnvelope(envelope, targetVersion = SCHEMA_VERSION, upgrades = UPGRADES, validators = VALIDATORS) {
-  let current = structuredClone(envelope);
+  const { files, ...rest } = envelope;
+  let current = structuredClone(rest);
+  if (Object.hasOwn(envelope, "files")) current.files = Array.isArray(files) ? [...files] : files;
   const errors = [];
   let warnings = [];
   while (true) {
@@ -145,7 +192,7 @@ export function upgradeEnvelope(envelope, targetVersion = SCHEMA_VERSION, upgrad
 
 export function validateBackup(raw) {
   const errors = [];
-  const summary = { notes: 0, folders: 0, tombstones: 0, trashed: 0, willUpgrade: false };
+  const summary = { notes: 0, folders: 0, tombstones: 0, trashed: 0, images: 0, imageBytes: 0, willUpgrade: false };
   let warnings = [];
   try {
     const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
@@ -164,6 +211,8 @@ export function validateBackup(raw) {
     const upgraded = upgradeEnvelope(parsed);
     errors.push(...upgraded.errors);
     warnings = upgraded.warnings;
+    summary.images = upgraded.envelope.files?.length ?? 0;
+    summary.imageBytes = Array.isArray(upgraded.envelope.files) ? upgraded.envelope.files.reduce((sum, file) => sum + (Number.isSafeInteger(file?.size) ? file.size : 0), 0) : 0;
     return { ok: !errors.length, errors, warnings, envelope: errors.length ? null : upgraded.envelope, summary };
   } catch (error) {
     errors.push(error instanceof SyntaxError ? "The file is not valid JSON." : error instanceof Error ? error.message : "Could not read this backup.");
@@ -178,16 +227,22 @@ export async function importBackup(envelope) {
   const notes = clean.notes.map((note) => ({ ...note, text: htmlToText(note.html), linkedIds: extractNoteLinks(note.html) }));
   const prefs = Object.entries(clean.preferences).filter(([key]) => EXPORTED_PREFS.includes(key)).map(([key, value]) => ({ key, value }));
   const generation = newId();
-  await writeTransaction([db.notes, db.folders, db.tombstones, db.prefs], async () => {
+  await writeTransaction([db.notes, db.folders, db.tombstones, db.prefs, db.files, db.fileData], async () => {
     // Only the exportable preferences are replaced: device-local ones such as a future API key
     // are not in any backup and must survive a restore.
-    await Promise.all([db.notes.clear(), db.folders.clear(), db.tombstones.clear(), db.prefs.bulkDelete([...EXPORTED_PREFS])]);
+    await Promise.all([db.files.clear(), db.fileData.clear(), db.notes.clear(), db.folders.clear(), db.tombstones.clear(), db.prefs.bulkDelete([...EXPORTED_PREFS])]);
     await db.notes.bulkAdd(notes);
     await db.folders.bulkAdd(clean.folders);
     await db.tombstones.bulkAdd(clean.tombstones);
+    for (const file of clean.files) {
+      const { id, type, size, width, height, createdAt, data } = file;
+      await db.files.add({ id, type, size, width, height, createdAt, unusedSince: null });
+      await db.fileData.add({ id, bytes: fromBase64(data) });
+    }
     await db.prefs.bulkAdd(prefs);
     await db.prefs.put({ key: "notebookGeneration", value: generation });
   });
+  clearFileUrls();
   notebookAccess.adopt(generation);
   announceReplacement(generation);
   return checked.summary;

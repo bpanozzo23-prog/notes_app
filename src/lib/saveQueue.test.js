@@ -204,3 +204,32 @@ it("does not start a second pending save when replacement arrives during a runni
   expect(save).toHaveBeenCalledOnce();
   expect(queue.entries.get("a").pending).toEqual({ title: "Pending" });
 });
+
+it("waits for tracked operations after hooks and saves the operation's edit in that flush", async () => {
+  let finish;
+  const save = vi.fn(), queue = new SaveQueue({ save });
+  const order = [];
+  queue.onBeforeFlush(() => order.push("hook"));
+  const operation = new Promise((resolve) => { finish = resolve; }).then(() => { order.push("insert"); queue.schedule("image-note", { html: "image" }); });
+  queue.track(operation);
+  expect(queue.status).toBe("pending");
+  let done = false;
+  const flushing = queue.flush().then(() => { done = true; });
+  await Promise.resolve(); await Promise.resolve();
+  expect(order).toEqual(["hook"]); expect(done).toBe(false); expect(save).not.toHaveBeenCalled();
+  finish(); await flushing;
+  expect(order).toEqual(["hook", "insert"]); expect(save).toHaveBeenCalledWith("image-note", { html: "image" }); expect(queue.status).toBe("idle");
+});
+it("tracked failures do not fail a flush; operations added by hooks are also awaited", async () => {
+  const queue = new SaveQueue({ save: vi.fn() });
+  queue.onBeforeFlush(() => { queue.track(Promise.reject(new Error("Image rejected"))); });
+  await expect(queue.flush()).resolves.toBeUndefined(); expect(queue.status).toBe("idle");
+});
+it("rejects a flush if another window replaces the notebook while an operation is pending", async () => {
+  const queue = new SaveQueue({ save: vi.fn() }), pending = deferred();
+  queue.track(pending.promise);
+  const result = queue.flush();
+  await Promise.resolve();
+  queue.block(new Error("Notebook replaced")); pending.resolve();
+  await expect(result).rejects.toThrow("Notebook replaced");
+});

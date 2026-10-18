@@ -4,6 +4,8 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import App from "./App.jsx";
 import { db, getPref, setPref, DATABASE_UPDATED } from "./db/db.js";
+import * as filesDb from "./db/files.js";
+import * as imageProcessing from "./lib/images.js";
 import * as notesDb from "./db/notes.js";
 import { createNote, getNote, trashNote } from "./db/notes.js";
 import { backupFixture, noteFixture, resetDatabase } from "./test/fixtures.js";
@@ -495,14 +497,16 @@ it("opens a newer database for reading, skips boot purge, and disables all editi
   await createFolder("Read only folder");
   db.close();
   const newer = new Dexie(db.name);
-  newer.version(4).stores({ notes: "id, updatedAt, deletedAt, *tags, *linkedIds", folders: "id, position", tombstones: "id", prefs: "key" });
+  newer.version(5).stores({ notes: "id, updatedAt, deletedAt, *tags, *linkedIds", folders: "id, position", tombstones: "id", prefs: "key", files: "id, unusedSince", fileData: "id" });
   await newer.open();
   newer.close();
   const purge = vi.spyOn(notesDb, "purgeExpired");
+  const cleanupImages = vi.spyOn(filesDb, "cleanupFiles");
   render(<App />);
   await screen.findByText("This notebook was updated by a newer version of the app. Reload to update.");
   await screen.findByRole("button", { name: "Newer notebook" });
   expect(purge).not.toHaveBeenCalled();
+  expect(cleanupImages).not.toHaveBeenCalled();
   expect(await db.notes.count()).toBe(2);
   expect(screen.getByRole("button", { name: "+ New note" }).disabled).toBe(true);
   await openNote("Newer notebook");
@@ -544,7 +548,7 @@ it("locks immediately on versionchange, drains held editor input, then closes af
   const observer = editor.view.domObserver;
   editor.view.dom.querySelector("p").firstChild.nodeValue = "Origina";
   observer.flushSoon();
-  act(() => { expect(db.on("versionchange").fire({ oldVersion: 30, newVersion: 40 })).toBe(false); });
+  act(() => { expect(db.on("versionchange").fire({ oldVersion: 40, newVersion: 50 })).toBe(false); });
   expect(screen.getByLabelText("Title").closest("[inert]")).toBeTruthy();
   await waitFor(() => expect(write).toHaveBeenCalledOnce());
   expect(db.isOpen()).toBe(true);
@@ -563,7 +567,7 @@ it("keeps versionchange failures locked with Retry usable, then closes after the
   await openNote("Before upgrade");
   const put = vi.spyOn(db.notes, "put").mockRejectedValue(new Error("Disk full"));
   fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Keep this edit" } });
-  act(() => db.on("versionchange").fire({ oldVersion: 30, newVersion: 40 }));
+  act(() => db.on("versionchange").fire({ oldVersion: 40, newVersion: 50 }));
   await screen.findByText("Not saved. Disk full");
   expect(db.isOpen()).toBe(true);
   expect(screen.getByLabelText("Title").closest("[inert]")).toBeTruthy();
@@ -678,4 +682,62 @@ it("Android Back dismisses the import confirmation without replacing the noteboo
   expect(screen.getByRole("heading", { name: "Settings" })).toBeTruthy();
   expect(await db.notes.toArray()).toEqual([note]);
   expect(downloadJson).not.toHaveBeenCalled();
+});
+
+it("a cleanup failure permits boot and reports the diagnostic in Settings", async () => {
+  await createNote({ title: "Still here" });
+  vi.spyOn(filesDb, "cleanupFiles").mockRejectedValue(new Error("Cleanup fixture failure"));
+  await start(); expect(screen.getByRole("button", { name: "Still here" })).toBeDefined();
+  await settings(); await screen.findByText("Image cleanup: Cleanup fixture failure");
+  expect(screen.queryByText(/Couldn't open your notes/)).toBeNull();
+});
+it("Settings shows images, estimated storage, large-backup guidance and image preview counts", async () => {
+  vi.spyOn(filesDb, "fileStats").mockResolvedValue({ count: 400, bytes: 160 * 1024 * 1024, base64Bytes: 214 * 1024 * 1024 });
+  navigator.storage.estimate = vi.fn(async () => ({ usage: 170 * 1024 * 1024, quota: 1000 * 1024 * 1024 }));
+  await start(); await settings();
+  await screen.findByText("Images: 400, 160.0 MB");
+  await screen.findByText("Storage used: 170.0 MB of about 1000.0 MB available");
+  expect(screen.getByText(/Your backup is getting large \(about 214.0 MB\)/)).toBeDefined();
+  await upload(backupFixture({ schemaVersion: 4, notes: [noteFixture({ html: '<img data-file="image">' })],
+    files: [{ id: "image", type: "image/png", size: 3, width: 1, height: 1, createdAt: "2026-10-17T00:00:00.000Z", data: "AQID" }] }));
+  expect(screen.getByText("1 image (1 KB)")).toBeDefined();
+});
+it("Back waits for a picked image and keeps Reload disabled until its reference saves", async () => {
+  pwa.needRefresh = true;
+  const note = await createNote({ title: "Pending image" });
+  await setPref("toolbar", ["image"]);
+  let finish;
+  vi.spyOn(imageProcessing, "processImage").mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+  await start(); await openNote("Pending image");
+  const editor = screen.getByLabelText("Note body").editor; stubEditorGeometry(editor);
+  fireEvent.click(screen.getByRole("button", { name: "Image" }));
+  fireEvent.change(screen.getByLabelText("Add images"), { target: { files: [new File(["generated"], "fixture.png", { type: "image/png" })] } });
+  await waitFor(() => expect(finish).toBeTypeOf("function"));
+  expect(screen.getByRole("button", { name: "Reload" }).disabled).toBe(true);
+  fireEvent.click(screen.getByRole("button", { name: "Back" }));
+  expect(screen.getByLabelText("Note body")).toBeDefined();
+  await act(async () => { finish({ type: "image/png", bytes: new Uint8Array([1, 2, 3]).buffer, width: 480, height: 270 }); });
+  await screen.findByRole("button", { name: "+ New note" });
+  const stored = await getNote(note.id); expect(stored.html).toContain("<img data-file=");
+  expect(await db.files.count()).toBe(1);
+});
+
+it.each(["paste", "drop"])("%s handles image files at the target position and preserves ordinary paste/drop", async (kind) => {
+  const note = await createNote({ title: "Image input", html: "<p>First</p><p>Second</p>" });
+  vi.spyOn(imageProcessing, "processImage").mockResolvedValue({ type: "image/png", bytes: new Uint8Array([1, 2, 3]).buffer, width: 1, height: 1 });
+  await start(); await openNote("Image input");
+  const editor = screen.getByLabelText("Note body").editor; stubEditorGeometry(editor);
+  act(() => editor.commands.setTextSelection(1));
+  vi.spyOn(editor.view, "posAtCoords").mockReturnValue({ pos: 8 });
+  const files = [new File(["generated"], "fixture.png", { type: "image/png" }), new File(["text"], "fixture.txt", { type: "text/plain" })];
+  const handler = editor.options.editorProps[kind === "paste" ? "handlePaste" : "handleDrop"];
+  await act(async () => {
+    expect(handler(editor.view, { clipboardData: { files }, dataTransfer: { files }, clientX: 10, clientY: 20 })).toBe(true);
+  });
+  await waitFor(() => expect(editor.getHTML()).toContain("<img"));
+  expect(imageProcessing.processImage).toHaveBeenCalledTimes(1);
+  expect(handler(editor.view, { clipboardData: { files: [files[1]] }, dataTransfer: { files: [files[1]] } })).toBe(false);
+  if (kind === "drop") expect(editor.getHTML().indexOf("First")).toBeLessThan(editor.getHTML().indexOf("<img"));
+  else expect(editor.getHTML().indexOf("<img")).toBeLessThan(editor.getHTML().indexOf("First"));
+  await back(); expect((await getNote(note.id)).html).toContain("<img");
 });

@@ -1,3 +1,4 @@
+import { NodeSelection } from "@tiptap/pm/state";
 import { BubbleMenu } from "@tiptap/react/menus";
 import { useEditorState } from "@tiptap/react";
 import { DEFAULT_SELECTION_MENU, resolveAction } from "./actions.js";
@@ -11,6 +12,7 @@ export default function SelectionMenu({ editor, ids = DEFAULT_SELECTION_MENU, fo
   const href = useEditorState({ editor, selector: ({ editor }) =>
     editor.state.selection.empty && editor.isActive("link") ? editor.getAttributes("link").href : null,
   });
+  const isImage = useEditorState({ editor, selector: ({ editor }) => editor.state.selection instanceof NodeSelection && editor.state.selection.node.type.name === "image" });
   const selectionEmpty = useEditorState({ editor, selector: ({ editor }) => editor.state.selection.empty });
   const applyFormat = ui?.painterArmed && !selectionEmpty;
   const internal = /^note:/i.test(href ?? "");
@@ -21,7 +23,7 @@ export default function SelectionMenu({ editor, ids = DEFAULT_SELECTION_MENU, fo
   // Contextual commands get the first row; formatting can use the remaining row.
   const split = splitToolbar(known, perRow, href || applyFormat ? "more" : "rows");
   return <BubbleMenu editor={editor}
-    shouldShow={({ editor, state, view, element }) => !ui?.readOnly && editor.isEditable && (known.length > 0 || ui?.painterArmed || editor.isActive("link")) &&
+    shouldShow={({ editor, state, view, element }) => !ui?.readOnly && editor.isEditable && (state.selection.node?.type.name === "image" || known.length > 0 || ui?.painterArmed || editor.isActive("link")) &&
       (view.hasFocus() || element.contains(document.activeElement)) && (!state.selection.empty || editor.isActive("link"))}
     options={{ strategy: "fixed", placement: "bottom", offset: 12,
       flip: { rootBoundary: "viewport", padding: { top: 8, bottom: bottomSpace + 8, left: 8, right: 8 } },
@@ -31,6 +33,12 @@ export default function SelectionMenu({ editor, ids = DEFAULT_SELECTION_MENU, fo
     data-selection-menu role="toolbar" aria-label="Selection formatting"
     style={{ maxWidth: viewport.width - 16 }}
     className="z-20 max-w-[calc(100vw-1rem)] rounded-lg border border-gray-200 bg-white p-0.5 shadow-lg">
+    {isImage ? <div className="action-row">
+      <ActionButton compact={false} label="View" onAction={ui?.viewImage}>View</ActionButton>
+      <ActionButton compact={false} label="Delete image" onAction={() => {
+        if (!ui?.readOnly && editor.state.selection.node?.type.name === "image") editor.chain().focus().deleteSelection().run();
+      }}>Delete</ActionButton>
+    </div> : <>
     {applyFormat && <div className="action-row mb-0.5"><ActionButton compact={false} label="Apply format"
       onAction={ui.applyPainter}>Apply format</ActionButton></div>}
     {href && <div className="action-row mb-0.5">
@@ -39,5 +47,6 @@ export default function SelectionMenu({ editor, ids = DEFAULT_SELECTION_MENU, fo
       <ActionButton compact={false} label="Remove link" onAction={() => ui?.removeLink?.(editor)}>Remove link</ActionButton>
     </div>}
     <ActionRows {...split} source="selection" editor={editor} formatting={formatting} ui={ui} readOnly={ui?.readOnly} size={18} />
+    </>}
   </BubbleMenu>;
 }
