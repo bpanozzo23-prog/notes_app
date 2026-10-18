@@ -37,7 +37,7 @@ export function createClaudeSession(access = notebookAccess) {
       const previous = controller;
       controller = null;
       current = token();
-      emit({ request: null, ...(["tidy", "reorganise"].includes(snapshot.request?.kind) ? { proposal: null } : {}), ...(snapshot.conversation?.turns ? { conversation: { ...snapshot.conversation,
+      emit({ request: null, ...((snapshot.request && snapshot.request.kind !== "ask") ? { proposal: null } : {}), ...(snapshot.conversation?.turns ? { conversation: { ...snapshot.conversation,
         turns: snapshot.conversation.turns.map((turn) => turn.status === "running" ? { ...turn, status: "stopped" } : turn),
       } } : {}) });
       previous?.abort();
@@ -52,7 +52,7 @@ export function createClaudeSession(access = notebookAccess) {
     },
     updateProposal(id, patch) { if (snapshot.proposal?.id === id) emit({ proposal: { ...snapshot.proposal, ...patch } }); },
     discardProposal() {
-      if (["tidy", "reorganise"].includes(snapshot.request?.kind)) this.cancelRequest();
+      if ((snapshot.request && snapshot.request.kind !== "ask")) this.cancelRequest();
       emit({ proposal: null });
     },
     clearConversation() {

@@ -911,3 +911,32 @@ have copied every note just to undo a few tags.) When Claude changed a note's te
 still works as in §47.
 **Measured:** on the 18-note sample this cost 5.5¢, and Claude's suggestions were sensible.
 **Lock-in: none.**
+
+### 58. Step 3e: links between notes
+
+**Chosen:** the Ask screen's **Tidy the notebook** now also offers **Links between notes**. Claude
+reads every note outside Trash (titles, text and the links they already have; no pictures, folders
+or tags) and suggests which notes should point to which. Claude never rewrites a note: **the app**
+places each link. If the words Claude picked appear exactly once in that note, as whole words and
+not inside code or an existing link, those words become the link. Otherwise the
+link goes on one **"See also:"** line at the end of the note, written with the other note's title,
+as the link picker does; a second run adds to that line instead of starting another. The review
+shows one card per note, a tick per link (all ticked to start), which of the two it will be, and
+the sentence with the linked words in bold. Apply saves the ticked links at once, or nothing if
+any of the notes involved, including the ones being linked to, changed since Claude read them.
+**Undo after you've edited one of the notes:** like titles, tags and folders (§57), Undo offers
+**Undo the N unchanged notes** and names the ones you edited, which keep their links. Adding links
+never changes your words, so a "(before Claude)" copy of an edited note would hold nothing you
+haven't kept or deliberately deleted; copies would only clutter the notebook. This departs from
+the plan's Undo rule, as 3d did; you approved it with the 3e plan.
+**What changed during review:** in my first real test, Claude linked loose phrases that only
+illustrated a topic ("el examen es" pointing at the grammar note). Claude is now told to link
+words only when they name the other note or its subject, and to leave looser connections to
+"See also:". The second test linked "ser y estar" to the grammar note and "Frases útiles" to that
+note, and put the rest under See also.
+**What you'll notice:** linked notes count as edited (they move to the top of the list). A link
+to an untitled note shows its whole first line. Harmless slips in Claude's reply (a note linking
+to itself, a link that already exists, the same link twice) are dropped rather than wasting the
+request; more than 30 links makes the reply unusable.
+**Measured:** about 5¢ on the 18-note sample; the estimate before sending said about 6¢.
+**Lock-in: none.** Links are ordinary note links; delete any you don't want.

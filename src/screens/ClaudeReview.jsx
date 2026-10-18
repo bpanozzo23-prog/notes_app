@@ -5,6 +5,8 @@ import Disclosure from "../components/Disclosure.jsx";
 import ChangeCard, { ReadOnlyBody } from "../components/ChangeCard.jsx";
 import ReorganiseCard from "../components/ReorganiseCard.jsx";
 import { captureReorganisePayload, runReorganise, reorganisePlan, reorganiseItemIds, STALE_REORGANISE } from "../claude/reorganise.js";
+import LinksCard from "../components/LinksCard.jsx";
+import { captureLinksPayload, runLinks, linksPlan, linksItemIds } from "../claude/links.js";
 import ClaudeUndo from "../components/ClaudeUndo.jsx";
 import { claudeSession, canStartClaudeRequest } from "../claude/session.js";
 import { captureTidyPayload, runTidy, tidyPlan, tidyItemIds, validateTitle } from "../claude/proposals.js";
@@ -13,11 +15,16 @@ import { loadClaudeSdk } from "../claude/client.js";
 import { notebookAccess, NotebookReplacedError, ReadOnlyNotebookError, DATABASE_UPDATED } from "../db/db.js";
 import { applyClaudeChanges, claudePlanIsCurrent, STALE_PROPOSAL } from "../db/claudeChanges.js";
 
+const kinds = {
+  tidy: { capture: (payload) => captureTidyPayload(payload.note.id, payload.instruction), run: runTidy, plan: tidyPlan, itemIds: tidyItemIds, stale: STALE_PROPOSAL },
+  reorganise: { capture: captureReorganisePayload, run: runReorganise, plan: reorganisePlan, itemIds: reorganiseItemIds, stale: STALE_REORGANISE },
+  links: { capture: captureLinksPayload, run: runLinks, plan: linksPlan, itemIds: linksItemIds, stale: STALE_REORGANISE },
+};
 export default function ClaudeReview({ run, queue, busy, onBack, refresh, claudeReady, notes = [], trash = [] }) {
   const state = useSyncExternalStore(claudeSession.subscribe, claudeSession.getSnapshot);
   const access = useSyncExternalStore(notebookAccess.subscribe, notebookAccess.getSnapshot);
   const entry = state.proposal, proposal = entry?.proposal, payload = entry?.payload;
-  const reorganise = payload?.kind === "reorganise", staleMessage = reorganise ? STALE_REORGANISE : STALE_PROPOSAL;
+  const kind = payload?.kind, actions = kinds[kind], staleMessage = actions?.stale;
   const [clock, setClock] = useState(Date.now()), [online, setOnline] = useState(navigator.onLine !== false);
   const [current, setCurrent] = useState(null);
   useEffect(() => {
@@ -30,10 +37,10 @@ export default function ClaudeReview({ run, queue, busy, onBack, refresh, claude
     setCurrent(null);
     if (!proposal || entry.status !== "ready") return;
     if (proposal.noChanges) { setCurrent(true); return; }
-    const plan = reorganise ? reorganisePlan(payload, proposal, []) : tidyPlan(payload, proposal, proposal.folder.action === "create" ? ["folder"] : []);
+    const plan = actions.plan(payload, proposal, kind === "tidy" && proposal.folder.action === "create" ? ["folder"] : []);
     const subscription = liveQuery(() => claudePlanIsCurrent(plan)).subscribe({ next: setCurrent, error: () => setCurrent(false) });
     return () => subscription.unsubscribe();
-  }, [payload, proposal, entry?.status, reorganise]);
+  }, [payload, proposal, entry?.status, kind, actions]);
   const guard = access.replaced ? new NotebookReplacedError().message : access.readOnly ? new ReadOnlyNotebookError().message : access.versionChange ? DATABASE_UPDATED : "";
   const disabled = busy || !canStartClaudeRequest(access);
   const sendMessage = guard || (!online ? "You're offline. Claude needs a connection." : !claudeReady ? "Turn Claude on in Settings → Claude." : "");
@@ -42,16 +49,16 @@ export default function ClaudeReview({ run, queue, busy, onBack, refresh, claude
     if (disabled || state.request) return;
     await run(async () => {
       await queue.flush();
-      const next = await (reorganise ? captureReorganisePayload() : captureTidyPayload(payload.note.id, payload.instruction));
+      const next = await actions.capture(payload);
       claudeSession.prepareProposal(next);
     });
   }
-  const selected = new Set(entry?.ticked ?? (proposal ? (reorganise ? reorganiseItemIds(proposal) : tidyItemIds(proposal)) : []));
+  const selected = new Set(entry?.ticked ?? (proposal ? actions.itemIds(proposal) : []));
   const title = entry?.editedTitle ?? proposal?.title ?? "";
   let titleError = "";
   if (selected.has("title")) try { validateTitle(title); } catch (error) { titleError = error.message; }
   const editedTitles = entry?.editedTitles ?? {}, titleErrors = {};
-  if (reorganise && proposal) for (const change of proposal.changes) {
+  if (kind === "reorganise" && proposal) for (const change of proposal.changes) {
     if (selected.has(`${change.note}:title`)) try { validateTitle(editedTitles[change.note] ?? change.title); } catch (error) { titleErrors[change.note] = error.message; }
   }
   if (Object.keys(titleErrors).length) titleError = "Check the proposed titles.";
@@ -61,7 +68,7 @@ export default function ClaudeReview({ run, queue, busy, onBack, refresh, claude
     await run(async () => {
       await queue.flush();
       try {
-        const result = await applyClaudeChanges(reorganise ? reorganisePlan(payload, proposal, selected, editedTitles) : tidyPlan(payload, proposal, selected, title));
+        const result = await applyClaudeChanges(actions.plan(payload, proposal, selected, kind === "tidy" ? title : editedTitles));
         claudeSession.updateProposal(entry.id, { status: "applied", applied: { changeId: result.changeId, count: selected.size } });
         await refresh();
       } catch (error) {
@@ -82,10 +89,11 @@ export default function ClaudeReview({ run, queue, busy, onBack, refresh, claude
       {entry?.status === "applied" && <><p role="status">Applied {entry.applied.count} {entry.applied.count === 1 ? "change" : "changes"}.</p><ClaudeUndo changeId={entry.applied.changeId} run={run} queue={queue} refresh={refresh} disabled={disabled} /></>}
       {entry?.status === "ready" && <>
         <p>{proposal.summary}</p><p className="text-xs text-[var(--color-muted)]">{costLabel(entry)}</p>
-        {!reorganise && <h2 className="text-xl font-semibold">{payload.note.title || "Untitled"}</h2>}
+        {kind === "tidy" && <h2 className="text-xl font-semibold">{payload.note.title || "Untitled"}</h2>}
         {current === false && <p role="alert">{staleMessage}</p>}
         {proposal.noChanges ? <p>Claude suggests no changes.</p> : <>
-          {reorganise ? proposal.changes.map((change) => <ReorganiseCard key={change.note} change={change} note={payload.notes.find((note) => note.handle === change.note)} folders={payload.folders} selected={selected}
+          {kind === "links" ? [...new Set(proposal.links.map((link) => link.from))].map((handle) => <LinksCard key={handle} source={payload.notes.find((note) => note.handle === handle)} links={proposal.links.filter((link) => link.from === handle)} notes={payload.notes} selected={selected} toggle={toggle} disabled={disabled}
+            untick={(ids) => claudeSession.updateProposal(entry.id, { ticked: [...selected].filter((id) => !ids.includes(id)) })} />) : kind === "reorganise" ? proposal.changes.map((change) => <ReorganiseCard key={change.note} change={change} note={payload.notes.find((note) => note.handle === change.note)} folders={payload.folders} selected={selected}
             title={editedTitles[change.note] ?? change.title ?? ""} titleError={titleErrors[change.note]} toggle={toggle} disabled={disabled}
             editTitle={(value) => claudeSession.updateProposal(entry.id, { editedTitles: { ...editedTitles, [change.note]: value } })}
             untick={(ids) => claudeSession.updateProposal(entry.id, { ticked: [...selected].filter((id) => !ids.includes(id)) })} />) : <>
@@ -106,6 +114,6 @@ export default function ClaudeReview({ run, queue, busy, onBack, refresh, claude
       {(entry?.status === "failed" || entry?.status === "ready" && current === false) && <button className="app-button" disabled={disabled || !!state.request} onClick={again}>Ask again</button>}
       {entry && !["running", "disclosure"].includes(entry.status) && <button className="app-button" disabled={busy} onClick={discard}>Discard</button>}
     </div>
-    {entry?.status === "disclosure" && <Disclosure prepared={{ payload }} disabled={disabled || !!state.request || !!sendMessage} message={sendMessage} onClose={() => claudeSession.discardProposal()} onCancel={discard} onSend={() => { if (!disabled && !state.request && !sendMessage) void (reorganise ? runReorganise : runTidy)({ payload }); }} />}
+    {entry?.status === "disclosure" && <Disclosure prepared={{ payload }} disabled={disabled || !!state.request || !!sendMessage} message={sendMessage} onClose={() => claudeSession.discardProposal()} onCancel={discard} onSend={() => { if (!disabled && !state.request && !sendMessage) void actions.run({ payload }); }} />}
   </section>;
 }

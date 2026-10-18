@@ -49,7 +49,7 @@ page.on("response", async (response) => {
 });
 
 let step = 0;
-const shot = async (name, fullPage = false) => { await page.waitForTimeout(400); await page.screenshot({ path: `${out}/${String(++step).padStart(2, "0")}-${name}.png`, fullPage }); };
+const shot = async (name, fullPage = false, target = page) => { await target.waitForTimeout(400); await target.screenshot({ path: `${out}/${String(++step).padStart(2, "0")}-${name}.png`, fullPage }); };
 const button = (name) => page.getByRole("button", { name, exact: true });
 const costLabels = () => page.getByText(/^(under 1¢|\d+¢|\$\d+\.\d\d|at least .+|cost unknown) · /);
 
@@ -149,6 +149,42 @@ if (reorganiseOutcome === "proposal") {
   ]);
   await shot("reorganise-undo", true);
 }
+// Links are placed locally; opening a source before Undo also checks editor serialization parity.
+await button("Back").click(); // review → Ask
+await button("Tidy the notebook").click(); await button("Links between notes").click();
+if (await discardOther.isVisible()) await button("Discard and continue").click();
+await disclosure.waitFor();
+const linksDisclosure = await disclosure.textContent(); await shot("links-disclosure");
+await disclosure.getByRole("button", { name: "Send", exact: true }).click();
+const linksOutcome = await Promise.race([
+  page.getByRole("button", { name: /^Apply \d+ changes?$/ }).waitFor().then(() => "proposal"),
+  page.getByRole("alert").first().waitFor().then(async () => `failed: ${await page.getByRole("alert").first().textContent()}`),
+  page.getByText("Claude suggests no changes.").waitFor().then(() => "no changes"),
+]);
+await shot("links-review", true);
+const linksRows = await page.getByRole("checkbox").count();
+const linksInline = await page.getByText(/^Links the words/).count(), linksSeeAlso = await page.getByText(/^Adds it to "See also:"/).count();
+let linksApplied = null, linksUndone = null, linksSource = null, linksAfterText = null;
+if (linksOutcome === "proposal") {
+  linksSource = await page.getByRole("article").first().getByRole("heading", { level: 2 }).textContent();
+  linksApplied = await page.getByRole("button", { name: /^Apply \d+ changes?$/ }).textContent();
+  await page.getByRole("button", { name: /^Apply \d+ changes?$/ }).click();
+  await page.getByText(/^Applied \d+ changes?\.$/).waitFor(); await shot("links-applied", true);
+  // Use another tab in the same throwaway profile: visiting from the list in this tab would
+  // replace forward history, losing the route back to the applied review (held only in memory).
+  const sourcePage = await context.newPage(); await sourcePage.goto(url, { waitUntil: "networkidle" });
+  await sourcePage.getByRole("button", { name: linksSource, exact: true }).click();
+  await sourcePage.getByLabel("Note body").waitFor();
+  linksAfterText = await sourcePage.getByLabel("Note body").innerText(); await shot("links-source-after", true, sourcePage);
+  await sourcePage.getByRole("button", { name: "Back", exact: true }).click(); // Flush any editor save before Undo.
+  await sourcePage.close();
+  await button("Undo").click();
+  linksUndone = await Promise.race([
+    page.getByText("Earlier version restored.", { exact: true }).waitFor().then(() => "clean"),
+    page.getByText(/^A note changed after Claude's edit/).waitFor().then(() => "conflict"),
+  ]);
+  await shot("links-undo", true);
+}
 await browser.close();
 
 const messages = calls.filter((call) => call.path === "/v1/messages");
@@ -156,6 +192,7 @@ const summary = {
   disclosed: disclosed?.replace(/\s+/g, " ").trim(), sources, followEstimate, shownCosts,
   tidyDisclosure: tidyDisclosure?.replace(/\s+/g, " ").trim(), tidyOutcome: outcome, applied, undone,
   reorganise: { disclosure: reorganiseDisclosure?.replace(/\s+/g, " ").trim(), outcome: reorganiseOutcome, rows: reorganiseRows, applied: reorganiseApplied, undone: reorganiseUndone },
+  links: { disclosure: linksDisclosure?.replace(/\s+/g, " ").trim(), outcome: linksOutcome, rows: linksRows, inline: linksInline, seeAlso: linksSeeAlso, applied: linksApplied, source: linksSource, afterText: linksAfterText, undone: linksUndone },
   calls, totalDollars: messages.reduce((sum, call) => sum + (call.dollars ?? 0), 0),
   followUpReadCache: (messages[1]?.usage?.cache_read_input_tokens ?? 0) > 0,
 };

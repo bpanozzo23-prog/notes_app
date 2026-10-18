@@ -12,6 +12,7 @@ import { chromium, devices } from "playwright";
 import { notebookAnswer, followupAnswer, noteAnswer, refusalAnswer, cutAnswer, overloadedAnswer, fallbackAnswer } from "../src/claude/fixtures/ask.js";
 import { tidyClass, tidyImage, tidyMalformed, tidyCut, tidyRefusal, tidyUnknown } from "../src/claude/fixtures/tidy.js";
 import { reorganiseNotebook } from "../src/claude/fixtures/reorganise.js";
+import { linksShotsEvents } from "../src/claude/fixtures/links.js";
 import { sseFrames } from "../src/claude/fixtures/responses.js";
 import { installSteppedClaudeFetch } from "../src/claude/fixtures/browser.js";
 
@@ -44,6 +45,7 @@ await context.route("https://api.anthropic.com/**", async (route) => {
 // Question markers are a screenshot convention only, never part of the app.
 await context.addInitScript(installSteppedClaudeFetch, { smoke: sseFrames(), cases: [
   ["Suggest better titles, tags and folders across this notebook.", reorganiseNotebook],
+  ["Suggest links between related notes in this notebook.", linksShotsEvents],
   ["[shot:tidy-class]", tidyClass], ["[shot:tidy-image]", tidyImage], ["[shot:tidy-invalid]", tidyMalformed],
   ["[shot:tidy-cut]", tidyCut], ["[shot:tidy-refusal]", tidyRefusal], ["[shot:tidy-unknown]", tidyUnknown],
   ["[shot:refusal]", refusalAnswer], ["[shot:cut]", cutAnswer], ["[shot:overloaded]", overloadedAnswer],
@@ -568,6 +570,49 @@ await button("Ask Claude").click(); await beginReorganise(); await finishTidy();
 await button("Mi recordatorio después de Claude").click(); await page.getByLabel("Title", { exact: true }).fill("Otra edición");
 await button("Claude's proposal is ready · Review").click();
 await page.getByText("Some notes changed since Claude read them. Ask again.", { exact: true }).waitFor(); await shot("121-reorganise-stale");
+await button("Discard").click(); await back();
+// Phase 3e: reimport for stable handles; all requests still use the fail-closed fixture guard.
+await button("Settings").click(); await page.getByLabel("Import backup").setInputFiles(sample);
+await button("Replace notebook").click();
+const linksImportDownload = page.waitForEvent("download");
+await button("Import and replace").click(); await linksImportDownload;
+await page.getByText(/^Backup imported\./).waitFor(); await back(); await button("Ask Claude").click();
+const beginLinks = async (takeShots = false) => {
+  await button("Tidy the notebook").click();
+  if (takeShots) await shot("122-links-tidy-sheet");
+  await button("Links between notes").click();
+  const discardOther = page.getByRole("dialog", { name: "Discard Claude's other proposal?" });
+  if (await discardOther.isVisible()) await button("Discard and continue").click();
+  await askDialog().waitFor();
+};
+await beginLinks(true); await shot("123-links-disclosure"); await finishTidy();
+await page.evaluate(() => window.scrollTo(0, 0)); await shot("124-links-review-top");
+const classLinks = page.getByRole("article", { name: "Ideas para la próxima clase", exact: true });
+await page.getByRole("article", { name: "Recordatorio suelto", exact: true }).scrollIntoViewIfNeeded(); await shot("125-links-both-placements");
+await classLinks.scrollIntoViewIfNeeded();
+await classLinks.getByRole("checkbox", { name: "→ Gramática — ser y estar", exact: true }).uncheck();
+await shot("126-links-row-unticked"); await applyTidy(); await shot("127-links-applied");
+await back(); await back(); await button("Ideas para la próxima clase").click();
+await page.getByLabel("Note body").getByRole("link", { name: "Frases útiles", exact: true }).waitFor(); await shot("128-links-inline-note");
+await page.getByLabel("Note body").getByText(/^See also:/).scrollIntoViewIfNeeded(); await shot("129-links-see-also-note");
+await page.getByLabel("Note body").getByRole("link", { name: "Frases útiles", exact: true }).click();
+// The new link must appear under "Linked from" on the target.
+await page.getByRole("region", { name: "Linked from" }).getByText("Ideas para la próxima clase", { exact: true }).scrollIntoViewIfNeeded();
+await page.evaluate(() => window.scrollBy(0, 300)); await shot("130-links-backlinks"); // clear of the toolbar
+await back(); await back(); await button("Settings").click(); await button("Claude On").click();
+await button("Undo Claude's last change").click();
+await page.getByRole("dialog", { name: "Undo Claude's last change?" }).getByRole("button", { name: "Undo", exact: true }).click();
+await page.getByText("Earlier version restored.", { exact: true }).waitFor(); await shot("131-links-clean-undo");
+await back(); await back(); await button("Ask Claude").click(); await beginLinks(); await finishTidy(); await applyTidy(); await back(); await back();
+await button("Ideas para la próxima clase").click(); await page.getByLabel("Title", { exact: true }).fill("Ideas para clase editadas"); await back();
+await button("Settings").click(); await button("Claude On").click(); await button("Undo Claude's last change").click();
+await page.getByRole("dialog", { name: "Undo Claude's last change?" }).getByRole("button", { name: "Undo", exact: true }).click();
+await button("Undo the 4 unchanged notes").waitFor(); await button("Undo the 4 unchanged notes").scrollIntoViewIfNeeded(); await shot("132-links-partial-undo-offer");
+await button("Undo the 4 unchanged notes").click(); await page.getByText(/^Restored 4 unchanged notes\. Left as they are \(their links stay\):/).waitFor(); await shot("133-links-partial-undo-result");
+await back(); await back(); await button("Ask Claude").click(); await beginLinks(); await finishTidy(); await back(); await back();
+await button("Lista de lecturas").click(); await page.getByLabel("Title", { exact: true }).fill("Lista de lecturas editada");
+await button("Claude's proposal is ready · Review").click();
+await page.getByText("Some notes changed since Claude read them. Ask again.", { exact: true }).waitFor(); await shot("134-links-stale");
 await button("Discard").click(); await back();
 await button("Vocabulario — comida").click();
 // Only this fresh browser context's fixture notebook is involved in the guard screenshots.

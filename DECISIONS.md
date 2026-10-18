@@ -772,3 +772,76 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   a new service worker (`sw.js` and the workbox file it imports), so the offline check ignores
   those two and requires every other file to come from the cache. — Seen in the second run; it is
   not page traffic.
+
+## Phase 3e implementation
+
+- 2026-10-18 — Links between notes captures every live note in one generation-checked read,
+  ordered by creation time then id. Only the task and each note's N handle, displayed title,
+  Claude text and existing links to live N handles go in the request. HTML, ids, dates, folders,
+  tags, preferences, images and Trash stay local. The disclosure and Send use the same frozen
+  snapshot. — Claude suggests relationships; the app places links without accepting note HTML.
+- 2026-10-18 — Placement is computed once against captured HTML, before ticking. A phrase must
+  occur exactly once, case-sensitively and on whole-word boundaries, outside code and links.
+  Hard breaks and excluded inline content retain their document positions. An overlapping later
+  link goes to See also, even if the earlier link is unticked. Review snippets are inert React
+  text. — Approval must write the placement shown and must never move when another row changes.
+- 2026-10-18 — Fallback links use the captured displayed target titles, joined with ` · ` in a
+  `See also:` paragraph. Append to a final See also paragraph or insert immediately after the
+  last non-empty block, before trailing empty paragraphs; an entirely empty note keeps its empty
+  paragraphs after the new line. Inline links retain the owner's other text formatting. — This
+  keeps one predictable end-of-note line and handles lists, callouts, dividers and empty notes.
+- 2026-10-18 — Drop self-links, existing links and repeated source/target pairs (keep the first).
+  Invalid or unusable phrases fall back to See also. Invalid shape, unknown handles or more than
+  30 links refuse the proposal. — Harmless redundancies should not waste the whole paid reply.
+- 2026-10-18 — Apply checks every referenced source and target, even for unticked links, once
+  per note: sources first, then targets, deduplicated. A changed revision, trashed target or
+  different notebook generation refuses the entire transaction. Only selected sources receive
+  body patches; projections and backlinks use the shared writer. — Unticking cannot bypass
+  freshness, and a note that is both source and target must not make its own plan stale.
+- 2026-10-18 — Owner-approved link-only Undo uses “Undo the N unchanged notes” after later
+  edits, like metadata Undo. Edited notes retain their links and See-also line and are named in
+  the result. Records carry `kind: "links"`; only HTML-only changes with no created/trashed notes
+  or created folders qualify. Records without the kind keep the copies path for body edits.
+  — Adding links never changes the owner's words, so a “(before Claude)” copy of an edited note
+  holds nothing the owner has not kept or deliberately deleted; copies would only add clutter.
+- 2026-10-18 — Apply serialises a note's whole body in the editor's form, including its required
+  trailing paragraph. For notes typed in the app this changes nothing else; for the sample or a
+  hand-made backup it only rewrites representation the editor already shows (attribute order,
+  colour notation and the end-of-note empty line). — Merely opening an applied note must not
+  save again, move its edit date or turn clean Undo into a conflict. Tests compare every full
+  fixture source with a real Tiptap editor after its first transaction.
+- 2026-10-18 — Added fixture-based links review, disclosure, Apply/Undo and stale coverage;
+  screenshot steps 122–134 and a links result in the real-request script. That script opens a
+  source in a second tab of the same throwaway profile, flushes and closes it, then returns to
+  the retained review for Undo: opening from the list in the review tab would replace forward
+  history. Links provisionally share 3d's named estimate constants pending real measurement.
+  Version 0.3.7; schema remains 4, with no new dependency or backup-format change. The public
+  sample and its generator are unchanged. Existing decision-log edits were preserved.
+- 2026-10-18 — Verification passed: `npm test` (54 files, 1,098 tests, including 79 new links
+  tests), `npm run build`, syntax checks for both edited browser scripts and `git diff --check`.
+  The build retains Vite's large-chunk warning. Screenshots, real Claude requests/costs and phone
+  layout/typing were not run or seen, as reserved for Claude Code and the owner. No network
+  requests, key/private-data access, package installation, server start, commit or push. The
+  unrelated `scripts/browser-checks.mjs` that appeared during work was left untouched.
+- 2026-10-18 — Review (Claude Code), before Codex started: a planning pass checked the design
+  against the real schema and found that a paragraph's `textContent` drops hard breaks (every link
+  after a line break would have landed on the wrong characters), that a note both source and
+  target would have made the review permanently stale, and the five places that knew only two
+  proposal kinds (Discard would have left a links request running and spending). All went into
+  the task and have tests. After it: shots 125 and 130 now scroll to what they show, and 130
+  waits for the new backlink under "Linked from".
+- 2026-10-18 — Real-request runs with 3e (sample notebook, test key), two full runs: 21.3¢ and
+  16.2¢ (the second read the first run's cache), 37.5¢ in total for the step. Links: 5,715 and
+  5,755 tokens in, 1,488 and 1,459 out, 5.3¢ and 5.2¢ against an estimate of "about 6¢" (5,821
+  tokens), so links keep the notebook ratio and reply allowance. Both proposals validated; Apply,
+  opening a linked note in another tab, and a clean Undo worked both times. — Real behaviour the
+  fixtures can't show.
+- 2026-10-18 — Prompt tightened after the first run: a phrase must name the target note or its
+  subject (its title, the book, person or topic), and notes related only by theme get null (See
+  also). The first run linked sentence fragments that merely illustrated a topic ("el examen es"
+  → the grammar note, "diez minutos antes del café" → the habits podcast): 7 in the text, 3 See
+  also. The second linked only words that name the target ("ser y estar", "Frases útiles",
+  "repasar los verbos"): 3 in the text, 8 See also. — In-text links on loose words read as
+  references that aren't there; thematic links belong in See also.
+- 2026-10-18 — Noted, not changed: a See-also link to an untitled note shows its whole first line
+  (the link picker does the same, through `noteTitle`).

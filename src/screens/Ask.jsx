@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import ScreenHeader from "../components/ScreenHeader.jsx";
 import Dialog from "../components/Dialog.jsx";
 import { captureReorganisePayload } from "../claude/reorganise.js";
+import { captureLinksPayload } from "../claude/links.js";
 import Confirm from "../components/Confirm.jsx";
 import Disclosure from "../components/Disclosure.jsx";
 import Sources from "../components/Sources.jsx";
@@ -47,12 +48,12 @@ export default function Ask({ notes, trash, folders, openNote, queue, run, busy,
       if (alive.current) { setPrepared({ payload, question: question.trim(), images: null, now: new Date().toISOString() }); setNotice(""); }
     });
   }
-  async function reorganise(confirmed = false) {
+  async function prepareTidy(kind, confirmed = false) {
     if (disabled) return;
-    if (!confirmed && claudeSession.getSnapshot().proposal) { setTidySheet(false); setConfirmTidy(true); return; }
+    if (!confirmed && claudeSession.getSnapshot().proposal) { setTidySheet(false); setConfirmTidy(kind); return; }
     const success = await run(async () => {
       await queue.flush();
-      const payload = await captureReorganisePayload();
+      const payload = await (kind === "links" ? captureLinksPayload() : captureReorganisePayload());
       if (!claudeSession.prepareProposal(payload)) throw new Error("Wait for Claude's current request to finish.");
     });
     if (success) { setTidySheet(false); setConfirmTidy(false); onOpen({ screen: "claude-review" }); }
@@ -116,9 +117,10 @@ export default function Ask({ notes, trash, folders, openNote, queue, run, busy,
     </div>
     {tidySheet && <Dialog title="Tidy the notebook" sheet busy={busy} onClose={() => setTidySheet(false)}>
       {disabledMessage && <p role="status">{disabledMessage}</p>}
-      <button className="app-button w-full" disabled={disabled} onClick={() => reorganise()}>Titles, tags and folders</button>
+      <button className="app-button w-full" disabled={disabled} onClick={() => prepareTidy("reorganise")}>Titles, tags and folders</button>
+      <button className="app-button mt-2 w-full" disabled={disabled} onClick={() => prepareTidy("links")}>Links between notes</button>
     </Dialog>}
-    {confirmTidy && <Confirm title="Discard Claude's other proposal?" confirmLabel="Discard and continue" busy={disabled} onCancel={() => setConfirmTidy(false)} onConfirm={() => reorganise(true)}>Only one proposal is kept at a time.</Confirm>}
+    {confirmTidy && <Confirm title="Discard Claude's other proposal?" confirmLabel="Discard and continue" busy={disabled} onCancel={() => setConfirmTidy(false)} onConfirm={() => prepareTidy(confirmTidy, true)}>Only one proposal is kept at a time.</Confirm>}
     {prepared && <Disclosure prepared={prepared} busy={preparingImages} disabled={disabled} message={notice || disabledMessage} onImages={includeImages} onCancel={() => setPrepared(null)} onSend={sendFirst} />}
     {confirmNew && <Confirm title="Clear this conversation?" confirmLabel="Clear conversation" onCancel={() => setConfirmNew(false)} onConfirm={() => { claudeSession.clearConversation(); setQuestion(""); setConfirmNew(false); }}>The answers will be cleared from this session.</Confirm>}
   </section>;

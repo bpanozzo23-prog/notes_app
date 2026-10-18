@@ -108,6 +108,14 @@ LLM can read. The code may become public; the notes never are.
 - **Phase 3d — committed 2026-10-18 (0.3.6).** Tidy the notebook → Titles, tags and folders: per-note
   cards with a tick per suggestion, all-or-nothing Apply, and Undo that skips notes edited since
   for metadata-only changes. Real-request run on the sample: 5.5¢. Owner phone check pending.
+- **Free browser checks — 2026-10-18.** `npm run browser-checks` (headless, made-up answers, no
+  cost): update prompt, offline reopen, a frozen page mid-answer and a dropped connection all behave
+  (15 of 15).
+- **Phase 3e — committed 2026-10-18 (0.3.7).** Tidy the notebook → Links between notes: Claude
+  suggests links, the app places each one on the words that name the other note (when they occur
+  once) or on a "See also:" line, a tick per link, all-or-nothing Apply, and Undo that skips notes
+  edited since. Real-request runs on the sample: about 5¢ per links request. Owner phone check
+  pending.
 
 ## Running it
 

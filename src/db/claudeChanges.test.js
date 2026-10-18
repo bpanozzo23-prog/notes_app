@@ -161,7 +161,7 @@ it.each(['edit', 'trash', 'purge', 'pin'])('metadata Undo after %s restores only
   if (kind === 'pin') await updateNote(b.id, { pinned: true });
   if (kind === 'trash' || kind === 'purge') { await trashNote(b.id); if (kind === 'purge') await purgeNow(b.id); }
   const later = await db.notes.get(b.id), beforeUndo = await db.notes.toArray();
-  expect(await undoClaudeChange(changeId)).toMatchObject({ conflict: true, metadataOnly: true, unchanged: 1 });
+  expect(await undoClaudeChange(changeId)).toMatchObject({ conflict: true, partial: true, unchanged: 1 });
   expect(await db.notes.toArray()).toEqual(beforeUndo);
   await expect(restoreClaudeCopies(changeId)).rejects.toThrow('unchanged notes');
   const result = await undoClaudeChange(changeId, { unchangedOnly: true });
@@ -194,6 +194,6 @@ it('a single body change anywhere keeps the copies path for the whole change', a
   const plan = planFor([a, b]); plan.notes[1].patch = { html: '<p>New body</p>' };
   const { changeId } = await applyClaudeChanges(plan); await updateNote(a.id, { title: 'Later' });
   const before = await db.notes.toArray();
-  expect(await undoClaudeChange(changeId, { unchangedOnly: true })).toMatchObject({ conflict: true, metadataOnly: false });
+  expect(await undoClaudeChange(changeId, { unchangedOnly: true })).toMatchObject({ conflict: true, partial: false });
   expect(await db.notes.toArray()).toEqual(before); expect((await restoreClaudeCopies(changeId)).ids).toHaveLength(2);
 });

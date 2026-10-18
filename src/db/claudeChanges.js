@@ -3,6 +3,7 @@ import { writeNoteInTransaction } from "./notes.js";
 import { clearReferencedFileMarks } from "./files.js";
 import { newId, isSafeId } from "../lib/ids.js";
 import { nowIso } from "../lib/dates.js";
+import { noteTitle } from "../lib/notebookView.js";
 import { neutralizeNoteLinks } from "../lib/text.js";
 
 export const STALE_PROPOSAL = "This note changed since Claude read it. Ask again.";
@@ -41,7 +42,7 @@ export function applyClaudeChanges(plan) {
       const id = newId(); created.set(name, id);
       await db.folders.add({ id, name, position: position++ });
     }
-    const undo = { changeId: newId(), generation: plan.generation, at: nowIso(), notes: [], createdFolders: [...created.values()], createdNotes: [], trashedNotes: [] };
+    const undo = { ...(plan.kind === "links" ? { kind: "links" } : {}), changeId: newId(), generation: plan.generation, at: nowIso(), notes: [], createdFolders: [...created.values()], createdNotes: [], trashedNotes: [] };
     for (const [index, item] of plan.notes.entries()) {
       const before = notes[index], patch = { ...item.patch };
       if (patch.folderId && typeof patch.folderId === "object") {
@@ -91,16 +92,19 @@ async function restoredPatch(before, fields, tombstones) {
   return patch;
 }
 export const isMetadataOnlyChange = (record) => record.createdNotes.length === 0 && record.trashedNotes.length === 0 && record.notes.every((entry) => entry.fields.every((field) => ["title", "tags", "folderId"].includes(field)));
+export const allowsPartialUndo = (record) => isMetadataOnlyChange(record) ||
+  (record.kind === "links" && !record.createdNotes.length && !record.trashedNotes.length &&
+  !record.createdFolders.length && record.notes.every((entry) => entry.fields.length === 1 && entry.fields[0] === "html"));
 export function undoClaudeChange(changeId, { unchangedOnly = false } = {}) {
   return writeTransaction(tables(), async () => {
     const record = await readUndo(changeId);
     const notes = await db.notes.bulkGet(record.notes.map((entry) => entry.id));
     const unchanged = notes.map((note, index) => !!note && note.deletedAt === null && note.rev === record.notes[index].writtenRev);
-    const metadataOnly = isMetadataOnlyChange(record);
-    if (unchanged.some((value) => !value) && !(unchangedOnly && metadataOnly)) {
-      return { conflict: true, metadataOnly, unchanged: unchanged.filter(Boolean).length, notes: record.notes.map((entry) => ({ id: entry.id, title: entry.before.title })) };
+    const partial = allowsPartialUndo(record);
+    if (unchanged.some((value) => !value) && !(unchangedOnly && partial)) {
+      return { conflict: true, partial, unchanged: unchanged.filter(Boolean).length, notes: record.notes.map((entry) => ({ id: entry.id, title: entry.before.title })) };
     }
-    const skipped = record.notes.filter((_entry, index) => !unchanged[index]).map((entry) => ({ id: entry.id, title: notes.find((note) => note?.id === entry.id)?.title || entry.before.title || "Untitled" }));
+    const skipped = record.notes.filter((_entry, index) => !unchanged[index]).map((entry) => ({ id: entry.id, title: noteTitle(notes.find((note) => note?.id === entry.id) ?? entry.before) }));
     const tombstones = new Set(await db.tombstones.toCollection().primaryKeys());
     for (const [index, entry] of record.notes.entries()) {
       if (!unchanged[index]) continue;
@@ -117,7 +121,7 @@ export function undoClaudeChange(changeId, { unchangedOnly = false } = {}) {
 export function restoreClaudeCopies(changeId) {
   return writeTransaction(tables(), async () => {
     const record = await readUndo(changeId);
-    if (isMetadataOnlyChange(record)) throw new Error("Use Undo for the unchanged notes instead.");
+    if (allowsPartialUndo(record)) throw new Error("Use Undo for the unchanged notes instead.");
     const tombstones = new Set(await db.tombstones.toCollection().primaryKeys()), ids = [];
     for (const { before } of record.notes) {
       const at = nowIso(), id = newId();

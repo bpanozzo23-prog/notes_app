@@ -94,12 +94,14 @@ export const CITED_TOKENS_PER_CHAR = 0.85;
 export const PLAIN_TOKENS_PER_CHAR = 0.65;
 // Notebook-wide proposals send plain note text in JSON: 6,621 tokens for about 13,200 characters,
 // and the reply (a list of small changes) measured 1,430 tokens (2026-10-18).
+// Links measured the same (2026-10-18): 5,715–5,755 tokens for about 11,640 characters, replies
+// 1,459–1,488 tokens, so they share these constants.
 export const NOTEBOOK_TOKENS_PER_CHAR = 0.5;
 const NOTEBOOK_OUTPUT_ALLOWANCE = 2000;
 const QUESTION_OUTPUT_ALLOWANCE = 1000;
 export function estimateRequest({ kind = "question", payload, images, history = [], question = "", now = new Date() }) {
-  if (kind === "tidy" || kind === "notebook-proposal") {
-    const notebook = kind === "notebook-proposal";
+  if (kind === "tidy" || kind === "notebook-proposal" || payload.kind === "links") {
+    const notebook = kind === "notebook-proposal" || payload.kind === "links";
     const tokens = Math.ceil((payload.requestText.length + payload.system.length) * (notebook ? NOTEBOOK_TOKENS_PER_CHAR : PLAIN_TOKENS_PER_CHAR));
     // A tidy returns the whole note, plus thinking at high effort; a notebook proposal, a list of small changes.
     const output = notebook ? NOTEBOOK_OUTPUT_ALLOWANCE : Math.ceil(payload.claudeHtml.length * PLAIN_TOKENS_PER_CHAR * 1.5) + 800;
