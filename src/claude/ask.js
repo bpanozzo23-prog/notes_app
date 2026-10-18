@@ -66,7 +66,8 @@ export function citationsToSources(content, payload) {
       if (!entry) continue;
       let source = sources.find((item) => item.noteId === entry.noteId);
       if (!source) { source = { number: sources.length + 1, noteId: entry.noteId, title: entry.title, quotes: [] }; sources.push(source); }
-      const quote = (citation.cited_text ?? "").slice(0, 200);
+      // Show the passage as the owner wrote it, without the projection's task and link markers.
+      const quote = (citation.cited_text ?? "").replace(/\[(?: |x)\] /g, "").replace(/ \[→ [^\]]*\]/g, "").replace(/\s+/g, " ").trim().slice(0, 200);
       if (quote && !source.quotes.includes(quote)) source.quotes.push(quote);
       if (!numbers.includes(source.number)) numbers.push(source.number);
     }

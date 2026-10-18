@@ -5,7 +5,7 @@ this one is for the owner: what was chosen, why, what it means for the app, what
 and how hard it would be to reverse ("lock-in"). Ordered by lock-in, hardest first. Updated whenever
 `DECISIONS.md` gains an entry with consequences for how the app behaves.
 
-Last updated 2026-10-18, with the text export (§55).
+Last updated 2026-10-18, with measured costs (§56).
 
 ---
 
@@ -619,6 +619,7 @@ in mind.
 
 **Lock-in: none.** It is one line; the price table already holds the others. Say if you'd rather
 start cheaper.
+**Measured 2026-10-18:** see §56 for what real requests actually cost.
 
 ### 41. Answers cite the passages they used, and you tap through to the note
 
@@ -874,4 +875,21 @@ the same tidy text the app already sends Claude when you ask a question.
 **What it leads to:** once exported or copied, the text is outside the app's protections, so
 treat it like any copy of your notes. It isn't a backup: it can't be imported, has no pictures or
 settings, and doesn't change "Last backup".
+**Lock-in: none.**
+
+### 56. What Claude actually costs, measured
+
+**Measured (2026-10-18)** with my own test key on the made-up sample notebook (18 short notes),
+not your notes: a question across all the notes cost **6¢**, a follow-up a minute later **2¢**
+(Anthropic's cache worked: the notes were read back at a twentieth of the price), and tidying a
+short note **2¢**. The costs the app showed matched Anthropic's own counts.
+**What it changes:** the estimate shown before you send is now based on these measurements. It
+had been counting the size of your notes too low: turning on citations (so Claude can point at
+the exact sentences it used) makes Anthropic split every note into sentences, which roughly
+doubles what a question costs to send. As a rule of thumb, a first question costs about **half a
+cent per 1,000 characters of notes** (a long note is a few thousand characters), plus about 2¢
+for the answer; follow-ups cost a fraction of that. The cost shown after each answer was always
+exact; only the before-sending estimate changes.
+**How it's checked from now on:** I can rerun this check with the test key whenever the Claude
+features change (about 10¢ a run, within the $1-per-step allowance).
 **Lock-in: none.**

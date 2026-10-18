@@ -676,3 +676,16 @@ Append-only. One dated line per decision: what was decided, then why, after the 
 - 2026-10-18 — Also planned without any new access: service-worker update and offline tests on
   a production build, page freeze/resume during a request (Android app switching) and dropped
   connections mid-stream, in headless Chromium. — Covers several phone-checklist items.
+- 2026-10-18 — First real-request check (`npm run claude-check -- --real`, the sample notebook,
+  the agent's test key): question across 18 notes 9,685 input tokens (cache write) + 689 out =
+  6.2¢; follow-up read the cache (9,685 read, 715 written) + 606 out = 1.8¢; tidy of "Notas de
+  clase" 2,301 in + 643 out = 2.2¢; total 10¢. Answers cited four notes, flagged general
+  knowledge, and the tidy fixed accents but deliberately kept "recivir" (the sentence is about
+  its spelling); Apply and a clean Undo worked; the app's shown costs matched Anthropic's
+  counts. — The made-up fixtures could not show real behaviour.
+- 2026-10-18 — Estimates use measured tokens per character: 0.85 for citation-enabled questions
+  (Anthropic adds instructions and splits documents into citable sentences; characters ÷ 3 had
+  undercounted by 2.5×) and 0.65 for proposal requests; the question output allowance falls to
+  1,000 tokens and a tidy's to 1.5 × the note plus 800. Quoted sources no longer show the
+  projection's `[x]`/`[ ]` and `[→ title]` markers. 0.3.5; 3d becomes 0.3.6 (each later step one
+  more). — From the run above; `claude-check` re-measures them.

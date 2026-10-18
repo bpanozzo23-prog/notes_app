@@ -101,8 +101,10 @@ LLM can read. The code may become public; the notes never are.
   edit). Deployed after the owner's backup; owner-verified on the phone 2026-10-18.
 - **Text export — committed 2026-10-18 (0.3.4, owner's request).** Settings → Export notes as text
   (a readable Markdown file of all live notes, by folder) and Copy as text on each note, for
-  other apps and AI tools. Owner-verified on the phone 2026-10-18. Later Phase 3 steps move one
-  more version (3d is 0.3.5).
+  other apps and AI tools. Owner-verified on the phone 2026-10-18.
+- **Measured costs — 0.3.5, 2026-10-18.** The agent's first real-request check (`npm run
+  claude-check -- --real`, sample notebook, test key): question 6¢, follow-up 2¢, tidy 2¢.
+  Estimates now use the measured token ratios; quoted sources drop internal markers. 3d is 0.3.6.
 
 ## Running it
 

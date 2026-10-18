@@ -1,12 +1,13 @@
 {
   "name": "notes_app",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "scripts": {
     "dev": "vite --host",
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "shots": "node scripts/screenshot.mjs"
+    "shots": "node scripts/screenshot.mjs",
+    "claude-check": "node scripts/claude-check.mjs"
   },
   "type": "module",
   "private": "true",

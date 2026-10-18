@@ -85,22 +85,31 @@ export async function prepareNoteImages(payload) {
   return deepFreeze({ images, omitted, sentBytes });
 }
 export const imageTokens = ({ width, height }) => Math.min(4784, Math.ceil(width / 28) * Math.ceil(height / 28));
+// Tokens per character, measured with real requests on the sample notebook (2026-10-18,
+// scripts/claude-check.mjs): citation-enabled documents cost far more than plain text (Anthropic
+// adds instructions and splits the text into citable sentences): 9,685 tokens for 11,800
+// characters. A tidy request (HTML inside JSON) measured 2,301 tokens for 3,640 characters.
+// Claude's replies at these efforts: about 600–700 tokens including its hidden thinking.
+export const CITED_TOKENS_PER_CHAR = 0.85;
+export const PLAIN_TOKENS_PER_CHAR = 0.65;
+const QUESTION_OUTPUT_ALLOWANCE = 1000;
 export function estimateRequest({ kind = "question", payload, images, history = [], question = "", now = new Date() }) {
   if (kind === "tidy") {
-    const tokens = Math.ceil((payload.requestText.length + payload.system.length) / 3);
-    const output = Math.ceil(payload.claudeHtml.length / 3) * 2 + 3000;
+    const tokens = Math.ceil((payload.requestText.length + payload.system.length) * PLAIN_TOKENS_PER_CHAR);
+    // The whole note comes back, plus thinking at high effort.
+    const output = Math.ceil(payload.claudeHtml.length * PLAIN_TOKENS_PER_CHAR * 1.5) + 800;
     return { tokens, dollars: priceUsage(CLAUDE_MODEL, { input_tokens: tokens, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: output }) };
   }
   const documents = buildDocuments(payload);
-  const base = Math.ceil((ASK_SYSTEM_PROMPT.length + documents.reduce((sum, doc) => sum + doc.title.length + doc.context.length + doc.source.data.length, 0)) / 3);
+  const base = Math.ceil((ASK_SYSTEM_PROMPT.length + documents.reduce((sum, doc) => sum + doc.title.length + doc.context.length + doc.source.data.length, 0)) * CITED_TOKENS_PER_CHAR);
   const previous = history.filter((turn) => turn.status === "completed").at(-1);
   const earlier = ["input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens", "output_tokens"].reduce((sum, key) => sum + (previous?.usage?.[key] ?? 0), 0);
   // A follow-up resends everything the previous request read and wrote; its reported counts
   // already include the instructions, notes and images, so they replace the character estimate.
-  const tokens = (previous ? earlier : base + (images?.images ?? images ?? []).reduce((sum, image) => sum + imageTokens(image), 0)) + Math.ceil(question.length / 3);
+  const tokens = (previous ? earlier : base + (images?.images ?? images ?? []).reduce((sum, image) => sum + imageTokens(image), 0)) + Math.ceil(question.length * PLAIN_TOKENS_PER_CHAR);
   const elapsed = previous ? +new Date(now) - +new Date(previous.startedAt) : Infinity;
   const cached = previous && elapsed >= 0 && elapsed < 300000;
-  const output = kind === "tidy" ? base * 2 + 3000 : ["proposal", "notebook-proposal"].includes(kind) ? 6000 : 1500;
+  const output = ["proposal", "notebook-proposal"].includes(kind) ? 6000 : QUESTION_OUTPUT_ALLOWANCE;
   const dollars = priceUsage(CLAUDE_MODEL, { input_tokens: tokens < 512 ? tokens : 0,
     cache_creation_input_tokens: tokens >= 512 && !cached ? tokens : 0, cache_read_input_tokens: tokens >= 512 && cached ? tokens : 0, output_tokens: output });
   return { tokens, dollars };

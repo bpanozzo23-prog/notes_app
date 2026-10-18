@@ -9,7 +9,7 @@ import { captureTidyPayload, validateTidyProposal, buildTidyRequest, runTidy, ti
 import { claudeSession as session } from "./session.js";
 import { saveClaudeKey } from "./prefs.js";
 import { TIDY_SYSTEM_PROMPT } from "./prompts.js";
-import { estimateRequest } from "./payload.js";
+import { estimateRequest, PLAIN_TOKENS_PER_CHAR } from "./payload.js";
 import { chunkedFetch } from "../test/anthropic.js";
 import { classBefore, classProposal, imageProposal, tidyClass, tidyImage, tidyUnknown, tidyCut, tidyMalformed, tidyRefusal, tidyEvents } from "./fixtures/tidy.js";
 import { RESPONSE_ERRORS } from "./client.js";
@@ -47,7 +47,7 @@ it("uses structured output, high effort, 32000 tokens, handles only and the fall
   expect((await getPref('claudeSpend')).dollars).toBe(0.11);
   await runTidy({ payload, fetch: fixture.fetch }); expect((await getPref('claudeSpend')).dollars).toBe(0.11);
   const estimate = estimateRequest({ kind: 'tidy', payload });
-  expect(estimate.tokens).toBe(Math.ceil((payload.system.length + payload.requestText.length) / 3));
+  expect(estimate.tokens).toBe(Math.ceil((payload.system.length + payload.requestText.length) * PLAIN_TOKENS_PER_CHAR));
 });
 it("sends the frozen capture even after a later save", async () => {
   await updateNote(note.id, { title: 'Later', html: '<p>Later</p>' });

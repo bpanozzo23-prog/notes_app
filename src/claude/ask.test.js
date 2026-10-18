@@ -189,3 +189,10 @@ it("doesn't include stopped, cut, lost, refused or failed turns in protocol hist
   expect(request.messages[1].content).toEqual(completed.assistantContent);
   expect(request.messages[2].content[0].text).toBe("New question");
 });
+
+it("shows quoted passages without the projection's task and link markers", () => {
+  const payload = { entries: [{ noteId: "n1", title: "Frases" }] };
+  const content = [{ type: "text", text: "Repasa esto.", citations: [{ type: "char_location", document_index: 0,
+    cited_text: "[x] subjuntivo después de \"ojalá\" [ ] pretérito vs. imperfecto Reglas en la nota [→ Gramática — ser y estar].", start_char_index: 0, end_char_index: 10 }] }];
+  expect(citationsToSources(content, payload).sources[0].quotes).toEqual(["subjuntivo después de \"ojalá\" pretérito vs. imperfecto Reglas en la nota."]);
+});

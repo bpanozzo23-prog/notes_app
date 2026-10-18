@@ -5,7 +5,7 @@ import { db, notebookAccess } from "../db/db.js";
 import { resetDatabase, noteFixture } from "../test/fixtures.js";
 import { importBackup } from "../db/backup.js";
 import { updateNote } from "../db/notes.js";
-import { captureNotebookPayload, captureNotePayload, buildDocuments, prepareNoteImages, estimateRequest, imageTokens, payloadIsLive } from "./payload.js";
+import { captureNotebookPayload, captureNotePayload, buildDocuments, prepareNoteImages, estimateRequest, imageTokens, payloadIsLive, CITED_TOKENS_PER_CHAR, PLAIN_TOKENS_PER_CHAR } from "./payload.js";
 import { ASK_SYSTEM_PROMPT } from "./prompts.js";
 import { notebookAnswer, followupAnswer, noteAnswer, cutAnswer, fallbackAnswer } from "./fixtures/ask.js";
 import { processImage } from "../lib/images.js";
@@ -79,15 +79,17 @@ it("uses valid empty document text and prices first, warm and expired follow-ups
   expect(buildDocuments(payload)[0].source.data).toBe("(empty note)");
   const now = "2026-10-18T12:00:00Z", question = "Hola";
   const docs = buildDocuments(payload);
-  const base = Math.ceil((ASK_SYSTEM_PROMPT.length + docs.reduce((n,d) => n+d.title.length+d.context.length+d.source.data.length,0))/3) + 2;
+  const asked = Math.ceil(question.length * PLAIN_TOKENS_PER_CHAR);
+  const base = Math.ceil((ASK_SYSTEM_PROMPT.length + docs.reduce((n,d) => n+d.title.length+d.context.length+d.source.data.length,0)) * CITED_TOKENS_PER_CHAR) + asked;
   const first = estimateRequest({ payload, question, now });
   expect(first.tokens).toBe(base);
-  expect(first.dollars).toBeCloseTo(base * (base >= 512 ? 5 : 4) / 1e6 + .03);
+  expect(first.dollars).toBeCloseTo(base * (base >= 512 ? 5 : 4) / 1e6 + .02); // 1,000 output tokens at $20/M
   const history = [{ status: "completed", startedAt: now, usage: { input_tokens: 100, cache_creation_input_tokens: 1000, cache_read_input_tokens: 0, output_tokens: 200 } }];
   const warm = estimateRequest({ payload, question, history, now: "2026-10-18T12:04:59Z" });
-  expect(warm.tokens).toBe(1300 + Math.ceil(question.length / 3)); // reported counts replace the character estimate expect(warm.dollars).toBeCloseTo(warm.tokens * .2 / 1e6 + .03);
+  // Reported counts replace the character estimate.
+  expect(warm.tokens).toBe(1300 + asked); expect(warm.dollars).toBeCloseTo(warm.tokens * .2 / 1e6 + .02);
   const cold = estimateRequest({ payload, question, history, now: "2026-10-18T12:05:00Z" });
-  expect(cold.dollars).toBeCloseTo(cold.tokens * 5 / 1e6 + .03);
+  expect(cold.dollars).toBeCloseTo(cold.tokens * 5 / 1e6 + .02);
   const withImage = estimateRequest({ payload, question, images: { images: [{ width: 1180, height: 2560 }] } });
   expect(withImage.tokens - first.tokens).toBe(imageTokens({ width: 1180, height: 2560 }));
   expect(imageTokens({ width: 10000, height: 10000 })).toBe(4784);

@@ -31,6 +31,8 @@ features; the owner's notes are the one thing that must never be lost or leaked.
   notebook, never the owner's notes; never print, log or copy it; never give it to Codex. Standing
   allowance (owner, 2026-10-18): up to **$1 per step** without asking, each run's cost reported;
   above that, ask first with the reason. Free calls (token counting) need no allowance.
+  `npm run claude-check -- --real` drives the app with real requests on the sample notebook
+  (question, follow-up, tidy, Apply, Undo; about 10¢) and writes `private-data/claude-check/`.
 - **Explain choices and define jargon the first time it appears.** The owner reads everything.
 - **Copy mi-cuaderno's patterns, not its code.** `~/code/mi-cuaderno` has the Dexie layer, backup
   export/import, the on-device Anthropic key with a spend cap, and the PWA/GitHub Pages setup.
