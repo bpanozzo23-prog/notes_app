@@ -9,6 +9,7 @@ import { makePng } from "./image-fixture.mjs";
 import { mkdirSync, writeFileSync, unlinkSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium, devices } from "playwright";
+import { notebookAnswer, followupAnswer, noteAnswer, refusalAnswer, cutAnswer, overloadedAnswer, fallbackAnswer } from "../src/claude/fixtures/ask.js";
 import { sseFrames } from "../src/claude/fixtures/responses.js";
 import { installSteppedClaudeFetch } from "../src/claude/fixtures/browser.js";
 
@@ -38,7 +39,12 @@ await context.route("https://api.anthropic.com/**", async (route) => {
     await route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ type: "error", error: { type: "api_error", message: "Unexpected fixture request" } }) });
   }
 });
-await context.addInitScript(installSteppedClaudeFetch, sseFrames());
+// Question markers are a screenshot convention only, never part of the app.
+await context.addInitScript(installSteppedClaudeFetch, { smoke: sseFrames(), cases: [
+  ["[shot:refusal]", refusalAnswer], ["[shot:cut]", cutAnswer], ["[shot:overloaded]", overloadedAnswer],
+  ["[shot:fallback]", fallbackAnswer], ["¿Me das un ejercicio?", followupAnswer],
+  ["Describe la captura", noteAnswer], ["repasar", notebookAnswer],
+].map(([match, events]) => ({ match, frames: sseFrames(events) })) });
 const page = await context.newPage();
 page.on("pageerror", (error) => console.log("pageerror:", error.message));
 page.on("console", (message) => { if (["error", "warning"].includes(message.type())) console.log(`console.${message.type()}:`, message.text()); });
@@ -376,6 +382,77 @@ await page.getByText("Anthropic rejected this key.", { exact: true }).waitFor();
 await shot("68-claude-key-rejected");
 await back();
 await back();
+// Start 3b from the exact sample order (earlier shots deliberately edited/trashed notes).
+await button("Settings").click();
+await page.getByLabel("Import backup").setInputFiles(sample);
+await button("Replace notebook").click();
+const askImportDownload = page.waitForEvent("download");
+await button("Import and replace").click(); await askImportDownload;
+await page.getByText(/^Backup imported\./).waitFor(); await back();
+await shot("69-notes-ask-claude");
+await button("Ask Claude").click();
+await shot("70-ask-empty");
+const askDialog = () => page.getByRole("dialog", { name: "Send to Anthropic?" });
+const release = async (count) => page.evaluate((count) => {
+  if (count === null) { while (window.__claudeStreams.at(-1).release()) { /* finish fixture */ } }
+  else for (let i = 0; i < count; i++) window.__claudeStreams.at(-1).release();
+}, count ?? null);
+const newQuestion = async () => {
+  await button("New question").click(); await button("Clear conversation").click();
+  await page.getByLabel("Your question").waitFor();
+};
+const beginAsk = async (question) => {
+  await page.getByLabel("Your question").fill(question); await button("Send").click(); await askDialog().waitFor();
+};
+const sendDisclosed = async () => {
+  const count = await page.evaluate(() => window.__claudeStreams.length);
+  await askDialog().getByRole("button", { name: "Send", exact: true }).click();
+  await page.waitForFunction((count) => window.__claudeStreams.length > count, count);
+};
+await beginAsk("¿Qué tengo que repasar de español?");
+await shot("71-ask-disclosure");
+await sendDisclosed(); await release(3);
+await page.getByText(/^Claude is thinking/).waitFor(); await shot("72-ask-thinking");
+await release(2); await page.locator("article").getByText(/^Repasa/).waitFor(); await shot("73-ask-streaming");
+await release(); await page.getByLabel("Follow-up question").waitFor(); await shot("74-ask-answer-sources");
+await page.getByRole("button", { name: /^1\. Frases para repasar/ }).click();
+await page.getByLabel("Note body").waitFor(); await shot("75-ask-source-note");
+// Make a second protected visit, then Back twice returns to the conversation.
+await page.locator('a[href^="note:"]').filter({ hasText: "la nota de gramática" }).click();
+await page.waitForFunction(() => document.querySelector('input[aria-label="Title"]')?.value === "Gramática — ser y estar");
+await page.getByLabel("Title", { exact: true }).fill("Gramática — ser y estar editada");
+await back(); await back();
+await page.getByText("Edited since Claude read it", { exact: true }).waitFor(); await shot("76-ask-source-edited");
+await page.getByLabel("Follow-up question").fill("¿Me das un ejercicio?");
+await page.getByLabel("Follow-up question").scrollIntoViewIfNeeded(); await shot("77-ask-followup-estimate");
+const followCount = await page.evaluate(() => window.__claudeStreams.length);
+await page.getByRole("button", { name: /^Send · about/ }).click();
+await page.waitForFunction((count) => window.__claudeStreams.length > count, followCount);
+await release(); await page.locator('article[aria-label="Turn 2"]').getByText(/Opus 5.5/).waitFor();
+await page.locator('article[aria-label="Turn 2"]').scrollIntoViewIfNeeded(); await shot("78-ask-followup-answer");
+await newQuestion(); await beginAsk("¿Qué repasar?"); await sendDisclosed(); await release(5);
+await page.locator("article").getByText(/^Repasa/).waitFor();
+await button("Cancel").click(); await page.getByText("Stopped", { exact: true }).waitFor(); await shot("79-ask-stopped");
+for (const [marker, name, expected] of [
+  ["refusal", "80-ask-refusal", "Claude declined to answer this."],
+  ["cut", "81-ask-cut-short", "Cut short"],
+  ["overloaded", "82-ask-overloaded", "Anthropic is busy. Try again shortly."],
+]) {
+  await newQuestion(); await beginAsk(`[shot:${marker}]`); await sendDisclosed(); await release();
+  await page.getByText(expected, { exact: true }).waitFor(); await shot(name);
+}
+await newQuestion(); await page.getByLabel("Your question").fill("¿Qué repasar?");
+await context.setOffline(true); await page.getByText("You're offline. Claude needs a connection.", { exact: true }).waitFor();
+if (await button("Send").isEnabled()) throw new Error("Offline Send must be disabled");
+await shot("83-ask-offline"); await context.setOffline(false);
+await back(); await button("Captura de ejemplo").click(); await button("Claude").click();
+await shot("84-note-claude-sheet"); await button("Ask about this note").click();
+await beginAsk("Describe la captura"); await askDialog().getByRole("checkbox").click(); // ticks once the images are prepared
+await page.getByText(/1 image prepared/).waitFor(); await shot("85-note-ask-images");
+await sendDisclosed(); await release(); await page.getByLabel("Follow-up question").waitFor(); await shot("86-note-ask-answer");
+await newQuestion(); await beginAsk("[shot:fallback]"); await sendDisclosed(); await release();
+await page.getByText(/answered by Opus 4.8/).waitFor(); await shot("87-ask-fallback");
+await newQuestion(); await back(); await back();
 await button("Vocabulario — comida").click();
 // Only this fresh browser context's fixture notebook is involved in the guard screenshots.
 await page.evaluate(() => {

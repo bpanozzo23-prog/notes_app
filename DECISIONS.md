@@ -560,3 +560,27 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   typing starts); a malformed `claudeSpend` record restarts the month's total instead of throwing;
   `enforced_spend_limit_reached` is recognised at either level of the error body. — Found reading
   the diff and the 375–412 px screenshots (62–68).
+
+## Phase 3b implementation
+
+- 2026-10-18 — Ask captures live notes, folder labels, image metadata and the generation in one read transaction, reading only the generation preference. Read-only capture itself is allowed; the UI and session refuse requests in guard states. — The capture must not bring the device key into a payload or React state, and must remain consistent across an import.
+- 2026-10-18 — The first user message is retained in memory as plain data, including its first-question date; retries replace the latest attempt and only completed assistant turns re-enter the protocol. After an unsuccessful first answer, the owner can retry or start a new question before following up. — This preserves the exact signed-thinking prefix, even across midnight, and avoids a follow-up with an unanswered first question.
+- 2026-10-18 — SDK 0.135.0's complete `BetaContentBlockParam` type list is explicitly allowed for non-text history blocks, including thinking, redacted thinking and fallback blocks, which are copied without altering fields or order. Unknown block types are dropped. Text citations use the five citation-param field lists; document citations omit response-only `file_id`. — The installed SDK types define what can be echoed; fallback boundaries and thinking signatures must survive unchanged.
+- 2026-10-18 — The estimate includes the instructions and document titles/context/text, the question, sent image dimensions and the last completed request's full usage; it never sums cumulative usage across all previous requests. Cache warmth uses that attempt's start time. — This follows the task's conservative estimate definition without repeatedly counting every earlier cumulative total. The displayed estimate is not a bill.
+- 2026-10-18 — Image preparation reads only the first 20 referenced files, checks the captured note revision and generation in that read transaction, then encodes outside the transaction. A missing image or still-oversize copy is omitted and listed; 5 MB is conservatively 5,000,000 base64 bytes. — Long image processing should not keep a database transaction open, and stored originals must never change. A stale revision requires a fresh disclosure with images unticked.
+- 2026-10-18 — Cancel changes the running display turn to Stopped before aborting and invalidating the request token. Message-start input counts provide a lower bound; incomplete/missing final counts never enter monthly spend. SDK-wrapped TypeError causes map to the fixed network sentence. — A late callback cannot overwrite Stopped, and a connection loss during an HTTP-200 stream needs the same treatment as a failed connection.
+- 2026-10-18 — Sources resolve current titles, folders and content-edit timestamps on render; snapshot titles remain available after deletion. The answer renderer understands only plain paragraphs, line breaks and `- ` lists. — No generated HTML or URL becomes an active element, and pin-only revisions do not falsely claim an edit.
+- 2026-10-18 — Shots 69–87 use last-user-text matching supplied only by the screenshot script, retaining the fail-closed Anthropic route guard and stepped stream controls. Before those shots the script reimports the public sample to restore citation order after earlier destructive shots. — Screenshot fixtures must be reproducible and cannot fall through to a real API call. The agent wrote but did not run these shots, as requested.
+- 2026-10-18 — Review fixes: a follow-up's estimate uses the previous request's reported token
+  counts in place of the character estimate (they already include the instructions, notes and
+  images, which were being counted twice); numbered lists reach Claude numbered from their start
+  ("3. 4. 5.", not "1. 1. 1."); an estimate under a cent reads "under 1¢" rather than "about
+  under 1¢"; the image line says "1 image prepared · 7 KB to send" without "base64". The
+  screenshot script taps the images checkbox instead of Playwright's `check()`, which fails
+  because the box is ticked only once the images are prepared. — Found reading the diff and
+  shots 69–87.
+- 2026-10-18 — The owner verified 3a on the published app with their own key, through the
+  checklist: Test key works, a wrong key is rejected, Turn off/on asks for the acknowledgement
+  again and keeps the key, a backup round trip keeps Claude on (airplane mode was optional). This was
+  the project's first real request to Anthropic: the browser call with the direct-access header
+  works from GitHub Pages. "Checks passed."

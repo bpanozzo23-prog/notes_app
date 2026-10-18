@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Folder, Settings, Search, Plus, Pin, Trash2, X } from "lucide-react";
+import { Sparkles, Folder, Settings, Search, Plus, Pin, Trash2, X } from "lucide-react";
+import { claudeSession } from "../claude/session.js";
 import { noteTitle, searchNotes, tagsInUse, visibleNotes } from "../lib/notebookView.js";
 
-export default function NotesList({ notes, folders, trashCount, filter, query = "", onQuery, onFilter, onOpen, onNew, busy, readOnly }) {
+export default function NotesList({ notes, folders, trashCount, filter, query = "", onQuery, onFilter, onOpen, onNew, busy, readOnly, claudeReady }) {
   // History stores trimmed queries; keep a trailing space while typing the next word.
   const [draftQuery, setDraftQuery] = useState(query);
   useEffect(() => { setDraftQuery((current) => current.trim() === query ? current : query); }, [query]);
@@ -16,6 +17,7 @@ export default function NotesList({ notes, folders, trashCount, filter, query = 
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold tracking-tight">Notes</h1>
         <div className="flex">
+          {claudeReady && <button className="icon-button" aria-label="Ask Claude" disabled={busy} onClick={() => { claudeSession.setPendingScope({ kind: "notebook" }); onOpen({ screen: "ask" }); }}><Sparkles size={21} aria-hidden="true" /></button>}
           <button className="icon-button" aria-label="Folders" disabled={busy} onClick={() => onOpen({ screen: "folders" })}><Folder size={21} aria-hidden="true" /></button>
           <button className="icon-button" aria-label="Settings" disabled={busy} onClick={() => onOpen({ screen: "settings" })}><Settings size={21} aria-hidden="true" /></button>
         </div>

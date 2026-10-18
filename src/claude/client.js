@@ -35,7 +35,7 @@ export function toClaudeError(error) {
   const type = typeof body?.type === "string" && /^[a-z_]+$/.test(body.type) ? body.type : undefined;
   let kind = "unknown";
   if (is("APIUserAbortError") || error?.name === "AbortError") kind = "cancelled";
-  else if (is("APIConnectionError") || error instanceof TypeError) kind = "network";
+  else if (is("APIConnectionError") || error instanceof TypeError || (is("AnthropicError") && error.cause instanceof TypeError)) kind = "network";
   else if (status === 401 || status === 403) kind = "auth";
   else if ((status === 400 && typeof body?.message === "string" && body.message.includes("specified API usage limits")) ||
     (status === 429 && (body?.details ?? error?.error?.details)?.error_code === "enforced_spend_limit_reached")) kind = "spend_limit";

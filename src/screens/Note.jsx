@@ -1,15 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Pin, Trash2 } from "lucide-react";
+import { Pin, Trash2, Sparkles } from "lucide-react";
 import NoteEditor from "../editor/NoteEditor.jsx";
 import LinkPicker from "../editor/LinkPicker.jsx";
 import ScreenHeader from "../components/ScreenHeader.jsx";
 import FolderPicker from "../components/FolderPicker.jsx";
 import TagInput from "../components/TagInput.jsx";
+import Dialog from "../components/Dialog.jsx";
+import { claudeSession } from "../claude/session.js";
 import Confirm from "../components/Confirm.jsx";
 import { noteTitle, tagsInUse, visibleNotes } from "../lib/notebookView.js";
 
-export default function Note({ initialNote, notes, folders, toolbarIds, formatting, readOnly = false, queue, status, busy, onBack, onDelete, onOpenNote, error, run, refresh, onImageError }) {
+export default function Note({ initialNote, notes, folders, toolbarIds, formatting, readOnly = false, queue, status, busy, onBack, onDelete, onOpenNote, error, run, refresh, onImageError, claudeReady, onOpen }) {
   const [note, setNote] = useState(initialNote);
+  const [claudeSheet, setClaudeSheet] = useState(false);
+  const [confirmAsk, setConfirmAsk] = useState(false);
+  function askNote(clear = false) {
+    const scope = claudeSession.getSnapshot().conversation?.scope;
+    if (!clear && scope && (scope.kind !== "note" || scope.noteId !== note.id)) { setClaudeSheet(false); setConfirmAsk(true); return; }
+    if (clear) claudeSession.clearSession();
+    claudeSession.setPendingScope({ kind: "note", noteId: note.id });
+    setClaudeSheet(false); setConfirmAsk(false); onOpen({ screen: "ask" });
+  }
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [linkEditor, setLinkEditor] = useState(null);
   const editorRef = useRef(null);
@@ -35,6 +46,7 @@ export default function Note({ initialNote, notes, folders, toolbarIds, formatti
   }
   return <section className="flex flex-1 flex-col pb-24" onBlur={() => { queue.flush().catch(() => {}); }}>
     <ScreenHeader title="Note" onBack={onBack} busy={busy}>
+      {claudeReady && <button className="icon-button" aria-label="Claude" disabled={busy} onClick={() => setClaudeSheet(true)}><Sparkles size={20} aria-hidden="true" /></button>}
       <span role="status" className={`pr-1 text-xs ${status === "error" ? "font-semibold text-red-700" : "text-[var(--color-muted)]"}`}>{status === "error" ? "Not saved" : status}</span>
     </ScreenHeader>
     <input className="mx-4 min-w-0 bg-transparent py-2 text-xl font-semibold outline-none" aria-label="Title" placeholder="Title (optional)"
@@ -60,6 +72,8 @@ export default function Note({ initialNote, notes, folders, toolbarIds, formatti
         </li>)}
       </ul>
     </section>}
+    {claudeSheet && <Dialog title="Claude" sheet onClose={() => setClaudeSheet(false)}><button className="app-button w-full" onClick={() => askNote()}>Ask about this note</button></Dialog>}
+    {confirmAsk && <Confirm title="Clear the current conversation and ask about this note?" confirmLabel="Clear and ask" onCancel={() => setConfirmAsk(false)} onConfirm={() => askNote(true)}>The current answers will be cleared.</Confirm>}
     {linkEditor && <LinkPicker editor={linkEditor} noteId={note.id} notes={notes} folders={folders} onClose={() => setLinkEditor(null)} />}
     {confirmDelete && <Confirm title="Move note to Trash?" confirmLabel="Move to Trash" busy={busy} error={error} onCancel={() => setConfirmDelete(false)} onConfirm={() => onDelete(note.id)}>
       You can restore this note for 30 days. After that, it is permanently deleted.

@@ -23,6 +23,16 @@ const folders = [
 const image = makePng();
 const imageId = "sample-landscape";
 const notes = [
+  { n: 15, title: "Notas de clase", folder: 1, tags: ["spanish"], created: 18, updated: 18,
+    html: '<p>ojala que tu vengas mañana. el examen es en el aula grande. Tengo que recivir el correo, pero creo que se escribe recibir.</p><p>Para clase necesito un cuaderno, un lapiz, repasar los verbos y traer el libro.</p>' },
+  { n: 16, title: "Libros por leer", folder: 2, tags: ["book"], created: 18, updated: 18,
+    html: '<ul><li><p>El principito</p></li><li><p>Pedro Páramo</p></li><li><p>La casa de los espíritus</p></li></ul>' },
+  { n: 17, title: "Lista de lecturas", folder: 2, tags: ["book"], created: 19, updated: 19,
+    html: '<p>Leer El principito y Pedro Páramo. Después, probar Ficciones.</p>' },
+  { n: 18, title: "Ideas para la próxima clase", folder: 1, tags: ["spanish"], created: 19, updated: 19,
+    html: '<p>Revisar ser y estar. Buscar ejemplos en Frases útiles y escribir dos frases nuevas.</p>' },
+  { n: 19, title: "Recordatorio suelto", folder: null, tags: [], created: 20, updated: 20,
+    html: '<p>Llevar el cuaderno azul a la biblioteca el jueves.</p>' },
   { n: 14, title: "Captura de ejemplo", folder: null, tags: ["test"], created: 17, updated: 17,
     html: `<p>Un paisaje inventado para probar las imágenes.</p><img data-file="${imageId}" width="480" height="270" alt=""><p>Esta imagen se guarda con la nota.</p>` },
   { n: 13, title: "Muestra de formato", folder: 1, tags: ["test"], created: 17, updated: 17,
@@ -55,7 +65,7 @@ const notes = [
 ];
 
 const envelope = {
-  format: "notes_app-backup", schemaVersion: 4, exportedAt: day(17, 8), appVersion: "sample",
+  format: "notes_app-backup", schemaVersion: 4, exportedAt: day(21, 8), appVersion: "sample",
   notes: notes.map((note) => ({
     id: id(note.n), title: note.title, html: note.html, text: htmlToText(note.html),
     folderId: note.folder ? folderId(note.folder) : null, tags: note.tags, linkedIds: extractNoteLinks(note.html),

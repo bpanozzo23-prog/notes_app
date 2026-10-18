@@ -8,6 +8,7 @@ import useNotebook from "./lib/useNotebook.js";
 import { activeEntry, createNavigationController, initialNavigation } from "./lib/navigation.js";
 import { resolveFormatting } from "./editor/formatting.js";
 import { notebookAccess, ReadOnlyNotebookError, NotebookReplacedError, DATABASE_UPDATED } from "./db/db.js";
+import Ask from "./screens/Ask.jsx";
 import NotesList from "./screens/NotesList.jsx";
 import Note from "./screens/Note.jsx";
 import Folders from "./screens/Folders.jsx";
@@ -22,7 +23,7 @@ import PopupSettings from "./screens/settings/PopupSettings.jsx";
 
 import ClaudeSettings from "./screens/settings/ClaudeSettings.jsx";
 import { claudeSession } from "./claude/session.js";
-import { getClaudeStatus } from "./claude/prefs.js";
+import { getClaudeStatus, useClaudeStatus } from "./claude/prefs.js";
 import { loadClaudeSdk } from "./claude/client.js";
 
 export default function App() {
@@ -33,6 +34,7 @@ export default function App() {
   const claudeHasContent = claude.conversation !== null || claude.proposal !== null;
   const claudeBusy = claude.request !== null;
   const notebook = useNotebook();
+  const { ready: claudeReady } = useClaudeStatus(notebook.prefs);
   const formatting = useMemo(() => resolveFormatting(notebook.prefs), [notebook.prefs]);
   const { refresh } = notebook;
   const [navigation, setNavigation] = useState(initialNavigation);
@@ -199,9 +201,10 @@ export default function App() {
     </div>}
     {message && <p role="status" className="mx-4 my-3 text-sm">{message}</p>}
     {ready && <div className="flex flex-1 flex-col" inert={locked} aria-busy={locked}>
-      {route.screen === "list" && <NotesList key={route.key} {...notebook} busy={locked} readOnly={access.readOnly} trashCount={notebook.trash.length} filter={route.filter} query={route.query} onQuery={nav.setQuery} onFilter={nav.setFilter} onOpen={open} onNew={() => run(newNote)} />}
+      {route.screen === "list" && <NotesList key={route.key} {...notebook} busy={locked} readOnly={access.readOnly} trashCount={notebook.trash.length} filter={route.filter} query={route.query} onQuery={nav.setQuery} onFilter={nav.setFilter} claudeReady={claudeReady} onOpen={open} onNew={() => run(newNote)} />}
       {route.screen === "note" && selected && <Note key={route.key} {...shared} onImageError={setMessage} initialNote={selected} notes={notebook.notes} folders={notebook.folders} queue={queue} status={status} onDelete={deleteNote} onOpenNote={openNote}
-        formatting={formatting} />}
+        formatting={formatting} claudeReady={claudeReady} onOpen={open} />}
+      {route.screen === "ask" && <Ask {...notebook} {...shared} claudeReady={claudeReady} openNote={openNote} onOpen={open} queue={queue} />}
       {route.screen === "folders" && <Folders {...notebook} {...shared} />}
       {route.screen === "trash" && <Trash trash={notebook.trash} {...shared} />}
       {route.screen === "settings" && <Settings cleanupError={cleanupError} {...shared} notebook={notebook} queue={queue} onOpen={open} setMessage={setMessage} updateState={updateState} />}

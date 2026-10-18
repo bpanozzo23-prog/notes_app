@@ -1,9 +1,87 @@
 {
   "format": "notes_app-backup",
   "schemaVersion": 4,
-  "exportedAt": "2026-10-17T08:00:00.000Z",
+  "exportedAt": "2026-10-21T08:00:00.000Z",
   "appVersion": "sample",
   "notes": [
+    {
+      "id": "a0000000-0000-4000-8000-000000000015",
+      "title": "Notas de clase",
+      "html": "<p>ojala que tu vengas mañana. el examen es en el aula grande. Tengo que recivir el correo, pero creo que se escribe recibir.</p><p>Para clase necesito un cuaderno, un lapiz, repasar los verbos y traer el libro.</p>",
+      "text": "ojala que tu vengas mañana. el examen es en el aula grande. Tengo que recivir el correo, pero creo que se escribe recibir.\nPara clase necesito un cuaderno, un lapiz, repasar los verbos y traer el libro.",
+      "folderId": "f0000000-0000-4000-8000-000000000001",
+      "tags": [
+        "spanish"
+      ],
+      "linkedIds": [],
+      "pinned": false,
+      "rev": 1,
+      "createdAt": "2026-10-18T09:00:00.000Z",
+      "updatedAt": "2026-10-18T18:00:00.000Z",
+      "deletedAt": null
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000000016",
+      "title": "Libros por leer",
+      "html": "<ul><li><p>El principito</p></li><li><p>Pedro Páramo</p></li><li><p>La casa de los espíritus</p></li></ul>",
+      "text": "El principito\nPedro Páramo\nLa casa de los espíritus",
+      "folderId": "f0000000-0000-4000-8000-000000000002",
+      "tags": [
+        "book"
+      ],
+      "linkedIds": [],
+      "pinned": false,
+      "rev": 1,
+      "createdAt": "2026-10-18T09:00:00.000Z",
+      "updatedAt": "2026-10-18T18:00:00.000Z",
+      "deletedAt": null
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000000017",
+      "title": "Lista de lecturas",
+      "html": "<p>Leer El principito y Pedro Páramo. Después, probar Ficciones.</p>",
+      "text": "Leer El principito y Pedro Páramo. Después, probar Ficciones.",
+      "folderId": "f0000000-0000-4000-8000-000000000002",
+      "tags": [
+        "book"
+      ],
+      "linkedIds": [],
+      "pinned": false,
+      "rev": 1,
+      "createdAt": "2026-10-19T09:00:00.000Z",
+      "updatedAt": "2026-10-19T18:00:00.000Z",
+      "deletedAt": null
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000000018",
+      "title": "Ideas para la próxima clase",
+      "html": "<p>Revisar ser y estar. Buscar ejemplos en Frases útiles y escribir dos frases nuevas.</p>",
+      "text": "Revisar ser y estar. Buscar ejemplos en Frases útiles y escribir dos frases nuevas.",
+      "folderId": "f0000000-0000-4000-8000-000000000001",
+      "tags": [
+        "spanish"
+      ],
+      "linkedIds": [],
+      "pinned": false,
+      "rev": 1,
+      "createdAt": "2026-10-19T09:00:00.000Z",
+      "updatedAt": "2026-10-19T18:00:00.000Z",
+      "deletedAt": null
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000000019",
+      "title": "Recordatorio suelto",
+      "html": "<p>Llevar el cuaderno azul a la biblioteca el jueves.</p>",
+      "text": "Llevar el cuaderno azul a la biblioteca el jueves.",
+      "folderId": null,
+      "tags": [],
+      "linkedIds": [],
+      "pinned": false,
+      "rev": 1,
+      "createdAt": "2026-10-20T09:00:00.000Z",
+      "updatedAt": "2026-10-20T18:00:00.000Z",
+      "deletedAt": null
+    },
     {
       "id": "a0000000-0000-4000-8000-000000000014",
       "title": "Captura de ejemplo",

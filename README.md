@@ -85,8 +85,13 @@ LLM can read. The code may become public; the notes never are.
   change.
 - **Phase 3a — committed 2026-10-18 (0.3.0).** Settings → Claude: spend-limit acknowledgement,
   API key stored on this phone only, Test key (free), Turn off, Remove key; backups refuse a key;
-  the request layer and test harness for later steps. Nothing is sent except Test key. Owner
-  phone check pending.
+  the request layer and test harness for later steps. Nothing is sent except Test key.
+  Owner-verified on the phone 2026-10-18 with the owner's key.
+- **Phase 3b — committed 2026-10-18 (0.3.1).** Ask Claude across the notebook (notes list) or
+  about one note (note screen, pictures optional): a disclosure of what goes and the estimated
+  cost before sending, streamed answers with numbered, tappable sources, follow-ups using the
+  cached notes, Cancel and Try again, the cost per answer and a monthly total. Owner phone check
+  pending.
 
 ## Running it
 

@@ -5,7 +5,7 @@ this one is for the owner: what was chosen, why, what it means for the app, what
 and how hard it would be to reverse ("lock-in"). Ordered by lock-in, hardest first. Updated whenever
 `DECISIONS.md` gains an entry with consequences for how the app behaves.
 
-Last updated 2026-10-18, at step 3a (§51).
+Last updated 2026-10-18, at step 3b (§52).
 
 ---
 
@@ -803,3 +803,22 @@ contains a key is refused.
 **What you'll notice:** only the new Settings screen; nothing is sent to Anthropic except Test
 key, which costs nothing. App version 0.3.0; schema version stays 4.
 **Lock-in: none** beyond §38.
+
+### 52. Step 3b: asking Claude about your notes
+
+**Chosen:** with Claude on, the notes list has an **Ask Claude** button (a sparkle) and each note
+has a **Claude** button with **Ask about this note**. Type a question and tap Send; before anything
+leaves the phone, a box shows the question, how many notes go and what kinds of information,
+that images and Trash are not sent, and the estimated tokens and cost. Send there sends exactly
+that. While Claude works you see "Claude is thinking… 12 s", then the answer appears as it is
+written; **Cancel** stops it. Under the answer, **Sources** lists the notes it used with the
+quoted passages, numbered to match small numbers in the answer; tap one to open the note, Back
+returns. A note changed, moved to Trash or deleted since is labelled. Each answer shows its cost
+and the model, and the cost is added to this month's total in Settings → Claude. Follow-ups show
+their estimate on the Send button and cost much less while Claude still has your notes cached (a
+few minutes). A question about one note can include its pictures if you tick the box. Answers
+stay until you tap New question or close the app.
+**What you'll notice:** the first real question is the time to compare the cost the app shows
+with the Anthropic console's usage page. The sample notebook gained five made-up notes (spelling
+mistakes, near-duplicates, unlinked mentions, an untagged note) for the tidy steps.
+**Lock-in: none** beyond §39–43.
