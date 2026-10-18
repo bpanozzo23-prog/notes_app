@@ -44,8 +44,8 @@ await shot("01-list-empty");
 // Import the sample notebook the way the owner would (the safety download is accepted silently).
 await button("Settings").click();
 await page.getByLabel("Import backup").setInputFiles(sample);
-await page.getByText(/^1 images/).waitFor();
-await page.getByText(/^1 images/).evaluate((element) => element.parentElement.scrollIntoView({ block: "center" }));
+await page.getByText(/^1 image \(/).waitFor();
+await page.getByText(/^1 image \(/).evaluate((element) => element.parentElement.scrollIntoView({ block: "center" }));
 await shot("54-import-image-preview");
 await button("Replace notebook").click();
 await shot("02-import-confirm");
@@ -198,7 +198,7 @@ await shot("38-formatting-dividers");
 await page.getByLabel("Note body").locator("p").first().click();
 await page.keyboard.press("Home");
 for (const [label, slug] of [["Text colour", "text-colour"], ["Highlight colour", "highlight-colour"], ["Font size", "size"],
-  ["Typeface", "typeface"], ["Line spacing", "spacing"], ["Callout", "callout"], ["Divider styles", "divider"]]) {
+  ["Typeface", "typeface"], ["Heading", "heading"], ["Line spacing", "spacing"], ["Callout", "callout"], ["Divider styles", "divider"]]) {
   await toolbar.getByRole("button", { name: label, exact: true }).click();
   await shot(`39-tray-${slug}`);
   await button("Close tray").click();

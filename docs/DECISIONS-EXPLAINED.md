@@ -5,7 +5,7 @@ this one is for the owner: what was chosen, why, what it means for the app, what
 and how hard it would be to reverse ("lock-in"). Ordered by lock-in, hardest first. Updated whenever
 `DECISIONS.md` gains an entry with consequences for how the app behaves.
 
-Last updated 2026-10-18, with step 2e (§35).
+Last updated 2026-10-18, with the Heading button (§36).
 
 ---
 
@@ -518,4 +518,14 @@ reach the app, depending on Chrome; the Image button always works. Pictures from
 pasted as part of text are dropped (the app never downloads anything). Your notes move to
 schema version 4.
 **Lock-in:** as §20, §21, §23 and §26.
+
+### 36. One Heading button
+
+**Chosen (your request):** a **Heading** button (an H) opens a small panel with Normal text,
+Heading 1, Heading 2 and Heading 3, each shown at its size, with the current one marked. It
+replaces the separate Heading 1 and Heading 2 buttons in the default toolbar. Your own toolbar
+isn't changed automatically: in Settings → Formatting → Toolbar, tap **Add buttons** → Heading,
+then remove Heading 1 and Heading 2 with ⋮ → Remove. The separate buttons stay available if you
+ever want one back.
+**Lock-in: none.**
 

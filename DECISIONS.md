@@ -459,3 +459,9 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   The v4 backup envelope stays unchanged.
 - 2026-10-17 — Settings and the import preview show sizes under 1 MB in KB and quotas over
   1 GB in GB, and say "1 image". — Review fix: the screenshots showed "Images: 2, 0.0 MB".
+- 2026-10-18 — The owner verified 2c and 2d on the published app: "Everything checks out."
+- 2026-10-18 — A single `heading` picker (Normal text, Heading 1–3, each drawn at its size, the
+  current one marked) replaces `h1` and `h2` in the default toolbar; the separate heading
+  buttons stay in the Add sheet. — The owner asked to combine the heading options into one
+  button. A stored (customised) toolbar is not changed: the owner swaps the buttons in
+  Settings → Formatting → Toolbar.

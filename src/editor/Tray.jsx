@@ -46,6 +46,11 @@ export function trayOptions(name, editor, formatting = resolveFormatting({})) {
     `family:${family}`, label, (chain) => family ? chain.setFontFamily(family) : chain.unsetFontFamily(),
     (editor) => (editor.getAttributes("textStyle").fontFamily ?? null) === family, { fontFamily: family ?? undefined },
   ));
+  if (name === "heading") return [[0, "Normal text"], [1, "Heading 1"], [2, "Heading 2"], [3, "Heading 3"]].map(([level, label]) => option(
+    `heading:${level}`, label, (chain) => level ? chain.setHeading({ level }) : chain.setParagraph(),
+    (editor) => level ? editor.isActive("heading", { level }) : editor.isActive("paragraph"),
+    level ? { fontSize: ["1.35em", "1.2em", "1.05em"][level - 1], fontWeight: 700 } : undefined,
+  ));
   if (name === "lineHeight") return [null, ...LINE_SPACINGS].map((value) => option(
     `spacing:${value}`, value ?? "Default", (chain) => value ? chain.setLineSpacing(value) : chain.unsetLineSpacing(),
     (editor) => editor.isActive("paragraph", { lineHeight: value }) || editor.isActive("heading", { lineHeight: value }),
@@ -79,7 +84,7 @@ export const TRAYS = Object.freeze(Object.assign(Object.create(null), {
   more: { label: "More", render: MoreTray },
   styles: { label: "Named styles", render: StylesTray },
   ...Object.fromEntries([["textColor", "Text colour"], ["highlightColor", "Highlight colour"], ["fontSize", "Font size"],
-    ["fontFamily", "Typeface"], ["lineHeight", "Line spacing"], ["callout", "Callout"], ["divider", "Divider styles"]]
+    ["fontFamily", "Typeface"], ["heading", "Heading"], ["lineHeight", "Line spacing"], ["callout", "Callout"], ["divider", "Divider styles"]]
     .map(([name, label]) => [name, { label, render: PickerTray }])),
 }));
 

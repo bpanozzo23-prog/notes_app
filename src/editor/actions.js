@@ -1,5 +1,5 @@
 import {
-  ImagePlus, Bold, Italic, Underline, Strikethrough, Highlighter, Heading1, Heading2, Heading3, List,
+  ImagePlus, Bold, Italic, Underline, Strikethrough, Highlighter, Heading, Heading1, Heading2, Heading3, List,
   ListOrdered, ListChecks, Quote, Minus, Undo2, Redo2, Eraser, Link, Circle,
   Paintbrush, PaintRoller, Baseline, ALargeSmall, CaseSensitive, ListCollapse, MessageSquare, Info, Lightbulb, TriangleAlert, CircleAlert, SeparatorHorizontal,
 } from "lucide-react";
@@ -51,6 +51,8 @@ export const actions = [
   picker("highlightColor", "Highlight colour", Highlighter, "Colours"),
   picker("fontSize", "Font size", ALargeSmall, "Size & font"),
   picker("fontFamily", "Typeface", CaseSensitive, "Size & font"),
+  // One button for Normal text and Heading 1–3 (the owner asked for a combined heading button).
+  picker("heading", "Heading", Heading, "Lines & blocks"),
   picker("lineHeight", "Line spacing", ListCollapse, "Lines & blocks"),
   picker("callout", "Callout", MessageSquare, "Lines & blocks"),
   picker("divider", "Divider styles", SeparatorHorizontal, "Lines & blocks"),
@@ -125,7 +127,7 @@ export function availableActions(formatting) {
     ...(formatting?.highlightColors ?? []).filter((entry) => !entry.hidden).map((entry) => `highlight:${entry.color}`),
     "color:none", ...(formatting?.textColors ?? []).filter((entry) => !entry.hidden).map((entry) => `color:${entry.color}`),
     "fontSize", "fontFamily",
-    "h1", "h2", "h3", "bulletList", "orderedList", "taskList", "blockquote", "callout",
+    "heading", "h1", "h2", "h3", "bulletList", "orderedList", "taskList", "blockquote", "callout",
     ...Object.keys(calloutIcons).map((type) => `callout:${type}`), "hr", "divider", "hr:thick", "hr:dashed", "hr:dotted", "lineHeight",
     "styles", ...(formatting?.namedStyles ?? []).map((style) => `style:${style.id}`),
     "link", "image", "painter", "clearFormatting", "undo", "redo",
@@ -134,7 +136,7 @@ export function availableActions(formatting) {
 
 export const DEFAULT_TOOLBAR = [
   "bold", "italic", "underline", "highlight", "strike", "textColor", "highlightColor", "fontSize", "styles", "painter", "color:none", "color:#dc2626",
-  "color:#15803d", "color:#2563eb", "color:#7c3aed", "h1", "h2", "bulletList",
+  "color:#15803d", "color:#2563eb", "color:#7c3aed", "heading", "bulletList",
   "orderedList", "taskList", "blockquote", "callout", "link", "hr", "clearFormatting", "undo", "redo",
 ];
 export const DEFAULT_SELECTION_MENU = ["bold", "italic", "underline", "highlight", "color:#dc2626", "color:#15803d", "color:#2563eb", "link"];

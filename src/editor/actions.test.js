@@ -119,3 +119,12 @@ it("offers named styles in owner order and adds only the two requested default t
     .toEqual(["styles", "style:default-heading", "style:second"]);
   expect(DEFAULT_TOOLBAR.slice(DEFAULT_TOOLBAR.indexOf("fontSize"), DEFAULT_TOOLBAR.indexOf("fontSize") + 3)).toEqual(["fontSize", "styles", "painter"]);
 });
+
+it("offers one Heading button that replaces Heading 1 and 2 in the default toolbar", () => {
+  expect(resolveAction("heading")).toMatchObject({ label: "Heading", tray: "heading", group: "Lines & blocks" });
+  expect(DEFAULT_TOOLBAR).toContain("heading");
+  expect(DEFAULT_TOOLBAR).not.toContain("h1");
+  expect(DEFAULT_TOOLBAR).not.toContain("h2");
+  // The separate buttons stay available for anyone who prefers them.
+  expect(availableActions({}).map((action) => action.id)).toEqual(expect.arrayContaining(["heading", "h1", "h2", "h3"]));
+});
