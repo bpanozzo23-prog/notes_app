@@ -96,7 +96,8 @@ it("creates, autosaves, leaves/reopens, exports and trashes a real fixture note"
   expect(await getPref("lastBackupAt")).toBeTruthy();
   await back();
   await openNote("Fixture title");
-  fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+  fireEvent.click(screen.getByRole("button", { name: "Note options" }));
+  fireEvent.click(screen.getByRole("button", { name: "Move to Trash…" }));
   fireEvent.click(screen.getByRole("button", { name: "Move to Trash" }));
   await screen.findByText("No notes yet.");
   expect((await getNote(stored.id)).deletedAt).not.toBeNull();
@@ -208,12 +209,14 @@ it("queues folder, tag and pin edits together with body edits, and reopens the s
   await openNote("Metadata");
   fireEvent.click(screen.getByRole("button", { name: "Choose folder" }));
   fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Reading" }));
+  fireEvent.click(screen.getByRole("button", { name: "Edit tags" }));
   fireEvent.change(screen.getByLabelText("Add tag"), { target: { value: "new tag" } });
   fireEvent.keyDown(screen.getByLabelText("Add tag"), { key: "Enter" });
   fireEvent.change(screen.getByLabelText("Add tag"), { target: { value: "spa" } });
   fireEvent.click(screen.getByRole("button", { name: "Spanish", exact: true }));
   fireEvent.change(screen.getByLabelText("Add tag"), { target: { value: "comma," } });
   fireEvent.click(screen.getByRole("button", { name: "Remove tag new tag" }));
+  fireEvent.click(screen.getByRole("button", { name: "Done" }));
   fireEvent.click(screen.getByRole("button", { name: "Pin note" }));
   act(() => screen.getByLabelText("Note body").editor.commands.insertContent("Saved body"));
   await back();
@@ -221,7 +224,7 @@ it("queues folder, tag and pin edits together with body edits, and reopens the s
   await openNote("Metadata");
   expect(screen.getByRole("button", { name: "Choose folder" }).textContent).toBe("Reading");
   expect(screen.getByRole("button", { name: "Pin note" }).getAttribute("aria-pressed")).toBe("true");
-  expect(screen.getByRole("button", { name: "Remove tag Spanish" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Edit tags" }).textContent).toBe("#Spanish #comma");
 });
 
 it("creates in the filtered folder and Android Back restores that filter and scroll", async () => {
@@ -284,7 +287,8 @@ it("restores from Trash and purges now only after confirmation, with tombstone a
   expect((await getNote(target.id)).deletedAt).toBeNull();
   await back();
   await openNote("Trash fixture");
-  fireEvent.click(screen.getByRole("button", { name: "Delete", exact: true }));
+  fireEvent.click(screen.getByRole("button", { name: "Note options" }));
+  fireEvent.click(screen.getByRole("button", { name: "Move to Trash…" }));
   fireEvent.click(screen.getByRole("button", { name: "Move to Trash" }));
   await screen.findByRole("button", { name: "Trash (1)" });
   fireEvent.click(screen.getByRole("button", { name: "Trash (1)" }));
@@ -520,10 +524,13 @@ it("opens a newer database for reading, allows text export/copy, and disables ed
   await openNote("Newer notebook");
   expect(screen.getByLabelText("Title").readOnly).toBe(true);
   expect(screen.getByLabelText("Note body").editor.isEditable).toBe(false);
-  for (const label of ["Pin note", "Choose folder", "Delete", "Bold"]) expect(screen.getByRole("button", { name: label, exact: true }).matches(":disabled")).toBe(true);
-  expect(screen.getByLabelText("Add tag").matches(":disabled")).toBe(true);
+  for (const label of ["Pin note", "Choose folder", "Edit tags", "Bold"]) expect(screen.getByRole("button", { name: label, exact: true }).matches(":disabled")).toBe(true);
+  expect(screen.getByRole("button", { name: "Note options" }).disabled).toBe(false);
   const writeText = vi.fn().mockResolvedValue(undefined);
   Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+  fireEvent.click(screen.getByRole("button", { name: "Note options" }));
+  expect(screen.getByRole("button", { name: "Copy as text" }).disabled).toBe(false);
+  expect(screen.getByRole("button", { name: "Move to Trash…" }).disabled).toBe(true);
   fireEvent.click(screen.getByRole("button", { name: "Copy as text" }));
   await screen.findByText("Copied as text.");
   expect(writeText.mock.calls[0][0]).toContain("# Newer notebook\nFolder: No folder");
@@ -651,7 +658,7 @@ it("uses stored selectionMenu ids for the real editor pop-up", async () => {
   expect(within(menu).getAllByRole("button").map((button) => button.getAttribute("aria-label"))).toEqual(["Strikethrough", "#123456"]);
 });
 
-it.each(["Delete", "Choose folder", "Link to note"])("Android Back closes %s without leaving the note; the next Back leaves", async (label) => {
+it.each(["Note options", "Edit tags", "Choose folder", "Link to note"])("Android Back closes %s without leaving the note; the next Back leaves", async (label) => {
   await createNote({ title: "Overlay fixture" });
   await start(); await openNote("Overlay fixture");
   fireEvent.click(screen.getByRole("button", { name: label, exact: true }));
@@ -662,6 +669,27 @@ it.each(["Delete", "Choose folder", "Link to note"])("Android Back closes %s wit
   await waitFor(() => expect(screen.getByRole("button", { name: "Back" }).disabled).toBe(false));
   expect(screen.getByLabelText("Title").value).toBe("Overlay fixture");
   expect(window.history.state[NAVIGATION_KEY]).toEqual(stack);
+  act(() => window.history.back());
+  await screen.findByRole("button", { name: "+ New note" });
+  expect(activeEntry(window.history.state[NAVIGATION_KEY]).screen).toBe("list");
+});
+
+it("Android Back closes the Trash confirmation opened from Note options; the next Back leaves", async () => {
+  const note = await createNote({ title: "Trash confirmation fixture" });
+  await start(); await openNote("Trash confirmation fixture");
+  fireEvent.click(screen.getByRole("button", { name: "Note options" }));
+  fireEvent.click(screen.getByRole("button", { name: "Move to Trash…" }));
+  expect(screen.queryByRole("dialog", { name: "Note options" })).toBeNull();
+  const confirm = within(screen.getByRole("dialog", { name: "Move note to Trash?" }));
+  expect(confirm.getByRole("button", { name: "Move to Trash" }).className).toContain("danger primary");
+  expect(confirm.getByText("You can restore this note for 30 days. After that, it is permanently deleted.")).toBeTruthy();
+  const stack = window.history.state[NAVIGATION_KEY];
+  act(() => window.history.back());
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  await waitFor(() => expect(screen.getByRole("button", { name: "Back" }).disabled).toBe(false));
+  expect(screen.getByLabelText("Title").value).toBe(note.title);
+  expect(window.history.state[NAVIGATION_KEY]).toEqual(stack);
+  expect(await getNote(note.id)).toEqual(note);
   act(() => window.history.back());
   await screen.findByRole("button", { name: "+ New note" });
   expect(activeEntry(window.history.state[NAVIGATION_KEY]).screen).toBe("list");

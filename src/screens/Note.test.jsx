@@ -110,8 +110,12 @@ it("a conflict keeps a persistent notice, locks editing and opens the copy", asy
   expect(screen.getByText('This note was changed in another window, so your edits here were saved in a new note, “Original (conflict copy)”. Nothing was overwritten.')).toBeTruthy();
   expect(screen.getByRole("textbox", { name: "Title" }).readOnly).toBe(true);
   expect(screen.getByLabelText("Note body").editor.isEditable).toBe(false);
-  expect(screen.getByRole("button", { name: "Pin note" }).disabled).toBe(true);
-  expect(screen.getByRole("button", { name: "Delete" }).disabled).toBe(true);
+  for (const name of ["Pin note", "Choose folder", "Edit tags"]) expect(screen.getByRole("button", { name }).matches(":disabled")).toBe(true);
+  expect(screen.getByRole("button", { name: "Note options" }).disabled).toBe(false);
+  fireEvent.click(screen.getByRole("button", { name: "Note options" }));
+  expect(screen.getByRole("button", { name: "Copy as text" }).disabled).toBe(false);
+  expect(screen.getByRole("button", { name: "Move to Trash…" }).disabled).toBe(true);
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
   const schedule = vi.spyOn(real, "schedule");
   fireEvent.change(screen.getByRole("textbox", { name: "Title" }), { target: { value: "Must not save" } });
   expect(schedule).not.toHaveBeenCalled();
@@ -119,4 +123,67 @@ it("a conflict keeps a persistent notice, locks editing and opens the copy", asy
   expect(known).toHaveBeenCalledTimes(1);
   fireEvent.click(screen.getByRole("button", { name: "Open the copy" }));
   expect(open).toHaveBeenCalledExactlyOnceWith("copy");
+});
+
+it.each([
+  [["a", "b"], "#a #b"], [[], "+ Tags"],
+])("shows tags %j as %s on the compact line", (tags, label) => {
+  render(<Note initialNote={noteFixture({ tags })} notes={[]} folders={[]} queue={queue()} />);
+  expect(screen.getByRole("button", { name: "Edit tags" }).textContent).toBe(label);
+  expect(screen.queryByLabelText("Add tag")).toBeNull();
+  expect(screen.queryByRole("button", { name: /Used before/ })).toBeNull();
+});
+
+it("focuses tag entry with suggestions open, keeps them after adding, and saves through the queue before Done closes", async () => {
+  const note = noteFixture();
+  const { SaveQueue } = await import("../lib/saveQueue.js");
+  const save = vi.fn().mockResolvedValue(undefined), real = new SaveQueue({ save });
+  const schedule = vi.spyOn(real, "schedule");
+  render(<Note initialNote={note} notes={[noteFixture({ id: "other", tags: ["Spanish", "vocab"] })]} folders={[]} queue={real} />);
+  const opener = screen.getByRole("button", { name: "Edit tags" });
+  opener.focus();
+  fireEvent.click(opener);
+  const sheet = within(screen.getByRole("dialog", { name: "Tags" }));
+  expect(document.activeElement).toBe(sheet.getByRole("textbox", { name: "Add tag" }));
+  expect(sheet.getByRole("button", { name: "Used before (2)" }).getAttribute("aria-expanded")).toBe("true");
+  const suggestions = within(sheet.getByRole("group", { name: "Tag suggestions" }));
+  fireEvent.click(suggestions.getByRole("button", { name: "Spanish" }));
+  expect(within(sheet.getByRole("group", { name: "Tag suggestions" })).getByRole("button", { name: "vocab" })).toBeTruthy();
+  expect(schedule).toHaveBeenCalledExactlyOnceWith(note.id, { tags: ["Spanish"] });
+  await act(() => real.flush());
+  expect(save).toHaveBeenCalledExactlyOnceWith(note.id, { tags: ["Spanish"] }, { expectedRev: note.rev });
+  fireEvent.click(sheet.getByRole("button", { name: "Done" }));
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(opener.textContent).toBe("#Spanish");
+  expect(document.activeElement).toBe(opener);
+  expect(schedule).toHaveBeenCalledTimes(1);
+});
+
+it("lists exactly Copy as text, Move to Trash… and Cancel in Note options, and Cancel restores focus", () => {
+  render(<Note initialNote={noteFixture()} notes={[]} folders={[]} queue={queue()} />);
+  const opener = screen.getByRole("button", { name: "Note options" });
+  opener.focus();
+  fireEvent.click(opener);
+  const sheet = within(screen.getByRole("dialog", { name: "Note options" }));
+  expect(sheet.getAllByRole("button").map((button) => button.textContent)).toEqual(["Copy as text", "Move to Trash…", "Cancel"]);
+  fireEvent.click(sheet.getByRole("button", { name: "Cancel" }));
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(document.activeElement).toBe(opener);
+});
+
+it("locks an already open Tags sheet when a conflict makes the note read-only", () => {
+  const real = queue(), note = noteFixture({ tags: ["a"] });
+  render(<Note initialNote={note} notes={[noteFixture({ id: "other", tags: ["b"] })]} folders={[]} queue={real} />);
+  fireEvent.click(screen.getByRole("button", { name: "Edit tags" }));
+  act(() => real.onConflict.mock.calls[0][0]({ noteId: note.id, copyId: "copy", copyTitle: "Conflict copy" }));
+  const sheet = within(screen.getByRole("dialog", { name: "Tags" }));
+  const input = sheet.getByRole("textbox", { name: "Add tag" });
+  expect(input.matches(":disabled")).toBe(true);
+  for (const button of sheet.getAllByRole("button").filter((button) => button.textContent !== "Done")) expect(button.matches(":disabled")).toBe(true);
+  fireEvent.change(input, { target: { value: "must not save," } });
+  expect(real.schedule).not.toHaveBeenCalled();
+  expect(sheet.getByRole("button", { name: "Done" }).disabled).toBe(false);
+  fireEvent.click(sheet.getByRole("button", { name: "Done" }));
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(screen.getByRole("button", { name: "Edit tags" }).textContent).toBe("#a");
 });

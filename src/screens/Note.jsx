@@ -1,6 +1,6 @@
 import { captureSplitPayload } from "../claude/split.js";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
-import { Pin, Trash2, Sparkles, Copy } from "lucide-react";
+import { Pin, Trash2, Sparkles, Copy, Ellipsis } from "lucide-react";
 import { db } from "../db/db.js";
 import { liveNotes } from "../db/notes.js";
 import { allFolders } from "../db/folders.js";
@@ -30,6 +30,8 @@ export default function Note({ initialNote, notes, folders, toolbarIds, formatti
     queue.setKnownRev(initialNote.id, initialNote.rev);
     return queue.onConflict((event) => { if (event.noteId === initialNote.id) setConflict(event); });
   }, [queue, initialNote.id]);
+  const [optionsSheet, setOptionsSheet] = useState(false);
+  const [tagsSheet, setTagsSheet] = useState(false);
   const [claudeSheet, setClaudeSheet] = useState(false);
   const session = useSyncExternalStore(claudeSession.subscribe, claudeSession.getSnapshot);
   const [splitInstruction, setSplitInstruction] = useState("");
@@ -92,8 +94,10 @@ export default function Note({ initialNote, notes, folders, toolbarIds, formatti
   }
   return <section className="flex flex-1 flex-col pb-24" onBlur={() => { queue.flush().catch(() => {}); }}>
     <ScreenHeader title="Note" onBack={onBack} busy={busy}>
-      {claudeReady && <button className="icon-button" aria-label="Claude" disabled={busy} onClick={() => setClaudeSheet(true)}><Sparkles size={20} aria-hidden="true" /></button>}
       <span role="status" className={`pr-1 text-xs ${status === "error" ? "font-semibold text-red-700" : "text-[var(--color-muted)]"}`}>{saveStatusLabel(status)}</span>
+      <button className="icon-button" aria-label="Pin note" disabled={readOnly} aria-pressed={note.pinned} onClick={() => edit({ pinned: !note.pinned })}><Pin size={18} aria-hidden="true" /></button>
+      {claudeReady && <button className="icon-button" aria-label="Claude" disabled={busy} onClick={() => setClaudeSheet(true)}><Sparkles size={20} aria-hidden="true" /></button>}
+      <button className="icon-button" aria-label="Note options" disabled={busy} onClick={() => setOptionsSheet(true)}><Ellipsis size={20} aria-hidden="true" /></button>
     </ScreenHeader>
     {conflict && <aside role="status" className="mx-4 my-3 rounded bg-amber-50 p-3 text-sm">
       <p>This note was changed in another window, so your edits here were saved in a new note, “{conflict.copyTitle}”. Nothing was overwritten.</p>
@@ -101,17 +105,13 @@ export default function Note({ initialNote, notes, folders, toolbarIds, formatti
     </aside>}
     <input className="mx-4 min-w-0 bg-transparent py-2 text-xl font-semibold outline-none" aria-label="Title" placeholder="Title (optional)"
       readOnly={readOnly} value={note.title} onChange={(event) => edit({ title: event.target.value })} />
-    <div className="mx-4 mb-2 min-w-0 border-b border-[var(--color-line)] pb-3">
-      <div className="flex items-center gap-1">
-        <fieldset disabled={readOnly} className="min-w-0 flex-1"><FolderPicker folders={folders} value={note.folderId} onChange={(folderId) => edit({ folderId })} /></fieldset>
-        <button className="icon-button" aria-label="Copy as text" disabled={busy} onClick={() => run(copyAsText)}><Copy size={18} aria-hidden="true" /></button>
-        <button className="icon-button" aria-label="Pin note" disabled={readOnly} aria-pressed={note.pinned} onClick={() => edit({ pinned: !note.pinned })}><Pin size={18} aria-hidden="true" /></button>
-        <button className="icon-button text-red-700" aria-label="Delete" disabled={readOnly} onClick={() => setConfirmDelete(true)}><Trash2 size={18} aria-hidden="true" /></button>
+    <div className="mx-4 mb-2 min-w-0 border-b border-[var(--color-line)] pb-2">
+      <div className="flex flex-wrap items-center gap-x-3">
+        <fieldset disabled={readOnly} className="min-w-0"><FolderPicker folders={folders} value={note.folderId} onChange={(folderId) => edit({ folderId })} /></fieldset>
+        <button className="flex min-h-11 min-w-0 flex-1 items-center text-left text-sm" aria-label="Edit tags" disabled={readOnly} onClick={() => setTagsSheet(true)}>
+          <span className={`min-w-0 break-words ${note.tags.length ? "" : "text-[var(--color-muted)]"}`}>{note.tags.length ? note.tags.map((tag) => `#${tag}`).join(" ") : "+ Tags"}</span>
+        </button>
       </div>
-      <fieldset disabled={readOnly} className="min-w-0">
-        {/* Copy as text works read-only; editing tags must not. */}
-        <fieldset disabled={readOnly} className="min-w-0"><TagInput tags={note.tags} allTags={tagsInUse(notes)} onChange={(tags) => edit({ tags })} /></fieldset>
-      </fieldset>
     </div>
     <NoteEditor queue={queue} onImageError={onImageError} note={note} onChange={(html) => edit({ html })} toolbarIds={toolbarIds} formatting={formatting} readOnly={readOnly} busy={busy} run={run} refresh={refresh} error={error} onEditor={onEditor}
       ui={{ openLinkPicker, openNote: onOpenNote, removeLink }} />
@@ -126,6 +126,17 @@ export default function Note({ initialNote, notes, folders, toolbarIds, formatti
         </li>)}
       </ul>
     </section>}
+    {optionsSheet && <Dialog title="Note options" sheet busy={busy} onClose={() => setOptionsSheet(false)}>
+      <div className="space-y-1">
+        <button className="flex min-h-11 w-full items-center gap-3 rounded px-2 text-left hover:bg-black/5" disabled={busy} onClick={async () => { await run(copyAsText); setOptionsSheet(false); }}><Copy size={18} aria-hidden="true" />Copy as text</button>
+        <button className="flex min-h-11 w-full items-center gap-3 rounded px-2 text-left text-red-700 hover:bg-black/5" disabled={readOnly || busy} onClick={() => { setOptionsSheet(false); setConfirmDelete(true); }}><Trash2 size={18} aria-hidden="true" />Move to Trash…</button>
+      </div>
+      <button className="app-button mt-4 w-full" disabled={busy} onClick={() => setOptionsSheet(false)}>Cancel</button>
+    </Dialog>}
+    {tagsSheet && <Dialog title="Tags" sheet busy={busy} onClose={() => setTagsSheet(false)}>
+      <fieldset disabled={readOnly} className="min-w-0"><TagInput tags={note.tags} allTags={tagsInUse(notes)} onChange={(tags) => edit({ tags })} suggestionsOpen initialFocus /></fieldset>
+      <button className="app-button mt-4 w-full" disabled={busy} onClick={() => setTagsSheet(false)}>Done</button>
+    </Dialog>}
     {claudeSheet && <Dialog title="Claude" sheet busy={busy} onClose={() => setClaudeSheet(false)}><div className="space-y-3"><button className="app-button w-full" disabled={busy} onClick={() => askNote()}>Ask about this note</button>
       <h2 className="font-semibold">Tidy this note</h2>
       <label className="block text-sm" htmlFor="tidy-instruction">What should Claude do? Leave blank to fix mistakes and tidy the formatting.</label>

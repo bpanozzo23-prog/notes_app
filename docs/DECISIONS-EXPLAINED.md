@@ -1043,3 +1043,27 @@ or made every button look equally important.
 before/after pictures at phone size before anything is published.
 
 **Lock-in: none.** All of this is styling and wording.
+
+### 62. Note screen: more room to write (your request, 2026-10-19)
+
+**Chosen:** the area above a note's text is about 95 points shorter (roughly 165 instead of 260 on
+your phone). With the keyboard open, about twice as much of the note shows when you start at the
+top.
+- **Top row:** ← Note … Saved · Pin · Claude · **⋯**.
+  - Pin moved up here. It stays one tap and stays blue when the note is pinned, so you can see it
+    at a glance.
+- **⋯ (Note options)** opens a small sheet with **Copy as text** and **Move to Trash…**, the two
+  actions you use rarely. Trash still asks you to confirm.
+- **Folder and tags share one line** ("📁 Español #spanish #vocab").
+  - Tapping the tags opens a **Tags** sheet with the same tag editor as before. The keyboard is
+    ready, your earlier tags are shown ready to tap, and Done closes it.
+  - A note without tags shows "+ Tags".
+
+**Why:** the tag box, "Used before" and the row of icons took about a third of the screen on
+every note, and you use them far less often than you write.
+
+**What didn't change:** saving, your data and Claude. Read-only notes still allow only Copy as
+text. Android Back closes each sheet first.
+
+**Lock-in: none.** It's layout only. Moving Pin into the ⋯ sheet, or anything back, is a small
+change.

@@ -1017,3 +1017,33 @@ Append-only. One dated line per decision: what was decided, then why, after the 
 - 2026-10-18 — The owner approved the look from before/after screenshots (note header, Settings,
   a red confirmation, the Send button, the list's end): "Looks good". Verification: `npm test`
   (67 files, 1,318 tests), `npm run build`, `npm run shots` (174 PNGs, new `04b-list-end`).
+
+## Note screen: more room to write (0.3.11)
+
+- 2026-10-19 — The header shows save status, Pin, Claude when available, and Note options in
+  that order. Pin stays one tap with its pressed state visible at a glance. — Keeping frequent
+  actions in the header frees writing space without hiding whether a note is pinned.
+- 2026-10-19 — Note options holds Copy as text and Move to Trash…, followed by Cancel. Copy
+  still works read-only and closes the sheet after the existing guarded operation; Trash opens
+  the unchanged confirmation. — Less frequent actions need no permanent row above the editor,
+  and the shared Dialog retains focus return, background locking and Android Back behavior.
+- 2026-10-19 — Folder and plain #tags share one compact line above the divider; + Tags marks an
+  untagged note. Edit tags opens a Tags sheet with Done, and edits still enter the save queue at
+  once. Its fieldset disables editing if a conflict locks the note while it is open. — Moving
+  tag entry into a sheet leaves more room for writing while preserving saving and read-only rules.
+- 2026-10-19 — TagInput accepts optional suggestionsOpen and initialFocus, both false by default.
+  The Tags sheet enables both: Used before starts open and remains open after adding, suggestions
+  still scroll sideways, and Dialog focuses Add tag when enabled. — Tags are ready to choose or
+  type with a short sheet, while callers without the options keep the existing behavior.
+- 2026-10-19 — Verification passed: `npm test -- --reporter=verbose` (68 files, 1,327 tests;
+  nine more), `npm run build`, `node --check scripts/screenshot.mjs` and `git diff --check`.
+  The build retains its large-chunk warning. — Tests cover both sheets, queued metadata saves,
+  focus return, read-only conflicts and Android Back; the 360 px header fit and approximately
+  165 px top were checked from CSS dimensions only. Screenshots and phone layout/keyboard
+  behavior were not run or seen. No network requests, key/private-data access, installs, server
+  start, commit or push. Version is 0.3.11; schema stays 4, with no dependency change.
+- 2026-10-19 — Claude Code's review checks: `npm test` (68 files, 1,327 tests), `npm run build`,
+  `npm run shots` (175 PNGs; new `07b-note-tags-sheet`; `107` now shows the Note options sheet;
+  read-only and conflict-notice shots checked), `npm run browser-checks` (15/15). No real Claude
+  request: no Claude code changed. The owner approved the look from before/after screenshots
+  (note top, a short window imitating the open keyboard, both sheets): "Looks good".

@@ -132,6 +132,10 @@ LLM can read. The code may become public; the notes never are.
 - **Visual quick wins — 2026-10-18 (0.3.10).** "Saved" instead of "idle"; the list's end clears
   the + button; a proper Import button and plain wording in Settings; one filled main action per
   screen and red for anything that deletes. Approved by the owner from before/after screenshots.
+- **Note screen, more room to write — 2026-10-19 (0.3.11).** Folder and tags share one line
+  (tags are edited in their own sheet); Pin moved to the top row; Copy as text and Move to Trash
+  are in a ⋯ sheet. Text starts about 95 points higher, roughly double the visible text with the
+  keyboard open.
 
 ## Running it
 

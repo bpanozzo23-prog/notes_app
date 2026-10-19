@@ -1,6 +1,6 @@
 {
   "name": "notes_app",
-  "version": "0.3.10",
+  "version": "0.3.11",
   "scripts": {
     "dev": "vite --host",
     "build": "vite build",

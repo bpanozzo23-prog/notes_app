@@ -140,10 +140,16 @@ await button("All").click();
 
 await button("Vocabulario — comida").click();
 await shot("07-note-vocab");
+await button("Edit tags").click();
+await page.getByRole("dialog", { name: "Tags", exact: true }).waitFor();
+await shot("07b-note-tags-sheet");
+await button("Done").click();
+await button("Note options").click();
+await page.getByRole("dialog", { name: "Note options", exact: true }).waitFor();
 await shot("107-note-copy-as-text");
 // Force the real plain-HTTP fallback even when running against HTTPS or localhost.
 await page.evaluate(() => Object.defineProperty(navigator, "clipboard", { configurable: true, value: undefined }));
-await button("Copy as text").click();
+await page.getByRole("dialog", { name: "Note options", exact: true }).getByRole("button", { name: "Copy as text", exact: true }).click();
 await page.getByText("Copied as text.", { exact: true }).waitFor();
 await shot("108-note-copied-as-text");
 await page.evaluate(() => { delete navigator.clipboard; });
