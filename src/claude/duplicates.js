@@ -1,4 +1,4 @@
-import { captureReorganisePayload, STALE_REORGANISE } from "./reorganise.js";
+import { captureReorganisePayload } from "./reorganise.js";
 import { deepFreeze } from "./payload.js";
 import { shape, runProposal } from "./proposals.js";
 import { DUPLICATES_SYSTEM_PROMPT } from "./prompts.js";
@@ -37,4 +37,4 @@ export function validateDuplicatesProposal(raw, payload) {
   } catch { throw new Error(RESPONSE_ERRORS.invalid); }
 }
 export const duplicatesItemIds = (proposal) => proposal.groups.flatMap((group, index) => group.notes.slice(0, 5).map((handle) => `g${index + 1}:${handle}`));
-export const runDuplicates = (options) => runProposal({ ...options, buildRequest: buildDuplicatesRequest, validate: validateDuplicatesProposal, staleMessage: STALE_REORGANISE });
+export const runDuplicates = (options) => runProposal({ ...options, buildRequest: buildDuplicatesRequest, validate: validateDuplicatesProposal });

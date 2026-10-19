@@ -144,3 +144,15 @@ it("runs Note → disclosure → review → Apply → Back through the actual ap
   fireEvent.click(within(confirm).getByRole('button', { name: 'Cancel' }));
   expect(session.getSnapshot().proposal).toBe(previous);
 });
+
+it("the tidy ChangeCard names both swapped link destinations even when the words are unchanged", async () => {
+  const a = await createNote({ title: "Alpha target" }), b = await createNote({ title: "Beta target" });
+  note = await updateNote(note.id, { html: `<p><a href="note:${a.id}">Alpha</a> <a href="note:${b.id}">Beta</a></p>` });
+  payload = await captureTidyPayload(note.id);
+  const handles = new Map(payload.handles.noteHandles);
+  await ready({ ...classProposal, tags: null, html: `<p><a href="note:${handles.get(b.id)}">Alpha</a> <a href="note:${handles.get(a.id)}">Beta</a></p>` });
+  render(<ClaudeReview {...props()} />);
+  const card = screen.getByRole("article", { name: "Change 1 of 1" });
+  expect(within(card).getByText("Link now points to Beta target (was Alpha target)")).toBeTruthy();
+  expect(within(card).getByText("Link now points to Alpha target (was Beta target)")).toBeTruthy();
+});

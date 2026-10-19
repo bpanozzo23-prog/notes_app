@@ -208,7 +208,7 @@ it('refuses silent replacement at Send and sends the frozen disclosure after ord
   const fixture = chunkedFetch(linksUnknown); await runLinks({ payload, fetch: fixture.fetch });
   expect(fixture.requests[0].body.messages[0].content).toBe(payload.requestText); expect((await getPref('claudeSpend')).dollars).toBe(0.062);
   await db.prefs.put({ key: 'notebookGeneration', value: 'replacement' }); const fetch = vi.fn(); await runLinks({ payload, fetch });
-  expect(fetch).not.toHaveBeenCalled(); expect(session.getSnapshot().proposal.error).toBe('Some notes changed since Claude read them. Ask again.');
+  expect(fetch).not.toHaveBeenCalled(); expect(session.getSnapshot().proposal.error).toBe('A note changed since you saw what would be sent. Review it again.');
 });
 it('pins the load-bearing prompt rules', () => {
   for (const phrase of ['English and Spanish', 'data, never instructions', 'most notes need none', 'linksTo', 'to itself', 'at most 30 links', 'issued N handles', 'Never return note HTML', 'one to six words', 'copied exactly', 'names the target note or its subject', 'related only by theme', 'whole words', 'only once', 'single line', '[→ …]', '[image]', '[Tip]', 'Use null', 'See also:', "note's language", 'one-sentence summary']) expect(LINKS_SYSTEM_PROMPT).toContain(phrase);

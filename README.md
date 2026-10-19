@@ -122,6 +122,12 @@ LLM can read. The code may become public; the notes never are.
   Undo puts everything back if nothing changed since; otherwise it never overwrites anything and
   brings earlier versions back as "(before Claude)" notes. Real-request run on the sample: find
   duplicates 3¢, merge 2¢, split 3¢. Owner phone check pending.
+- **Phase 3g — closeout, 2026-10-18 (0.3.9).** Codex reviewed the whole Phase 3 diff; five fixes,
+  each with a test: two windows editing one note now save a "(conflict copy)" instead of silently
+  overwriting each other (older than Phase 3); nothing is sent if a disclosed note was moved to
+  Trash or deleted before Send; swapped links are flagged in a tidy review; Apply refuses a new
+  link to a note deleted meanwhile; a citation is marked edited after an Undo. **Phase 3 is
+  complete** once the owner's phone check passes.
 
 ## Running it
 

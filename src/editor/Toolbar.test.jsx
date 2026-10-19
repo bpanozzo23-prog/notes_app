@@ -65,7 +65,7 @@ it("closes the tray before a link dialog opens and keeps the selected range for 
   const note = noteFixture();
   render(<Note initialNote={note} notes={[note, noteFixture({ id: "target", title: "Target" })]} folders={[]}
     formatting={resolveFormatting({ toolbarLayout: "more" })}
-    queue={{ schedule() {}, flush: () => Promise.resolve(), onBeforeFlush: () => () => {} }} />);
+    queue={{ setKnownRev() {}, onConflict: () => () => {}, schedule() {}, flush: () => Promise.resolve(), onBeforeFlush: () => () => {} }} />);
   const editor = screen.getByLabelText("Note body").editor;
   stubEditorGeometry(editor);
   act(() => { editor.view.focus(); editor.commands.setTextSelection({ from: 1, to: 6 }); });

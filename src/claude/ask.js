@@ -86,7 +86,7 @@ export async function runAsk({ payload, images = null, question, retry = false, 
   if (existing && !retry && existing.turns[0]?.status !== "completed") return;
   if (retry && (!existing || existing.turns.at(-1)?.status === "completed")) return;
   payload = existing?.payload ?? payload; images = existing?.images ?? images;
-  if (!payload || payload.generation !== access.getGeneration()) { session.invalidateSession(); return; }
+  if (!payload) return;
   const request = session.beginRequest("ask");
   if (!request) return;
   const { token, signal } = request;
@@ -98,8 +98,10 @@ export async function runAsk({ payload, images = null, question, retry = false, 
     session.setConversation(token, conversation);
   };
   try {
-    if (existing && !(await payloadIsLive(payload))) {
-      if (session.isCurrent(token)) session.setConversation(token, { ...conversation, ended: CONVERSATION_ENDED });
+    if (!(await payloadIsLive(payload))) {
+      if (!session.isCurrent(token)) return;
+      if (!existing) return { refused: true };
+      session.setConversation(token, { ...conversation, ended: CONVERSATION_ENDED });
       return;
     }
     if (!session.isCurrent(token)) return;

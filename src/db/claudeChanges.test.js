@@ -14,8 +14,9 @@ it("writes projections, rev, recency and a complete undo copy, and restores exac
   const before = await createNote({ title: "Original", html: '<p>Before</p><img data-file="image">' });
   await db.files.put({ id: "image", unusedSince: AT });
   vi.setSystemTime(Date.now() + 1000);
-  const result = await applyClaudeChanges(planFor([before], { html: '<p><a href="note:target">After</a></p>', title: "After" }));
-  expect(await db.notes.get(before.id)).toMatchObject({ rev: 2, text: "After", linkedIds: ["target"], updatedAt: new Date().toISOString() });
+  const target = await createNote({ title: "Target" });
+  const result = await applyClaudeChanges(planFor([before], { html: `<p><a href="note:${target.id}">After</a></p>`, title: "After" }));
+  expect(await db.notes.get(before.id)).toMatchObject({ rev: 2, text: "After", linkedIds: [target.id], updatedAt: new Date().toISOString() });
   const record = await getPref("claudeLastChange");
   expect(record).toMatchObject({ changeId: result.changeId, generation: null, notes: [{ id: before.id, before, fields: ["html", "title"], writtenRev: 2 }], createdNotes: [], trashedNotes: [] });
   expect((await db.files.get("image")).unusedSince).toBeNull();

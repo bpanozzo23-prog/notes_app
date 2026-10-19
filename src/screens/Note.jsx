@@ -1,5 +1,5 @@
 import { captureSplitPayload } from "../claude/split.js";
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Pin, Trash2, Sparkles, Copy } from "lucide-react";
 import { db } from "../db/db.js";
 import { liveNotes } from "../db/notes.js";
@@ -21,8 +21,14 @@ import { noteDates, nowIso } from "../lib/dates.js";
 // The fields whose change counts as an edit, as in src/db/notes.js.
 const CONTENT_FIELDS = ["title", "html", "folderId", "tags"];
 
-export default function Note({ initialNote, notes, folders, toolbarIds, formatting, readOnly = false, queue, status, busy, onBack, onDelete, onOpenNote, error, run, refresh, onImageError, claudeReady, onOpen, setMessage }) {
+export default function Note({ initialNote, notes, folders, toolbarIds, formatting, readOnly: locked = false, queue, status, busy, onBack, onDelete, onOpenNote, error, run, refresh, onImageError, claudeReady, onOpen, setMessage }) {
   const [note, setNote] = useState(initialNote);
+  const [conflict, setConflict] = useState(null);
+  const readOnly = locked || !!conflict;
+  useLayoutEffect(() => {
+    queue.setKnownRev(initialNote.id, initialNote.rev);
+    return queue.onConflict((event) => { if (event.noteId === initialNote.id) setConflict(event); });
+  }, [queue, initialNote.id]);
   const [claudeSheet, setClaudeSheet] = useState(false);
   const session = useSyncExternalStore(claudeSession.subscribe, claudeSession.getSnapshot);
   const [splitInstruction, setSplitInstruction] = useState("");
@@ -88,6 +94,10 @@ export default function Note({ initialNote, notes, folders, toolbarIds, formatti
       {claudeReady && <button className="icon-button" aria-label="Claude" disabled={busy} onClick={() => setClaudeSheet(true)}><Sparkles size={20} aria-hidden="true" /></button>}
       <span role="status" className={`pr-1 text-xs ${status === "error" ? "font-semibold text-red-700" : "text-[var(--color-muted)]"}`}>{status === "error" ? "Not saved" : status}</span>
     </ScreenHeader>
+    {conflict && <aside role="status" className="mx-4 my-3 rounded bg-amber-50 p-3 text-sm">
+      <p>This note was changed in another window, so your edits here were saved in a new note, “{conflict.copyTitle}”. Nothing was overwritten.</p>
+      <button className="min-h-11 underline" disabled={busy} onClick={() => onOpenNote(conflict.copyId)}>Open the copy</button>
+    </aside>}
     <input className="mx-4 min-w-0 bg-transparent py-2 text-xl font-semibold outline-none" aria-label="Title" placeholder="Title (optional)"
       readOnly={readOnly} value={note.title} onChange={(event) => edit({ title: event.target.value })} />
     <div className="mx-4 mb-2 min-w-0 border-b border-[var(--color-line)] pb-3">

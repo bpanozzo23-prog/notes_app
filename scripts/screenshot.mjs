@@ -673,6 +673,25 @@ await button("Open the note").click(); await page.getByLabel("Note body").getByT
 await page.getByLabel("Note body").getByRole("link", { name: "En el restaurante" }).click(); await page.getByLabel("Note body").waitFor(); await shot("159-split-new-note");
 await back(); await back(); await button("Undo").click(); await page.getByText("Split undone.", { exact: true }).waitFor(); await shot("160-split-clean-undo");
 await back();
+// Both pages share IndexedDB, the fixture fetch installer and the fail-closed route guard.
+await back(); await button("Vocabulario — comida").click();
+await page.getByLabel("Note body").waitFor();
+const otherWindow = await context.newPage();
+await otherWindow.goto(url, { waitUntil: "networkidle" });
+await otherWindow.getByRole("button", { name: "Vocabulario — comida", exact: true }).click();
+await otherWindow.getByLabel("Note body").fill("Saved in the other window.");
+await otherWindow.getByRole("button", { name: "Back", exact: true }).click();
+await otherWindow.getByRole("heading", { name: "Notes", exact: true }).waitFor();
+await page.getByLabel("Note body").fill("My draft in this window.");
+await page.getByText(/This note was changed in another window/).waitFor();
+await page.evaluate(() => window.scrollTo(0, 0)); await shot("161-conflict-copy-notice");
+await back();
+await button("Vocabulario — comida (conflict copy)").waitFor();
+await shot("162-conflict-copy-in-list");
+await otherWindow.close();
+// Leave a note open for the existing database guards and reload checks.
+await button("Vocabulario — comida (conflict copy)").click();
+await page.getByLabel("Note body").waitFor();
 // Only this fresh browser context's fixture notebook is involved in the guard screenshots.
 await page.evaluate(() => {
   const channel = new BroadcastChannel("notes_app");

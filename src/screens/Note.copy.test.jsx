@@ -89,7 +89,7 @@ it("keeps folder, tags, pin and delete disabled in read-only mode while Copy as 
   const { default: NoteScreen } = await import("./Note.jsx");
   const { noteFixture: fixture } = await import("../test/fixtures.js");
   clear();
-  const queue = { schedule: () => {}, flush: async () => {}, onBeforeFlush: () => () => {} };
+  const queue = { setKnownRev: () => {}, onConflict: () => () => {}, schedule: () => {}, flush: async () => {}, onBeforeFlush: () => () => {} };
   draw(<NoteScreen initialNote={fixture({ tags: ["uno"] })} notes={[]} folders={[]} queue={queue} readOnly run={(task) => task()} setMessage={() => {}} />);
   expect(view.getByRole("button", { name: "Copy as text" }).disabled).toBe(false);
   for (const name of ["Pin note", "Delete"]) expect(view.getByRole("button", { name }).disabled).toBe(true);

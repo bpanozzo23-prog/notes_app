@@ -10,7 +10,6 @@ import { nullableString, shape, runProposal } from "./proposals.js";
 import { LINKS_SYSTEM_PROMPT } from "./prompts.js";
 import { CLAUDE_MODEL, PROPOSAL_EFFORT, PROPOSAL_MAX_TOKENS } from "./config.js";
 import { RESPONSE_ERRORS } from "./client.js";
-import { STALE_REORGANISE } from "./reorganise.js";
 
 export const LINKS_TASK = "Suggest links between related notes in this notebook.";
 const properties = { from: { type: "string" }, to: { type: "string" }, phrase: nullableString, reason: { type: "string" } };
@@ -119,4 +118,4 @@ export function linksPlan(payload, proposal, ticked) {
   });
   return { generation: payload.generation, kind: "links", notes, folderChecks: [], createFolders: [] };
 }
-export const runLinks = (options) => runProposal({ ...options, buildRequest: buildLinksRequest, validate: validateLinksProposal, staleMessage: STALE_REORGANISE });
+export const runLinks = (options) => runProposal({ ...options, buildRequest: buildLinksRequest, validate: validateLinksProposal });

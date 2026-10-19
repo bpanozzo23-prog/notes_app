@@ -102,7 +102,7 @@ it("tidy fixtures match the regenerated public sample without changing it", asyn
 it("refuses Send after a silent generation replacement without fetching", async () => {
   await db.prefs.put({ key: 'notebookGeneration', value: 'new-notebook' });
   const fetch = vi.fn(); await runTidy({ payload, fetch });
-  expect(fetch).not.toHaveBeenCalled(); expect(session.getSnapshot().proposal.error).toContain('changed since Claude read it');
+  expect(fetch).not.toHaveBeenCalled(); expect(session.getSnapshot().proposal.error).toBe('A note changed since you saw what would be sent. Review it again.');
 });
 it("an interrupted stream retains a cost lower bound and never adds partial usage to spend", async () => {
   const events = [...tidyClass.slice(0, 2), { type: 'error', error: { type: 'overloaded_error', message: key } }];

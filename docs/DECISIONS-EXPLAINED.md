@@ -993,3 +993,30 @@ Restoring some notes in place after a later change could lose words you had move
 - A split about 3¢.
 
 **Lock-in: none.** Merged notes are ordinary notes, and Trash keeps the originals for 30 days.
+
+### 60. Phase 3 closeout: the whole-phase review and its fixes
+
+**Chosen:** before calling Phase 3 done, Codex read every Phase 3 change at once, without being
+able to change anything, and checked it against the plan you approved. It found five problems.
+It found no way for your key to leak. It found the merge/split Undo rules, the all-or-nothing
+saves and the protection for pictures sound. All five are fixed, each with a test that failed
+before the fix:
+- **Two windows on one note can no longer overwrite each other.** This was older than Claude: if
+  a note was open in two places (say the installed app and a browser tab), whichever saved last
+  won, silently. Now each window remembers which version it opened. If the note changed elsewhere,
+  that window's edits are saved as a new note, "… (conflict copy)", next to the other version.
+  The note screen there says so, stops editing, and offers **Open the copy**. Nothing is
+  overwritten; you combine them by hand if you want.
+- **Nothing goes to Anthropic if a note left the notebook after you saw the Send box.** If you
+  move a note to Trash, or delete it for good, between seeing "Send to Anthropic?" and tapping
+  Send, nothing is sent and you're asked to review again. An ordinary edit in between still sends
+  what you saw, as the plan says.
+- **A tidy review now flags links that were swapped** (two links pointing to each other's notes
+  with the same words). Before, this showed no warning.
+- **Apply refuses to add a link to a note that was deleted for good** while the review was open.
+- **"Edited since Claude read it"** now also appears after an Undo puts back an older version.
+
+**What you'll notice:** almost certainly nothing, unless you edit one note in two places at once,
+which now gives you a conflict copy instead of a silent loss.
+
+**Lock-in: none.** A conflict copy is an ordinary note.

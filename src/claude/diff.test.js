@@ -54,3 +54,20 @@ it("gives each neighbouring paragraph edited in place its own change, but keeps 
   const split = diffNoteBodies("<p>uno dos</p>", "<p>uno</p><p>dos</p>").filter((run) => run.id);
   expect(split.map((run) => [run.before.length, run.after.length])).toEqual([[1, 2]]);
 });
+
+it("reports both destinations when two unchanged link texts swap their targets", () => {
+  const [change] = changes('<p><a href="note:a">Alpha</a> <a href="note:b">Beta</a></p>', '<p><a href="note:b">Alpha</a> <a href="note:a">Beta</a></p>');
+  expect(change.words).toEqual([]);
+  expect(change.effects).toEqual([
+    { type: "link-retargeted", before: "note:a", after: "note:b" },
+    { type: "link-retargeted", before: "note:b", after: "note:a" },
+  ]);
+});
+it("keeps word-only link changes silent after matching unchanged pairs and retargets", () => {
+  expect(changes('<p><a href="note:a">Old words</a></p>', '<p><a href="note:a">New words</a></p>')[0].effects).toEqual([]);
+  const [change] = changes('<p><a href="note:a">Same</a> <a href="note:a">Old words</a> <a href="note:b">Retarget</a></p>', '<p><a href="note:a">Same</a> <a href="note:a">New words</a> <a href="https://example.com/new">Retarget</a></p>');
+  expect(change.effects).toEqual([
+    { type: "link-retargeted", before: "note:b", after: "https://example.com/new" },
+    { type: "web-link-added", href: "https://example.com/new" },
+  ]);
+});

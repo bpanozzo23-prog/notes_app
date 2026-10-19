@@ -5,7 +5,7 @@ import { noteFixture } from "../test/fixtures.js";
 import { stubEditorGeometry } from "../test/editor.js";
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
-const queue = () => ({ schedule: vi.fn(), flush: vi.fn().mockResolvedValue(undefined), onBeforeFlush: vi.fn(() => () => {}) });
+const queue = () => ({ setKnownRev: vi.fn(), onConflict: vi.fn(() => () => {}), schedule: vi.fn(), flush: vi.fn().mockResolvedValue(undefined), onBeforeFlush: vi.fn(() => () => {}) });
 
 it("lists only live backlinks in pinned/recent order, includes folders, and opens outside the editor surface", () => {
   const target = noteFixture();
@@ -73,7 +73,7 @@ it("hands the editor's held input to the queue before every flush, so a reload o
   act(() => { editor.view.dom.querySelector("p").textContent = "Origina"; });
   observer.flushSoon();
   await act(() => real.flush());
-  expect(real.save).toHaveBeenLastCalledWith(note.id, { html: "<p>Origina</p>" });
+  expect(real.save).toHaveBeenLastCalledWith(note.id, { html: "<p>Origina</p>" }, { expectedRev: note.rev });
   expect(observer.flushingSoon).toBe(-1);
 });
 
@@ -83,4 +83,29 @@ it("ends with the creation and last edit dates, and an edit updates them at once
   expect(screen.getByText("Created 5 Jan 2025 · Edited 6 Feb 2025")).toBeTruthy();
   fireEvent.change(screen.getByRole("textbox", { name: "Title" }), { target: { value: "A new title" } });
   expect(screen.getByText(/^Created 5 Jan 2025 · Edited today, \d\d:\d\d$/)).toBeTruthy();
+});
+
+it("a conflict keeps a persistent notice, locks editing and opens the copy", async () => {
+  const note = noteFixture({ html: "<p>Original</p>" }), open = vi.fn();
+  const { SaveQueue } = await import("../lib/saveQueue.js");
+  const save = vi.fn().mockRejectedValue(new Error("Changed"));
+  const real = new SaveQueue({ save, resolveConflict: async () => ({ id: "copy", title: "Original (conflict copy)", rev: 1 }) });
+  const known = vi.spyOn(real, "setKnownRev");
+  const props = { initialNote: note, notes: [note], folders: [], queue: real, onOpenNote: open };
+  const view = render(<Note {...props} />);
+  expect(known).toHaveBeenCalledExactlyOnceWith(note.id, note.rev);
+  fireEvent.change(screen.getByRole("textbox", { name: "Title" }), { target: { value: "Draft" } });
+  await act(() => real.flush());
+  expect(screen.getByText('This note was changed in another window, so your edits here were saved in a new note, “Original (conflict copy)”. Nothing was overwritten.')).toBeTruthy();
+  expect(screen.getByRole("textbox", { name: "Title" }).readOnly).toBe(true);
+  expect(screen.getByLabelText("Note body").editor.isEditable).toBe(false);
+  expect(screen.getByRole("button", { name: "Pin note" }).disabled).toBe(true);
+  expect(screen.getByRole("button", { name: "Delete" }).disabled).toBe(true);
+  const schedule = vi.spyOn(real, "schedule");
+  fireEvent.change(screen.getByRole("textbox", { name: "Title" }), { target: { value: "Must not save" } });
+  expect(schedule).not.toHaveBeenCalled();
+  view.rerender(<Note {...props} initialNote={{ ...note, rev: 2 }} />);
+  expect(known).toHaveBeenCalledTimes(1);
+  fireEvent.click(screen.getByRole("button", { name: "Open the copy" }));
+  expect(open).toHaveBeenCalledExactlyOnceWith("copy");
 });

@@ -11,7 +11,7 @@ import ClaudeAnswer from "../components/ClaudeAnswer.jsx";
 import { notebookAccess, ReadOnlyNotebookError, NotebookReplacedError, DATABASE_UPDATED } from "../db/db.js";
 import { noteTitle } from "../lib/notebookView.js";
 import { claudeSession, canStartClaudeRequest } from "../claude/session.js";
-import { captureNotebookPayload, captureNotePayload, prepareNoteImages, estimateRequest } from "../claude/payload.js";
+import { captureNotebookPayload, captureNotePayload, prepareNoteImages, estimateRequest, DISCLOSURE_CHANGED } from "../claude/payload.js";
 import { runAsk, aboutMoney, costLabel } from "../claude/ask.js";
 import { loadClaudeSdk } from "../claude/client.js";
 
@@ -78,7 +78,10 @@ export default function Ask({ notes, trash, folders, openNote, queue, run, busy,
   function sendFirst() {
     if (disabled || !prepared || preparingImages) return;
     const disclosed = prepared; setPrepared(null); setQuestion("");
-    void runAsk({ payload: disclosed.payload, images: disclosed.images, question: disclosed.question }); // Network outlives this screen and nav.run.
+    // Network outlives this screen and nav.run; an unsent question belongs back in the box.
+    void runAsk({ payload: disclosed.payload, images: disclosed.images, question: disclosed.question }).then((result) => {
+      if (result?.refused && alive.current) { setQuestion(disclosed.question); setNotice(DISCLOSURE_CHANGED); }
+    });
   }
   function followUp() {
     if (disabled || !question.trim()) return;
@@ -92,6 +95,7 @@ export default function Ask({ notes, trash, folders, openNote, queue, run, busy,
       {conversation && <button className="app-button text-sm" disabled={busy} onClick={() => setConfirmNew(true)}>New question</button>}
     </ScreenHeader>
     <div className="space-y-5 px-4">
+      {notice && !prepared && <p role="status" className="text-sm">{notice}</p>}
       <p className="break-words text-sm text-[var(--color-muted)]">{conversation
         ? scope.kind === "notebook" ? `Using your ${conversation.payload.entries.length} notes as of ${time}. Start a new question to include later changes.` : `Using ${conversation.payload.entries[0].title} as of ${time}.`
         : scope.kind === "notebook" ? "All your notes" : `About: ${title ? noteTitle(title) : "a deleted note"}`}</p>

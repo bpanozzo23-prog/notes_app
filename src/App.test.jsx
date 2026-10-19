@@ -817,3 +817,31 @@ it("honours explicit Reload with content through the activation callback, retain
   expect(pwa.update).toHaveBeenCalledWith(true);
   expect(claudeSession.hasContent()).toBe(true);
 });
+
+it.each(["edit", "trash", "purge"])("opens a conflict copy even while list refresh is pending after another window's %s", async (change) => {
+  const note = await createNote({ title: "Original", html: "<p>Before</p>" });
+  await start(); await openNote("Original");
+  if (change === "edit") await notesDb.updateNote(note.id, { html: "<p>Other window</p>" });
+  else { await trashNote(note.id); if (change === "purge") await notesDb.purgeNow(note.id); }
+  const other = await getNote(note.id);
+  let release;
+  navigator.storage.persisted = () => new Promise((resolve) => { release = resolve; });
+  fireEvent.change(screen.getByLabelText("Title"), { target: { value: "My draft" } });
+  fireEvent(window, new Event("pagehide"));
+  await screen.findByText(/This note was changed in another window/);
+  await waitFor(() => expect(release).toBeTypeOf("function"));
+  fireEvent.click(screen.getByRole("button", { name: "Open the copy" }));
+  delete navigator.storage.persisted;
+  await act(async () => { release(false); });
+  await waitFor(() => {
+    expect(screen.getByLabelText("Title").value).toBe("My draft (conflict copy)");
+    expect(screen.getByLabelText("Title").readOnly).toBe(false);
+  });
+  expect(await getNote(note.id)).toEqual(other);
+  if (change === "edit") {
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    await waitFor(() => expect(screen.getByLabelText("Title").value).toBe("Original"));
+  }
+  await back();
+  expect(screen.getByRole("button", { name: "My draft (conflict copy)" })).toBeTruthy();
+});

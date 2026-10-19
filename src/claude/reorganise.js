@@ -94,4 +94,4 @@ export function reorganisePlan(payload, proposal, ticked, titles = {}) {
   });
   return { generation: payload.generation, notes, folderChecks: [...folderChecks.values()], createFolders: [...creates].map((name) => ({ name })), expectedNewFolders: [...expectedNewFolders] };
 }
-export const runReorganise = (options) => runProposal({ ...options, buildRequest: buildReorganiseRequest, validate: validateReorganiseProposal, staleMessage: STALE_REORGANISE });
+export const runReorganise = (options) => runProposal({ ...options, buildRequest: buildReorganiseRequest, validate: validateReorganiseProposal });

@@ -1,6 +1,10 @@
 export class SaveQueue {
-  constructor({ save, quietMs = 400, maxWaitMs = 2000, timers = {} }) {
+  constructor({ save, resolveConflict, quietMs = 400, maxWaitMs = 2000, timers = {} }) {
     this.save = save;
+    this.resolveConflict = resolveConflict;
+    this.knownRevs = new Map();
+    this.redirects = new Map();
+    this.conflictListeners = new Set();
     this.quietMs = quietMs;
     this.maxWaitMs = maxWaitMs;
     this.timers = {
@@ -21,6 +25,35 @@ export class SaveQueue {
   onBeforeFlush(fn) {
     this.beforeFlushHooks.add(fn);
     return () => this.beforeFlushHooks.delete(fn);
+  }
+
+  setKnownRev(noteId, rev) {
+    this.knownRevs.set(noteId, rev);
+    this.redirects.delete(noteId);
+  }
+
+  onConflict(listener) {
+    this.conflictListeners.add(listener);
+    return () => this.conflictListeners.delete(listener);
+  }
+
+  async saveEntry(noteId, patch) {
+    if (this.blocked) throw this.blocked;
+    const targetId = this.redirects.get(noteId) ?? noteId, expectedRev = this.knownRevs.get(targetId);
+    let saved;
+    try {
+      saved = await (expectedRev === undefined ? this.save(targetId, patch) : this.save(targetId, patch, { expectedRev }));
+    } catch (error) {
+      if (this.blocked) throw this.blocked;
+      if (!this.resolveConflict) throw error;
+      saved = await this.resolveConflict(error, targetId, patch);
+      // Keep the entry under the editor's original id, including input queued during recovery.
+      this.redirects.set(noteId, saved.id);
+      this.knownRevs.set(saved.id, saved.rev);
+      for (const listener of this.conflictListeners) listener({ noteId, copyId: saved.id, copyTitle: saved.title });
+      return;
+    }
+    if (saved) this.knownRevs.set(targetId, saved.rev);
   }
 
   track(promise) {
@@ -106,7 +139,7 @@ export class SaveQueue {
     entry.ready = false;
     // Start through a promise so synchronous exceptions follow the same retry path.
     entry.running = Promise.resolve()
-      .then(() => this.save(entry.noteId, patch))
+      .then(() => this.saveEntry(entry.noteId, patch))
       .then(() => { entry.error = null; }, (error) => {
         // Newer fields win, but failed fields must never disappear.
         entry.pending = { ...patch, ...entry.pending };

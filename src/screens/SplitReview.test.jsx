@@ -49,7 +49,7 @@ it('Note Split discloses and sends only on Send', async () => {
 });
 
 it('disables Split for read-only, busy and a running request, including one begun with the sheet open', async () => {
-  const props = { ...reviewProps(sample.notes), initialNote: sample.notes.find((n) => n.id === payload.note.id), onOpenNote: vi.fn(), onDelete: vi.fn(), queue: { flush: vi.fn(async () => {}), onBeforeFlush: () => () => {}, subscribe: () => () => {}, schedule: vi.fn() } };
+  const props = { ...reviewProps(sample.notes), initialNote: sample.notes.find((n) => n.id === payload.note.id), onOpenNote: vi.fn(), onDelete: vi.fn(), queue: { flush: vi.fn(async () => {}), onBeforeFlush: () => () => {}, subscribe: () => () => {}, setKnownRev: vi.fn(), onConflict: vi.fn(() => () => {}), schedule: vi.fn() } };
   const view = render(<Note {...props} readOnly />); fireEvent.click(button('Claude')); expect(button('Split…').disabled).toBe(true);
   view.rerender(<Note {...props} />); expect(button('Split…').disabled).toBe(false);
   act(() => { session.beginRequest('ask'); }); expect(button('Split…').disabled).toBe(true); act(() => session.cancelRequest());

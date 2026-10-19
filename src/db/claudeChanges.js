@@ -4,7 +4,7 @@ import { clearReferencedFileMarks } from "./files.js";
 import { newId, isSafeId } from "../lib/ids.js";
 import { nowIso } from "../lib/dates.js";
 import { noteTitle } from "../lib/notebookView.js";
-import { neutralizeNoteLinks } from "../lib/text.js";
+import { extractNoteLinks, neutralizeNoteLinks } from "../lib/text.js";
 
 export const STALE_PROPOSAL = "This note changed since Claude read it. Ask again.";
 const stale = () => { throw new Error(STALE_PROPOSAL); };
@@ -18,6 +18,15 @@ async function checkPlan(plan) {
   if (!plan.notes.length || new Set(plan.notes.map((item) => item.id)).size !== plan.notes.length) stale();
   const notes = await db.notes.bulkGet(plan.notes.map((item) => item.id));
   if (notes.some((note, index) => !note || note.deletedAt !== null || note.rev !== plan.notes[index].expectedRev)) stale();
+  const createdIds = new Set((plan.createNotes ?? []).map((note) => note.id)), targets = new Set();
+  for (const [index, item] of plan.notes.entries()) {
+    if (Object.hasOwn(item.patch, "html")) for (const id of extractNoteLinks(item.patch.html)) {
+      if (!notes[index].linkedIds.includes(id)) targets.add(id);
+    }
+  }
+  for (const note of plan.createNotes ?? []) for (const id of extractNoteLinks(note.html)) targets.add(id);
+  const linked = await db.notes.bulkGet([...targets].filter((id) => !createdIds.has(id)));
+  if (linked.some((note) => !note)) stale();
   for (const expected of plan.folderChecks ?? []) {
     const folder = await db.folders.get(expected.id);
     if (!folder || folder.name !== expected.name) stale();

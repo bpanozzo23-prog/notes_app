@@ -954,3 +954,28 @@ Append-only. One dated line per decision: what was decided, then why, after the 
 - 2026-10-18 — Verification: `npm test` (62 files, 1,231 tests; one earlier run had a single
   failure that two reruns did not reproduce), `npm run build`, `npm run shots` (171 PNGs read,
   135–160 new), `npm run browser-checks` on 0.3.8 (15 of 15).
+
+## Phase 3 closeout (3g)
+
+- 2026-10-18 — Ordinary editor saves check the revision last opened or written by this window. A conflict creates an unpinned copy in one guarded transaction, cleaning purged links and missing folders; pending and later input follows that copy, including another conflict. The original editor locks with a persistent notice and an Open the copy button; reopening resets its revision and redirect. The mounted editor survives a refresh after Trash/purge, and Open the copy reads fresh notes if the conflict refresh has not reached the list yet. — A second window's edit, Claude Apply/Undo, Trash or purge must never be overwritten, and preserving the draft must let navigation finish. Notebook replacement and version guards retain precedence.
+- 2026-10-18 — Every Send checks the stored generation and all disclosed note ids in one read transaction, including title-only otherNotes. Trash, purge or a missed import notification refuses the first question or proposal with a fresh-review message; the first question returns to its input box without starting a conversation. Follow-ups retain their conversation-ended message. — Trash must never be transmitted, while ordinary edits still send exactly the snapshot the owner approved.
+- 2026-10-18 — Link effects first cancel identical words/destination pairs, then pair remaining links by words to report changed destinations, then cancel word-only changes by destination before listing additions/removals. Image handling is unchanged. — Swapping two destinations must produce two visible ChangeCard warnings even when Before and After have the same words.
+- 2026-10-18 — Review freshness and Apply check that every newly introduced note-link destination still exists (live or Trash); every link in a newly created note is checked, excluding ids the same plan creates. Existing missing links on stored notes remain allowed. — Purging an unlinked target does not change the source revision, so revision checks alone could write a new dangling link. The check runs before any write or Undo replacement.
+- 2026-10-18 — Sources compares edit timestamps for inequality, including a timestamp restored backwards by Undo; pin-only revisions remain silent. — A citation captured after tidy is outdated when Undo restores the earlier content and timestamp.
+- 2026-10-18 — Test-first verification: before each fix, the new regressions failed: 14 save/database/Note conflict tests (then 3 app tests for opening a copy before refresh), 25 Send/disclosure tests, 2 swapped-link diff/review tests, 4 purged-target Apply tests, and 1 post-Undo source-label test. Preservation controls cover ordinary edits after disclosure, word-only link changes, existing missing links, split-created ids and pin-only source changes. One existing Apply fixture now creates its link target; Send assertions use the newly required sentence, and Note queue doubles expose its new methods. — Regressions must demonstrate the fault before implementation; controls protect existing behavior.
+- 2026-10-18 — Final verification passed: `npm test` (66 files, 1,294 tests; 63 added), `npm run build`, `node --check scripts/screenshot.mjs` and `git diff --check`. The first full run's seven failures were corrected (normal Delete/navigation interactions, the copy-opening race, and two old Send-message assertions). The build retains its existing large-chunk warning. Version 0.3.9; schema 4, dependencies, backup format and sample notebook unchanged. Shots 161–162 use a second page in the same fixture browser context, close it, and retain the fail-closed Anthropic route guard. Screenshots, browser/real-Claude checks and phone layout/keyboard behavior were not run or seen, as requested; phone verification remains at http://brent-dell-system-xps-l502x:5174/notes_app/. No network requests, key/private-data access, package installation, server start, commit or push. README and DECISIONS-EXPLAINED remain for Claude Code.
+- 2026-10-18 — Closeout review (Codex, read-only, xhigh, `git diff phase-3-base...HEAD`): five
+  findings, all fixed above (two P0, two P1, one P2); no key-leak path; merge/split Undo,
+  transactions, image retention, late-reply protection, kind handling and the BRIEF amendments
+  found sound. The second-window overwrite (P0) predates Phase 3: two windows editing the same
+  note could always overwrite each other; the owner approved fixing it for every save, not just
+  Claude's, with a conflict copy rather than a refusal. — Independent review before calling
+  Phase 3 done, as the plan required.
+- 2026-10-18 — Review fix: a conflict copy of a note that was deleted for good, with only a title
+  or tag edit pending, starts from the editor's empty body (`<p></p>`) rather than an empty
+  string, so opening the copy doesn't re-save it.
+- 2026-10-18 — Verification (Claude Code): `npm test` (66 files, 1,294 tests), `npm run build`,
+  `npm run shots` (173 PNGs; 161–162 show the conflict notice and the copy beside the other
+  window's version), `npm run browser-checks` (15 of 15), and one real-request run on the sample
+  (27.3¢): question, follow-up (cache read), tidy, titles/tags/folders, links, find duplicates,
+  merge and split all sent, applied and undid cleanly after the new pre-send check.

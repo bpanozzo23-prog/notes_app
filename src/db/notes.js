@@ -65,11 +65,30 @@ export async function insertNoteInTransaction({ id, title, html, folderId, tags 
   return note;
 }
 
-export async function updateNote(id, patch) {
+export class NoteChangedElsewhereError extends Error {
+  constructor() { super("This note changed in another window."); this.name = "NoteChangedElsewhereError"; }
+}
+
+export async function createConflictCopy(id, patch) {
+  const clean = cleanPatch(patch);
+  return writeTransaction([db.notes, db.folders, db.tombstones, db.files], async () => {
+    const stored = await db.notes.get(id);
+    // "<p></p>" is the editor's empty body: a purged note with only a title edit must not re-save on open.
+    const fields = { title: "", html: "<p></p>", folderId: null, tags: [] };
+    for (const key of EDIT_FIELDS) fields[key] = Object.hasOwn(clean, key) ? clean[key] : stored?.[key] ?? fields[key];
+    fields.title = `${fields.title || "Untitled"} (conflict copy)`;
+    fields.html = neutralizeNoteLinks(fields.html, new Set(await db.tombstones.toCollection().primaryKeys()));
+    if (fields.folderId && !(await db.folders.get(fields.folderId))) fields.folderId = null;
+    return insertNoteInTransaction({ ...fields, id: newId() });
+  });
+}
+
+export async function updateNote(id, patch, { expectedRev } = {}) {
   const clean = cleanPatch(patch); // Validate and capture before opening the transaction.
   const captured = Object.fromEntries(Object.keys(patch).map((key) => [key, clean[key]]));
   return writeTransaction([db.notes, db.folders, db.files], async () => {
     const note = await db.notes.get(id);
+    if (expectedRev !== undefined && (!note || note.rev !== expectedRev)) throw new NoteChangedElsewhereError();
     if (!note) throw new Error("Note does not exist");
     return writeNoteInTransaction(note, captured);
   });

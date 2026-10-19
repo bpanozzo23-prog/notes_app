@@ -1,5 +1,5 @@
 import { db, notebookAccess } from "../db/db.js";
-import { checkGeneration, deepFreeze } from "./payload.js";
+import { checkGeneration, deepFreeze, payloadIsLive, DISCLOSURE_CHANGED } from "./payload.js";
 import { resolveFormatting } from "../editor/formatting.js";
 import { extractNoteLinks, extractFileIds } from "../lib/text.js";
 import { isSafeId } from "../lib/ids.js";
@@ -10,7 +10,6 @@ import { TIDY_SYSTEM_PROMPT } from "./prompts.js";
 import { CLAUDE_MODEL, PROPOSAL_EFFORT, PROPOSAL_MAX_TOKENS, priceUsage } from "./config.js";
 import { streamMessage, toClaudeError, RESPONSE_ERRORS } from "./client.js";
 import { claudeSession, canStartClaudeRequest } from "./session.js";
-import { STALE_PROPOSAL } from "../db/claudeChanges.js";
 import { addClaudeSpend } from "./prefs.js";
 
 export const DEFAULT_TIDY_INSTRUCTION = "Fix mistakes and make the formatting consistent, changing as little as possible.";
@@ -117,8 +116,8 @@ export function tidyPlan(payload, proposal, ticked, title = proposal.title) {
 }
 export const tidyItemIds = (proposal) => [proposal.title !== null && "title", proposal.tags !== null && "tags", proposal.folder.action !== "keep" && "folder", ...proposal.changes.map((run) => run.id)].filter(Boolean);
 export const runTidy = (options) => runProposal({ ...options, buildRequest: buildTidyRequest, validate: validateTidyProposal });
-export async function runProposal({ payload, buildRequest, validate, staleMessage = STALE_PROPOSAL, session = claudeSession, access = notebookAccess, fetch, maxRetries }) {
-  if (!payload || payload.generation !== access.getGeneration()) return;
+export async function runProposal({ payload, buildRequest, validate, session = claudeSession, access = notebookAccess, fetch, maxRetries }) {
+  if (!payload) return;
   const request = session.beginRequest(payload.kind);
   if (!request) return;
   const { token, signal } = request;
@@ -126,9 +125,8 @@ export async function runProposal({ payload, buildRequest, validate, staleMessag
   const update = (patch) => { state = { ...state, ...patch }; session.setProposal(token, state); };
   update({});
   try {
-    // Saving after disclosure must not change the snapshot; replacement must stop it.
-    try { await db.transaction("r", db.prefs, () => checkGeneration(payload.generation)); }
-    catch { update({ status: "failed", error: staleMessage }); return; }
+    // Edits keep the disclosed snapshot; deletion or replacement requires another review.
+    if (!(await payloadIsLive(payload))) { update({ status: "failed", error: DISCLOSURE_CHANGED }); return; }
     if (!session.isCurrent(token)) return;
     const response = await streamMessage(buildRequest(payload), { fetch, maxRetries, signal, onEvent(event) {
       if (event.type !== "message_start" || !session.isCurrent(token)) return;

@@ -6,7 +6,7 @@ export function sourceState(source, payload, notes, trash, folders) {
   const snapshot = payload.entries.find((entry) => entry.noteId === source.noteId);
   return { title: note ? noteTitle(note) : source.title,
     folder: note ? folders.find((folder) => folder.id === note.folderId)?.name ?? "No folder" : "",
-    label: !note ? "No longer exists" : !live ? "In Trash" : note.updatedAt > snapshot?.updatedAt ? "Edited since Claude read it" : "",
+    label: !note ? "No longer exists" : !live ? "In Trash" : note.updatedAt !== snapshot?.updatedAt ? "Edited since Claude read it" : "",
     exists: !!note,
   };
 }

@@ -19,7 +19,7 @@ import { inspect } from "node:util";
 const key = "sk-ant-SENTINEL-DO-NOT-LEAK-1234567890";
 const note = noteFixture({ title: "Made-up note" });
 const events = askEvents({ blocks: [{ type: "text", text: 'An answer. <img src=x onerror=alert(1)> https://example.com', citations: [{ type: "char_location", document_index: 0, document_title: note.title, cited_text: "Hello", start_char_index: 0, end_char_index: 5, file_id: null }] }] });
-const queue = () => ({ flush: vi.fn().mockResolvedValue(), schedule: vi.fn(), onBeforeFlush: vi.fn(() => () => {}) });
+const queue = () => ({ flush: vi.fn().mockResolvedValue(), setKnownRev: vi.fn(), onConflict: vi.fn(() => () => {}), schedule: vi.fn(), onBeforeFlush: vi.fn(() => () => {}) });
 const props = () => ({ notes: [note], trash: [], folders: [], openNote: vi.fn(), queue: queue(), run: async (task) => { await task(); return true; }, busy: false, claudeReady: true, onBack: vi.fn(), onOpen: vi.fn() });
 beforeEach(async () => {
   session.clearSession(); await resetDatabase(); await db.notes.put(note); await saveClaudeKey(key); await setClaudeEnabled(true);
@@ -185,4 +185,18 @@ it("closes the old disclosure if a stale image recapture can no longer find a li
   fireEvent.click(within(dialog).getByRole("checkbox"));
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   expect(fetch).not.toHaveBeenCalled(); expect(screen.getByLabelText("Your question").value).toBe("What is here?");
+});
+
+it("a first question refused after disclosure restores the question and requires fresh review", async () => {
+  const fetch = vi.fn(async () => { throw new Error("Fixture only"); }); vi.stubGlobal("fetch", fetch);
+  render(<Ask {...props()} />);
+  const dialog = await disclose("Keep my question");
+  await updateNote(note.id, { deletedAt: new Date().toISOString() });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Send" }));
+  await screen.findByText("A note changed since you saw what would be sent. Review it again.");
+  expect(screen.getByLabelText("Your question").value).toBe("Keep my question");
+  expect(fetch).not.toHaveBeenCalled(); expect(session.getSnapshot().conversation).toBeNull();
+  fireEvent.click(button("Send"));
+  await screen.findByRole("dialog", { name: "Send to Anthropic?" });
+  expect(fetch).not.toHaveBeenCalled();
 });

@@ -51,10 +51,20 @@ export const captureNotePayload = (noteId) => capture({ kind: "note", noteId });
 export const buildDocuments = (payload) => payload.entries.map(({ title, context, text }) => ({
   type: "document", source: { type: "text", media_type: "text/plain", data: text || "(empty note)" }, title, context, citations: { enabled: true },
 }));
+export const DISCLOSURE_CHANGED = "A note changed since you saw what would be sent. Review it again.";
+export function sentNoteIds(payload) {
+  switch (payload.kind) {
+    case undefined: case "ask": return payload.entries.map((entry) => entry.noteId);
+    case "tidy": case "split": return [payload.note.id, ...payload.otherNotes.map((note) => note.id)];
+    case "reorganise": case "links": case "duplicates": return payload.notes.map((note) => note.id);
+    case "merge": return [...payload.notes, ...payload.otherNotes].map((note) => note.id);
+    default: throw new Error("Unknown disclosure kind");
+  }
+}
 export async function payloadIsLive(payload) {
   return db.transaction("r", db.notes, db.prefs, async () => {
     try { await checkGeneration(payload.generation); } catch { return false; }
-    const rows = await db.notes.bulkGet(payload.entries.map((entry) => entry.noteId));
+    const rows = await db.notes.bulkGet(sentNoteIds(payload));
     return rows.every((note) => note?.deletedAt === null);
   });
 }

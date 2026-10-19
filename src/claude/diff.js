@@ -23,16 +23,18 @@ export function effects(before, after) {
   const images = subtract(a.images, b.images, (x, y) => x === y);
   for (const id of images.removed) result.push({ type: "image-removed", id });
   for (const id of images.added) result.push({ type: "image-added", id });
-  const links = subtract(a.links, b.links, (x, y) => x.href === y.href);
+  const links = subtract(a.links, b.links, (x, y) => x.text === y.text && x.href === y.href), unpaired = [];
   for (const old of links.removed) {
     const index = links.added.findIndex((next) => next.text === old.text);
     if (index >= 0) {
       const next = links.added.splice(index, 1)[0];
       result.push({ type: "link-retargeted", before: old.href, after: next.href });
       if (!next.href.startsWith("note:")) result.push({ type: "web-link-added", href: next.href });
-    } else result.push({ type: "link-removed", href: old.href });
+    } else unpaired.push(old);
   }
-  for (const next of links.added) result.push({ type: next.href.startsWith("note:") ? "note-link-added" : "web-link-added", href: next.href });
+  const remaining = subtract(unpaired, links.added, (x, y) => x.href === y.href);
+  for (const old of remaining.removed) result.push({ type: "link-removed", href: old.href });
+  for (const next of remaining.added) result.push({ type: next.href.startsWith("note:") ? "note-link-added" : "web-link-added", href: next.href });
   return result;
 }
 function formatLabels(before, after) {

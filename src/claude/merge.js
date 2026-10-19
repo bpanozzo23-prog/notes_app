@@ -10,7 +10,6 @@ import { isSafeId } from "../lib/ids.js";
 import { MERGE_SYSTEM_PROMPT } from "./prompts.js";
 import { CLAUDE_MODEL, PROPOSAL_EFFORT, PROPOSAL_MAX_TOKENS } from "./config.js";
 import { RESPONSE_ERRORS } from "./client.js";
-import { STALE_REORGANISE } from "./reorganise.js";
 
 export const MERGE_TASK = "Merge these notes into one note.";
 const properties = { summary: { type: "string" }, title: { type: "string" }, html: { type: "string" }, tags: { type: "array", items: { type: "string" } }, folder: folderSchema, reason: { type: "string" } };
@@ -86,4 +85,4 @@ export function mergePlan(payload, proposal) {
 export function buildMergeRequest(payload) {
   return { model: CLAUDE_MODEL, max_tokens: PROPOSAL_MAX_TOKENS, output_config: { effort: PROPOSAL_EFFORT, format: { type: "json_schema", schema: MERGE_SCHEMA } }, system: payload.system, messages: [{ role: "user", content: payload.requestText }] };
 }
-export const runMerge = (options) => runProposal({ ...options, buildRequest: buildMergeRequest, validate: validateMergeProposal, staleMessage: STALE_REORGANISE });
+export const runMerge = (options) => runProposal({ ...options, buildRequest: buildMergeRequest, validate: validateMergeProposal });

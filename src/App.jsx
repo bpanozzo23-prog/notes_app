@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useRegisterSW } from "virtual:pwa-register/react";
-import { createNote, purgeExpired, trashNote, updateNote } from "./db/notes.js";
+import { createNote, createConflictCopy, NoteChangedElsewhereError, purgeExpired, trashNote, updateNote } from "./db/notes.js";
 import { cleanupFiles } from "./db/files.js";
 import { SaveQueue } from "./lib/saveQueue.js";
 import { requestPersistence } from "./lib/persistence.js";
@@ -29,7 +29,10 @@ import { getClaudeStatus, useClaudeStatus } from "./claude/prefs.js";
 import { loadClaudeSdk } from "./claude/client.js";
 
 export default function App() {
-  const [queue] = useState(() => new SaveQueue({ save: updateNote }));
+  const [queue] = useState(() => new SaveQueue({ save: updateNote, resolveConflict: (error, id, patch) => {
+    if (!(error instanceof NoteChangedElsewhereError)) throw error;
+    return createConflictCopy(id, patch);
+  } }));
   const status = useSyncExternalStore(queue.subscribe, queue.getSnapshot);
   const access = useSyncExternalStore(notebookAccess.subscribe, notebookAccess.getSnapshot);
   const claude = useSyncExternalStore(claudeSession.subscribe, claudeSession.getSnapshot);
@@ -39,6 +42,8 @@ export default function App() {
   const { ready: claudeReady } = useClaudeStatus(notebook.prefs);
   const formatting = useMemo(() => resolveFormatting(notebook.prefs), [notebook.prefs]);
   const { refresh } = notebook;
+  useEffect(() => queue.onConflict(() => { void refresh(); }), [queue, refresh]);
+  const openedNote = useRef(null);
   const [navigation, setNavigation] = useState(initialNavigation);
   const [busy, setBusy] = useState(true);
   const [ready, setReady] = useState(false);
@@ -139,11 +144,15 @@ export default function App() {
     return nav.run(task);
   }
   function open(entry) { setMessage(""); setError(""); void nav.open(entry); }
-  function openNote(noteId) {
-    if (notebook.notes.some((note) => note.id === noteId)) open({ screen: "note", noteId });
-    else setMessage(notebook.trash.some((note) => note.id === noteId)
-      ? "That note is in the Trash. Restore it from the Trash to open it."
-      : "That note no longer exists.");
+  async function openNote(noteId) {
+    try {
+      // The conflict notice can be tapped before its list refresh has finished.
+      const current = [...queue.redirects.values()].includes(noteId) ? await refresh() : notebook;
+      if (current.notes.some((note) => note.id === noteId)) open({ screen: "note", noteId });
+      else setMessage(current.trash.some((note) => note.id === noteId)
+        ? "That note is in the Trash. Restore it from the Trash to open it."
+        : "That note no longer exists.");
+    } catch (error) { setError(error.message || "Couldn't open that note. Try again."); }
   }
   function back() { setMessage(""); setError(""); nav.back(); }
   async function newNote() {
@@ -183,7 +192,9 @@ export default function App() {
   function retrySave() {
     return run(() => access.versionChange === "pending" ? finishDatabaseUpdate() : queue.flush());
   }
-  const selected = notebook.notes.find((note) => note.id === route.noteId);
+  const selected = notebook.notes.find((note) => note.id === route.noteId) ?? (queue.redirects.has(route.noteId) && openedNote.current?.key === route.key ? openedNote.current.note : null);
+  // A conflict with Trash/purge still needs its mounted editor and copy notice after refresh.
+  openedNote.current = { key: route.key, note: selected };
   return <OverlayNavigation value={nav}><DialogLock value={access.replaced || !!access.versionChange}><main className="mx-auto flex min-h-dvh max-w-2xl flex-col">
     {guardMessage && <aside role="alert" className="border-b border-[var(--color-line)] bg-amber-50 px-4 py-2 text-sm">{guardMessage}</aside>}
     {bootError !== null && <div role="alert" className="mx-4 my-3 text-red-700">
