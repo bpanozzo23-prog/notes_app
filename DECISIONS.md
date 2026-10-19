@@ -750,6 +750,8 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   and Undo were clean.
 - 2026-10-18 — Asked at the start of 3e: the owner's 3d phone check has not been done yet. It
   stays pending; 3e proceeds (no schema change, and 3d's Undo covers its changes).
+- 2026-10-18 — The owner verified 3d on the published app with their own key, in the same
+  sitting as 3e (the 3d checklist was item 7 of the 3e one): "Phone checks pass".
 
 ## Free browser checks (2026-10-18)
 
@@ -845,3 +847,7 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   references that aren't there; thematic links belong in See also.
 - 2026-10-18 — Noted, not changed: a See-also link to an untitled note shows its whole first line
   (the link picker does the same, through `noteTitle`).
+- 2026-10-18 — The owner verified 3e on the published app with their own key, through the
+  checklist (Links between notes on their own notebook, unticking a link, Apply, an in-text link,
+  the See-also line and "Linked from", Undo), together with the pending 3d check: "Phone checks
+  pass".
