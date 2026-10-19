@@ -979,3 +979,7 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   window's version), `npm run browser-checks` (15 of 15), and one real-request run on the sample
   (27.3¢): question, follow-up (cache read), tidy, titles/tags/folders, links, find duplicates,
   merge and split all sent, applied and undid cleanly after the new pre-send check.
+- 2026-10-18 — The owner verified 0.3.9 on the published app through the closeout checklist (a
+  note edited in the installed app and a browser tab gave a conflict copy with nothing lost; Ask
+  and Tidy this note still work): "Checks pass". Asked, the owner said the 3f merge/split
+  checklist has not been tried on the phone yet; it stays pending.

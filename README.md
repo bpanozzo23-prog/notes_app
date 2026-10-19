@@ -126,8 +126,9 @@ LLM can read. The code may become public; the notes never are.
   each with a test: two windows editing one note now save a "(conflict copy)" instead of silently
   overwriting each other (older than Phase 3); nothing is sent if a disclosed note was moved to
   Trash or deleted before Send; swapped links are flagged in a tidy review; Apply refuses a new
-  link to a note deleted meanwhile; a citation is marked edited after an Undo. **Phase 3 is
-  complete** once the owner's phone check passes.
+  link to a note deleted meanwhile; a citation is marked edited after an Undo. Owner-verified on
+  the phone 2026-10-18. **Phase 3 is complete** apart from the owner's merge/split (3f) phone
+  check, still pending.
 
 ## Running it
 
