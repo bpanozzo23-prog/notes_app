@@ -18,7 +18,7 @@ function subtract(before, after, same) {
   const removed = before.filter((old) => { const index = added.findIndex((next) => same(old, next)); if (index < 0) return true; added.splice(index, 1); return false; });
   return { removed, added };
 }
-function effects(before, after) {
+export function effects(before, after) {
   const a = references(before), b = references(after), result = [];
   const images = subtract(a.images, b.images, (x, y) => x === y);
   for (const id of images.removed) result.push({ type: "image-removed", id });
@@ -89,4 +89,50 @@ export function assembleBody(currentHtml, changes, ticked) {
   const selected = ticked instanceof Set ? ticked : new Set(ticked);
   const result = changes.flatMap((run) => run.unchanged ?? (selected.has(run.id) ? run.after : run.before));
   return serializeBody(withTrailingParagraph(doc(result.flatMap((html) => parseBody(html).content))));
+}
+
+// Only the app's link-only end lines are excluded; ordinary prose beginning with a label stays.
+function isLinkLine(node) {
+  if (node.type !== "paragraph" || !node.content?.every((child) => child.type === "text")) return false;
+  const text = node.content.map((child) => child.text).join("");
+  const label = /^(See also:|Split into:) /.exec(text)?.[0];
+  if (!label) return false;
+  let offset = 0, pattern = "";
+  for (const child of node.content) {
+    const rest = child.text.slice(Math.max(0, label.length - offset)); offset += child.text.length;
+    if (rest) pattern += child.marks?.some((mark) => mark.type === "link") ? "L" : rest;
+  }
+  return /^L+( · L+)*$/.test(pattern);
+}
+export function textLines(html) {
+  const result = [];
+  function visit(node, task = "") {
+    if (node.type === "taskItem") task = node.attrs.checked ? "[x] " : "[ ] ";
+    if (["paragraph", "heading", "codeBlock"].includes(node.type)) {
+      if (isLinkLine(node)) return;
+      const text = (node.content ?? []).map((child) => child.type === "hardBreak" ? "\n" : child.text ?? "").join("");
+      for (const line of text.split("\n")) {
+        const shown = line.trim();
+        if (shown) result.push({ key: task + shown.normalize("NFC").replace(/\s+/g, " "), text: task + shown });
+      }
+      return;
+    }
+    for (const child of node.content ?? []) visit(child, task);
+  }
+  visit(parseBody(html)); return result;
+}
+export function lineChanges(before, after) {
+  const lines = (notes) => notes.flatMap(({ title, html }) => textLines(html).map((line) => ({ ...line, title })));
+  const a = lines(before), b = lines(after), ak = new Set(a.map((line) => line.key)), bk = new Set(b.map((line) => line.key));
+  const unique = (items) => items.filter((item, index) => items.findIndex((other) => other.title === item.title && other.key === item.key) === index);
+  return { missing: unique(a.filter((line) => !bk.has(line.key))).map(({ title, text }) => ({ from: title, text })),
+    added: unique(b.filter((line) => !ak.has(line.key))).map(({ title, text }) => ({ in: title, text })) };
+}
+export function markCounts(html) {
+  const counts = {};
+  function visit(node) {
+    if (node.type === "text") for (const mark of node.marks ?? []) counts[mark.type] = (counts[mark.type] ?? 0) + node.text.length;
+    for (const child of node.content ?? []) visit(child);
+  }
+  visit(parseBody(html)); return counts;
 }

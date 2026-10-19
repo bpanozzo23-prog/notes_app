@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { captureSplitPayload } from "../claude/split.js";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Pin, Trash2, Sparkles, Copy } from "lucide-react";
 import { db } from "../db/db.js";
 import { liveNotes } from "../db/notes.js";
@@ -23,6 +24,8 @@ const CONTENT_FIELDS = ["title", "html", "folderId", "tags"];
 export default function Note({ initialNote, notes, folders, toolbarIds, formatting, readOnly = false, queue, status, busy, onBack, onDelete, onOpenNote, error, run, refresh, onImageError, claudeReady, onOpen, setMessage }) {
   const [note, setNote] = useState(initialNote);
   const [claudeSheet, setClaudeSheet] = useState(false);
+  const session = useSyncExternalStore(claudeSession.subscribe, claudeSession.getSnapshot);
+  const [splitInstruction, setSplitInstruction] = useState("");
   const [instruction, setInstruction] = useState("");
   const [confirmTidy, setConfirmTidy] = useState(false);
   async function copyAsText() {
@@ -37,12 +40,12 @@ export default function Note({ initialNote, notes, folders, toolbarIds, formatti
       setMessage("Couldn't copy. Use Settings → Export notes as text.");
     }
   }
-  async function tidyNote(confirmed = false) {
+  async function tidyNote(kind = "tidy", confirmed = false) {
     const existing = claudeSession.getSnapshot().proposal;
-    if (!confirmed && existing) { setClaudeSheet(false); setConfirmTidy(true); return; }
+    if (!confirmed && existing) { setClaudeSheet(false); setConfirmTidy(kind); return; }
     const success = await run(async () => {
       await queue.flush();
-      const payload = await captureTidyPayload(note.id, instruction);
+      const payload = await (kind === "split" ? captureSplitPayload(note.id, splitInstruction) : captureTidyPayload(note.id, instruction));
       if (!claudeSession.prepareProposal(payload)) throw new Error("Wait for Claude's current request to finish.");
     });
     if (success) { setClaudeSheet(false); setConfirmTidy(false); onOpen({ screen: "claude-review" }); }
@@ -116,9 +119,13 @@ export default function Note({ initialNote, notes, folders, toolbarIds, formatti
       <h2 className="font-semibold">Tidy this note</h2>
       <label className="block text-sm" htmlFor="tidy-instruction">What should Claude do? Leave blank to fix mistakes and tidy the formatting.</label>
       <textarea id="tidy-instruction" disabled={busy} rows={3} maxLength={500} className="w-full rounded border p-2" value={instruction} onChange={(event) => setInstruction(event.target.value)} />
-      <button className="app-button" disabled={busy || readOnly || claudeSession.isBusy()} onClick={() => tidyNote()}>Continue</button>
+      <button className="app-button" disabled={busy || readOnly || !!session.request} onClick={() => tidyNote()}>Continue</button>
+      <h2 className="font-semibold">Split this note</h2>
+      <label className="block text-sm" htmlFor="split-instruction">How should Claude split it? Leave blank to split by topic.</label>
+      <textarea id="split-instruction" disabled={busy} rows={3} maxLength={500} className="w-full rounded border p-2" value={splitInstruction} onChange={(event) => setSplitInstruction(event.target.value)} />
+      <button className="app-button" disabled={busy || readOnly || !!session.request} onClick={() => tidyNote("split")}>Split…</button>
     </div></Dialog>}
-    {confirmTidy && <Confirm title="Discard Claude's other proposal?" confirmLabel="Discard and continue" busy={busy} onCancel={() => setConfirmTidy(false)} onConfirm={() => tidyNote(true)}>Only one proposal is kept at a time.</Confirm>}
+    {confirmTidy && <Confirm title="Discard Claude's other proposal?" confirmLabel="Discard and continue" busy={busy} onCancel={() => setConfirmTidy(false)} onConfirm={() => tidyNote(confirmTidy, true)}>Only one proposal is kept at a time.</Confirm>}
     {confirmAsk && <Confirm title="Clear the current conversation and ask about this note?" confirmLabel="Clear and ask" onCancel={() => setConfirmAsk(false)} onConfirm={() => askNote(true)}>The current answers will be cleared.</Confirm>}
     <p className="mx-4 mt-6 text-xs text-[var(--color-muted)]">{noteDates(note)}</p>
     {linkEditor && <LinkPicker editor={linkEditor} noteId={note.id} notes={notes} folders={folders} onClose={() => setLinkEditor(null)} />}

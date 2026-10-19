@@ -55,6 +55,16 @@ export async function createNote({ folderId = null, title = "", html = "<p></p>"
   return note;
 }
 
+// Only call inside a guarded notes/folders/files transaction. add refuses an occupied id.
+export async function insertNoteInTransaction({ id, title, html, folderId, tags }) {
+  const at = nowIso(), clean = cleanPatch({ title, html, folderId, tags });
+  await checkFolder(folderId);
+  const note = { id, ...clean, pinned: false, rev: 1, createdAt: at, updatedAt: at, deletedAt: null };
+  await db.notes.add(note);
+  await clearReferencedFileMarks(note.html);
+  return note;
+}
+
 export async function updateNote(id, patch) {
   const clean = cleanPatch(patch); // Validate and capture before opening the transaction.
   const captured = Object.fromEntries(Object.keys(patch).map((key) => [key, clean[key]]));

@@ -940,3 +940,56 @@ to itself, a link that already exists, the same link twice) are dropped rather t
 request; more than 30 links makes the reply unusable.
 **Measured:** about 5¢ on the 18-note sample; the estimate before sending said about 6¢.
 **Lock-in: none.** Links are ordinary note links; delete any you don't want.
+
+### 59. Step 3f: merging and splitting notes
+
+**Chosen:** two new Claude actions, each approved as a whole (one Apply button, no ticks).
+- **Merge.** The Ask screen's **Tidy the notebook** now offers **Find duplicates to merge**.
+  Claude reads every note outside Trash and suggests groups of notes that hold the same thing
+  (two copies of a list, an earlier draft). You tick which notes of a group to merge (two to five)
+  and tap **Merge**. That sends a second request with only those notes in full, and Claude writes
+  one combined note.
+- **Split.** A note's **Claude** button now offers **Split this note**, with an optional "how". Claude
+  moves parts of the note into new notes, and the app adds a **"Split into:"** line of links at
+  the end of the original.
+
+**What the merge review shows:** the whole merged note, and that the **oldest** note is the one
+kept, so links to it keep working. It shows which notes go to **Trash**, restorable for 30 days.
+It names which other notes link to those and will be pointed at the merged note instead.
+Two lists, worked out on the phone for free:
+- every line of the originals that isn't in the result word for word;
+- every line Claude worded newly.
+
+Merging is where something could be dropped quietly; these lists make it visible before you
+apply. The split review shows the same lists, plus any change in formatting such as bold.
+
+**Undo:**
+- **If nothing has changed since,** Undo puts everything back. The merged note gets its earlier
+  content, the merged-away notes come out of Trash, and redirected links point where they did. A
+  split's original is restored and its new notes go to Trash.
+- **If anything changed since,** Undo never overwrites or removes anything, and lists what it will
+  do before you confirm. Notes still in Trash come back out. The merged (or split) note stays as
+  you left it, and its earlier version comes back as a new note "… (before Claude)".
+
+This departs from the plan's Undo rule, as 3d and 3e did; you approved it with the 3f plan.
+Restoring some notes in place after a later change could lose words you had moved between them.
+
+**What changed during review:**
+- A reviewer read my first plan against the code before building and found the Undo holes the
+  rule above closes.
+- After building, I fixed one case: merging an exact duplicate, where the kept note doesn't need
+  to change, was being refused. It now just moves the copy to Trash.
+
+**What you'll notice:**
+- After a merge, **Other suggested merges** goes back to Claude's list without asking again.
+- A merge ends any Ask conversation that included a merged-away note, because that note is now
+  in Trash.
+- Don't keep the merged note open in a second tab while merging: typing there could overwrite
+  the merged text (the merged-away notes would still be in Trash).
+
+**Measured, on the 18-note sample:**
+- Find duplicates about 3¢; its estimate now says about 4¢.
+- A merge of two notes about 2¢.
+- A split about 3¢.
+
+**Lock-in: none.** Merged notes are ordinary notes, and Trash keeps the originals for 30 days.

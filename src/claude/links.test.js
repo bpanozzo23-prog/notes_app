@@ -36,7 +36,7 @@ it('captures frozen live notes and only the disclosed fields, with ordered dedup
   expect(Object.isFrozen(note('N1'))).toBe(true);
   for (const item of data.notes) expect(Object.keys(item)).toEqual(['handle', 'title', 'text', 'linksTo']);
   for (const value of [key, 'Nota en la papelera', 'sample-landscape', ...payload.notes.map((n) => n.id), ...(await db.folders.toArray()).map((f) => f.id), '<p>', 'note:']) expect(text).not.toContain(value);
-  expect(note('N1').linksTo).toEqual(['N2', 'N3']); expect(note('N2').linksTo).toEqual(['N4']); expect(note('N4').linksTo).toEqual(['N2']); expect(note('N7').linksTo).toEqual(['N6']);
+  expect(note('N18').linksTo).toEqual(['N16']); expect(note('N1').linksTo).toEqual(['N2', 'N3']); expect(note('N2').linksTo).toEqual(['N4']); expect(note('N4').linksTo).toEqual(['N2']); expect(note('N7').linksTo).toEqual(['N6']);
   const trashed = (await db.notes.toArray()).find((n) => n.deletedAt !== null);
   await updateNote(note('N1').id, { html: `<p><a href="note:${note('N3').id}">Three</a><a href="note:${note('N2').id}">Two</a><a href="note:${note('N3').id}">Again</a><a href="note:${trashed.id}">Trash</a><a href="note:missing">Missing</a></p>` });
   const next = await captureLinksPayload(); expect(next.notes[0].linksTo).toEqual(['N2', 'N3']); expect(next.requestText).not.toContain(trashed.title);

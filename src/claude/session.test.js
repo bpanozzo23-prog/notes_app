@@ -2,7 +2,7 @@ import { beforeEach, afterEach, expect, it, vi } from "vitest";
 import { db, notebookAccess } from "../db/db.js";
 import { resetDatabase, backupFixture } from "../test/fixtures.js";
 import { importBackup } from "../db/backup.js";
-import { claudeSession as session, canStartClaudeRequest } from "./session.js";
+import { claudeSession as session, canStartClaudeRequest, createClaudeSession } from "./session.js";
 
 beforeEach(async () => { session.clearSession(); await resetDatabase(); });
 afterEach(() => { session.clearSession(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
@@ -74,3 +74,21 @@ it.each([{ readOnly: true }, { replaced: true }, { versionChange: "pending" }, {
   expect(canStartClaudeRequest(state)).toBe(false);
 });
 it("allows an ordinary writable notebook", () => expect(canStartClaudeRequest({ readOnly: false, replaced: false, versionChange: null })).toBe(true));
+
+it('retains ready duplicate suggestions with ticks across merge cancel, discard and recapture, and clears them for other work', () => {
+  const session = createClaudeSession();
+  const payload = { kind: 'duplicates', generation: null };
+  session.prepareProposal(payload); const id = session.getSnapshot().proposal.id;
+  session.updateProposal(id, { status: 'ready', proposal: { groups: [] }, ticked: ['g1:N1'] }); const original = session.getSnapshot().proposal;
+  session.prepareProposal({ kind: 'merge', generation: null }, { keepSuggestions: true }); expect(session.getSnapshot().suggestions).toEqual(original);
+  expect(session.hasContent()).toBe(true); session.discardProposal(); expect(session.getSnapshot().suggestions).toEqual(original);
+  session.prepareProposal({ kind: 'merge', generation: null }); expect(session.getSnapshot().suggestions).toEqual(original);
+  const request = session.beginRequest('merge'); expect(request).toBeTruthy(); expect(session.restoreSuggestions()).toBe(false); session.cancelRequest();
+  expect(session.restoreSuggestions()).toBe(true); expect(session.getSnapshot().proposal.ticked).toEqual(['g1:N1']); expect(session.getSnapshot().suggestions).toBeNull();
+  for (const kind of ['duplicates', 'tidy', 'links', 'reorganise', 'split']) {
+    session.updateProposal(session.getSnapshot().proposal.id, { kind: 'duplicates', status: 'ready' });
+    session.prepareProposal({ kind: 'merge', generation: null }, { keepSuggestions: true });
+    session.prepareProposal({ kind, generation: null }); expect(session.getSnapshot().suggestions).toBeNull();
+  }
+  session.invalidateSession(); expect(session.getSnapshot().suggestions).toBeNull(); session.dispose();
+});

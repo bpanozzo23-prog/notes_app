@@ -32,7 +32,7 @@ const notes = [
   { n: 18, title: "Ideas para la próxima clase", folder: 1, tags: ["spanish"], created: 19, updated: 19,
     html: '<p>Revisar ser y estar. Buscar ejemplos en Frases útiles y escribir dos frases nuevas.</p>' },
   { n: 19, title: "Recordatorio suelto", folder: null, tags: [], created: 20, updated: 20,
-    html: '<p>Llevar el cuaderno azul a la biblioteca el jueves.</p>' },
+    html: `<p>Llevar el cuaderno azul a la biblioteca el jueves y devolver los libros de la ${link(17, "lista de lecturas")}.</p>` },
   { n: 14, title: "Captura de ejemplo", folder: null, tags: ["test"], created: 17, updated: 17,
     html: `<p>Un paisaje inventado para probar las imágenes.</p><img data-file="${imageId}" width="480" height="270" alt=""><p>Esta imagen se guarda con la nota.</p>` },
   { n: 13, title: "Muestra de formato", folder: 1, tags: ["test"], created: 17, updated: 17,

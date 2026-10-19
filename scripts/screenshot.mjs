@@ -12,6 +12,9 @@ import { chromium, devices } from "playwright";
 import { notebookAnswer, followupAnswer, noteAnswer, refusalAnswer, cutAnswer, overloadedAnswer, fallbackAnswer } from "../src/claude/fixtures/ask.js";
 import { tidyClass, tidyImage, tidyMalformed, tidyCut, tidyRefusal, tidyUnknown } from "../src/claude/fixtures/tidy.js";
 import { reorganiseNotebook } from "../src/claude/fixtures/reorganise.js";
+import { duplicatesShotsEvents } from "../src/claude/fixtures/duplicates.js";
+import { mergeShotsEvents } from "../src/claude/fixtures/merge.js";
+import { splitShotsEvents } from "../src/claude/fixtures/split.js";
 import { linksShotsEvents } from "../src/claude/fixtures/links.js";
 import { sseFrames } from "../src/claude/fixtures/responses.js";
 import { installSteppedClaudeFetch } from "../src/claude/fixtures/browser.js";
@@ -44,6 +47,9 @@ await context.route("https://api.anthropic.com/**", async (route) => {
 });
 // Question markers are a screenshot convention only, never part of the app.
 await context.addInitScript(installSteppedClaudeFetch, { smoke: sseFrames(), cases: [
+  ["Find notes in this notebook that duplicate each other.", duplicatesShotsEvents],
+  ["Merge these notes into one note.", mergeShotsEvents],
+  ["Split this note into separate notes.", splitShotsEvents],
   ["Suggest better titles, tags and folders across this notebook.", reorganiseNotebook],
   ["Suggest links between related notes in this notebook.", linksShotsEvents],
   ["[shot:tidy-class]", tidyClass], ["[shot:tidy-image]", tidyImage], ["[shot:tidy-invalid]", tidyMalformed],
@@ -484,7 +490,7 @@ const beginTidy = async (instruction, sheetShot = false) => {
   if (await discardOther.isVisible()) await button("Discard and continue").click();
   await askDialog().waitFor();
 };
-const finishTidy = async () => { await sendDisclosed(); await release(); await page.getByRole("button", { name: /^Apply \d+ changes?$/ }).waitFor(); };
+const finishTidy = async (name = /^Apply \d+ changes?$/) => { await sendDisclosed(); await release(); await page.getByRole("button", { name }).first().waitFor(); };
 const applyTidy = async () => { await page.getByRole("button", { name: /^Apply \d+ changes?$/ }).click(); await page.getByText(/^Applied \d+ changes?\.$/).waitFor(); };
 await button("Notas de clase").click();
 await beginTidy("Fix accents and make the supplies a list. [shot:tidy-class]", true);
@@ -614,14 +620,66 @@ await button("Lista de lecturas").click(); await page.getByLabel("Title", { exac
 await button("Claude's proposal is ready · Review").click();
 await page.getByText("Some notes changed since Claude read them. Ask again.", { exact: true }).waitFor(); await shot("134-links-stale");
 await button("Discard").click(); await back();
-await button("Vocabulario — comida").click();
+// Phase 3f: a fresh public sample makes group handles, backlinks and Undo reproducible.
+await button("Settings").click(); await page.getByLabel("Import backup").setInputFiles(sample);
+await button("Replace notebook").click();
+const moveImportDownload = page.waitForEvent("download"); await button("Import and replace").click(); await moveImportDownload;
+await page.getByText(/^Backup imported\./).waitFor(); await back(); await button("Ask Claude").click();
+const beginDuplicates = async (takeShots = false) => {
+  await button("Tidy the notebook").click(); if (takeShots) await shot("135-merge-tidy-sheet");
+  await button("Find duplicates to merge").click();
+  if (await page.getByRole("dialog", { name: "Discard Claude's other proposal?" }).isVisible()) await button("Discard and continue").click();
+  await askDialog().waitFor();
+};
+const selectReadingMerge = async () => {
+  await page.getByRole("article", { name: "Suggested merge 1" }).getByRole("button", { name: "Merge 2 notes…" }).click(); await askDialog().waitFor();
+};
+const applyMerge = async () => { await button("Apply merge").click(); await page.getByText(/^Merged 2 notes into/).waitFor(); };
+await beginDuplicates(true); await shot("136-duplicates-disclosure"); await finishTidy("Merge 2 notes…"); await shot("137-suggested-merges");
+await selectReadingMerge(); await shot("138-merge-disclosure"); await finishTidy("Apply merge");
+await page.evaluate(() => window.scrollTo(0, 0)); await shot("139-merge-review-top");
+await page.getByText("Not in the merged note word for word:", { exact: true }).evaluate((el) => el.scrollIntoView({ block: "start" })); await shot("140-merge-review-body");
+await button("Apply merge").scrollIntoViewIfNeeded(); await shot("141-merge-review-bottom");
+await applyMerge(); await button("Other suggested merges (1)").waitFor(); await shot("142-merge-applied");
+await button("Open the merged note").click(); await page.getByLabel("Note body").waitFor(); await shot("143-merged-note");
+await back(); await back(); await back(); await button("Trash (2)").click(); await page.getByText("Lista de lecturas", { exact: true }).waitFor(); await shot("144-merge-source-in-trash");
+await back(); await button("Recordatorio suelto").click(); await page.getByLabel("Note body").getByRole("link", { name: "lista de lecturas" }).waitFor(); await shot("145-merge-backlink-note");
+await page.getByLabel("Note body").getByRole("link", { name: "lista de lecturas" }).click();
+// Wait for the navigation itself: the previous note's title field is still on screen at first.
+await page.waitForFunction(() => document.querySelector('input[aria-label="Title"]')?.value === "Libros por leer", null, { timeout: 10000 })
+  .catch(() => { throw new Error("Merge backlink did not open the kept note"); });
+await shot("146-backlink-opens-merged-note"); await back(); await back();
+await button("Settings").click(); await button("Claude On").click(); await button("Undo Claude's last change").click();
+await page.getByRole("dialog", { name: "Undo Claude's last change?" }).getByRole("button", { name: "Undo", exact: true }).click();
+await page.getByText("Merge undone.", { exact: true }).waitFor(); await shot("147-merge-clean-undo");
+await back(); await back(); await button("Ask Claude").click(); await beginDuplicates(); await finishTidy("Merge 2 notes…"); await selectReadingMerge(); await finishTidy("Apply merge"); await applyMerge();
+await button("Open the merged note").click(); await page.getByLabel("Title", { exact: true }).fill("Libros por leer editados"); await back();
+await button("Undo").click(); await button("Undo, keeping later changes").waitFor(); await button("Undo, keeping later changes").scrollIntoViewIfNeeded(); await shot("148-merge-keep-edits-offer");
+await button("Undo, keeping later changes").click(); await page.getByText("Undone, keeping later changes. Earlier content restored as copies where needed.").waitFor(); await shot("149-merge-keep-edits-result");
+await button("Other suggested merges (2)").click(); await page.getByRole("article", { name: "Suggested merge 2" }).scrollIntoViewIfNeeded(); await shot("150-other-suggested-merges");
+await back(); await back(); await button("Libros por leer (before Claude)").waitFor(); await button("Lista de lecturas").waitFor(); await shot("151-merge-copies-and-restored-source");
+await button("Claude's suggestions are ready · Review").click(); await selectReadingMerge(); await finishTidy("Apply merge"); await back();
+await button("Lista de lecturas").click(); await page.getByLabel("Title", { exact: true }).fill("Lista de lecturas editada"); await button("Claude's proposal is ready · Review").click();
+await page.getByText("Some notes changed since Claude read them. Ask again.", { exact: true }).waitFor(); await shot("152-merge-stale");
+await button("Discard").click(); await back(); await back();
+await button("Vocabulario — comida").click(); await button("Claude").click(); await button("Split…").scrollIntoViewIfNeeded(); await shot("153-note-split-sheet");
+await button("Split…").click();
+if (await page.getByRole("dialog", { name: "Discard Claude's other proposal?" }).isVisible()) await button("Discard and continue").click();
+await askDialog().waitFor(); await shot("154-split-disclosure"); await finishTidy("Apply split");
+await page.evaluate(() => window.scrollTo(0, 0)); await shot("155-split-review-keeps");
+await page.getByRole("article", { name: "En el restaurante" }).scrollIntoViewIfNeeded(); await shot("156-split-review-new-note");
+await button("Apply split").click(); await page.getByText("Split into 1 new note.", { exact: true }).waitFor(); await shot("157-split-applied");
+await button("Open the note").click(); await page.getByLabel("Note body").getByText(/^Split into:/).scrollIntoViewIfNeeded(); await shot("158-split-original-links");
+await page.getByLabel("Note body").getByRole("link", { name: "En el restaurante" }).click(); await page.getByLabel("Note body").waitFor(); await shot("159-split-new-note");
+await back(); await back(); await button("Undo").click(); await page.getByText("Split undone.", { exact: true }).waitFor(); await shot("160-split-clean-undo");
+await back();
 // Only this fresh browser context's fixture notebook is involved in the guard screenshots.
 await page.evaluate(() => {
   const channel = new BroadcastChannel("notes_app");
   channel.postMessage({ type: "notebook-replaced", generation: "screenshot-fixture" });
   channel.close();
 });
-await page.getByText(/^The notebook was replaced in another window/).waitFor();
+await page.getByText(/^The notebook was replaced in another window/).first().waitFor();
 await shot("16-notebook-replaced");
 await page.reload({ waitUntil: "networkidle" });
 await page.getByLabel("Note body").waitFor();

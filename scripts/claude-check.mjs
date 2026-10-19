@@ -185,6 +185,66 @@ if (linksOutcome === "proposal") {
   ]);
   await shot("links-undo", true);
 }
+// Merge and split each retain their own disclosure, review outcome and Undo result.
+await button("Back").click(); // links review → Ask
+await button("Tidy the notebook").click(); await button("Find duplicates to merge").click();
+if (await discardOther.isVisible()) await button("Discard and continue").click();
+await disclosure.waitFor();
+const duplicates = { disclosure: (await disclosure.textContent())?.replace(/\s+/g, " ").trim() };
+await shot("duplicates-disclosure"); await disclosure.getByRole("button", { name: "Send", exact: true }).click();
+duplicates.outcome = await Promise.race([
+  page.getByRole("article", { name: /^Suggested merge / }).first().waitFor().then(() => "suggestions"),
+  page.getByText(/^(No suggested merges left|Claude found no duplicates to merge)\.$/).waitFor().then(() => "no merges"),
+  page.getByRole("alert").first().waitFor().then(async () => `failed: ${await page.getByRole("alert").first().textContent()}`),
+]);
+duplicates.groups = await page.getByRole("article", { name: /^Suggested merge / }).count(); await shot("duplicates-review", true);
+const merge = { outcome: "no group" };
+if (duplicates.groups) {
+  await page.getByRole("article", { name: /^Suggested merge / }).first().getByRole("button", { name: /^Merge \d+ notes…$/ }).click();
+  await disclosure.waitFor(); merge.disclosure = (await disclosure.textContent())?.replace(/\s+/g, " ").trim(); await shot("merge-disclosure");
+  await disclosure.getByRole("button", { name: "Send", exact: true }).click();
+  merge.outcome = await Promise.race([
+    button("Apply merge").waitFor().then(() => "proposal"),
+    page.getByRole("alert").first().waitFor().then(async () => `failed: ${await page.getByRole("alert").first().textContent()}`),
+  ]);
+  merge.trashLines = await page.getByText(/^Moves to Trash:/).count(); merge.backlinkLines = await page.getByText(/^Also updates links in:/).count();
+  merge.wordForWordLists = await page.getByRole("heading", { name: /^(Not in the merged note word for word:|New wording:)$/ }).count();
+  merge.wordForWordItems = await page.locator('ul.list-disc li').count(); await shot("merge-review", true);
+  if (merge.outcome === "proposal") {
+    await button("Apply merge").click(); await page.getByText(/^Merged \d+ notes into/).waitFor();
+    merge.applied = await page.getByText(/^Merged \d+ notes into/).textContent(); await shot("merge-applied", true);
+    const title = /into “(.*)”\.$/.exec(merge.applied)?.[1];
+    const mergedPage = await context.newPage(); await mergedPage.goto(url, { waitUntil: "networkidle" });
+    await mergedPage.getByRole("button", { name: title, exact: true }).click(); await mergedPage.getByLabel("Note body").waitFor();
+    merge.afterText = await mergedPage.getByLabel("Note body").innerText(); await shot("merge-note-after", true, mergedPage);
+    await mergedPage.getByRole("button", { name: "Back", exact: true }).click(); await mergedPage.close();
+    await button("Undo").click();
+    merge.undone = await Promise.race([
+      page.getByText("Merge undone.", { exact: true }).waitFor().then(() => "Merge undone."),
+      page.getByText(/^Some notes changed after Claude's merge/).waitFor().then(() => "conflict"),
+    ]); await shot("merge-undo", true);
+  }
+}
+await button("Back").click(); await button("Back").click(); // review → Ask → list
+await button("Vocabulario — comida").click(); await button("Claude").click(); await button("Split…").click();
+if (await discardOther.isVisible()) await button("Discard and continue").click();
+await disclosure.waitFor(); const split = { disclosure: (await disclosure.textContent())?.replace(/\s+/g, " ").trim() };
+await shot("split-disclosure"); await disclosure.getByRole("button", { name: "Send", exact: true }).click();
+split.outcome = await Promise.race([
+  button("Apply split").waitFor().then(() => "proposal"),
+  page.getByText("Claude suggests no split.", { exact: true }).first().waitFor().then(() => "no split"),
+  page.getByRole("alert").first().waitFor().then(async () => `failed: ${await page.getByRole("alert").first().textContent()}`),
+]);
+split.newNotes = await page.getByRole("article").count(); await shot("split-review", true);
+if (split.outcome === "proposal") {
+  await button("Apply split").click(); await page.getByText(/^Split into \d+ new notes?\.$/).waitFor(); split.applied = await page.getByText(/^Split into \d+ new notes?\.$/).textContent();
+  await button("Open the note").click(); await page.getByLabel("Note body").waitFor(); split.afterText = await page.getByLabel("Note body").innerText(); await shot("split-original-after", true);
+  await button("Back").click(); await button("Undo").click();
+  split.undone = await Promise.race([
+    page.getByText("Split undone.", { exact: true }).waitFor().then(() => "Split undone."),
+    page.getByText(/^Some notes changed after Claude's split/).waitFor().then(() => "conflict"),
+  ]); await shot("split-undo", true);
+}
 await browser.close();
 
 const messages = calls.filter((call) => call.path === "/v1/messages");
@@ -193,6 +253,7 @@ const summary = {
   tidyDisclosure: tidyDisclosure?.replace(/\s+/g, " ").trim(), tidyOutcome: outcome, applied, undone,
   reorganise: { disclosure: reorganiseDisclosure?.replace(/\s+/g, " ").trim(), outcome: reorganiseOutcome, rows: reorganiseRows, applied: reorganiseApplied, undone: reorganiseUndone },
   links: { disclosure: linksDisclosure?.replace(/\s+/g, " ").trim(), outcome: linksOutcome, rows: linksRows, inline: linksInline, seeAlso: linksSeeAlso, applied: linksApplied, source: linksSource, afterText: linksAfterText, undone: linksUndone },
+  duplicates, merge, split,
   calls, totalDollars: messages.reduce((sum, call) => sum + (call.dollars ?? 0), 0),
   followUpReadCache: (messages[1]?.usage?.cache_read_input_tokens ?? 0) > 0,
 };

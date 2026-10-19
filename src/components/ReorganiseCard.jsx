@@ -1,8 +1,8 @@
+import { notePreview } from "../claude/preview.js";
 import { reorganiseRowIds } from "../claude/reorganise.js";
 
 export default function ReorganiseCard({ change, note, folders, selected, title, titleError, toggle, editTitle, untick, disabled }) {
-  // The first line as the owner wrote it, without the projection's heading, list and task markers.
-  const preview = note.text.split("\n")[0].replace(/^(?:#{1,6} |> |- |\d+\. |\[(?: |x)\] |\[(?:Note|Tip|Warning|Important)\]$)+/, "").replace(/ \[→ [^\]]*\]/g, "").trim() || "(empty note)";
+  const preview = notePreview(note.text);
   const row = (field, text) => <label className="flex min-h-11 items-center gap-3"><input type="checkbox" checked={selected.has(`${change.note}:${field}`)} disabled={disabled} onChange={() => toggle(`${change.note}:${field}`)} />{text}</label>;
   return <article aria-label={note.displayTitle} className="space-y-2 rounded-lg border border-[var(--color-line)] p-3">
     <h2 className="text-lg font-semibold">{note.displayTitle}</h2>

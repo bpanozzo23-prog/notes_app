@@ -47,6 +47,14 @@ export function neutralizeNoteLinks(html, ids) {
     name.toLowerCase() === "href" && ids.has(noteId(double ?? single ?? bare ?? "")) ? "" : attr));
 }
 
+export function retargetNoteLinks(html, map) {
+  const escape = (value) => value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return html.replace(ANCHOR, (tag) => tag.replace(ATTRIBUTE, (attr, name, double, single, bare) => {
+    const id = noteId(double ?? single ?? bare ?? "");
+    return name.toLowerCase() === "href" && map.has(id) ? ` href="note:${escape(map.get(id))}"` : attr;
+  }));
+}
+
 export function normalize(text) {
   return text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 }

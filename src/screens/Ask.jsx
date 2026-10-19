@@ -1,3 +1,4 @@
+import { captureDuplicatesPayload } from "../claude/duplicates.js";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import ScreenHeader from "../components/ScreenHeader.jsx";
 import Dialog from "../components/Dialog.jsx";
@@ -53,7 +54,7 @@ export default function Ask({ notes, trash, folders, openNote, queue, run, busy,
     if (!confirmed && claudeSession.getSnapshot().proposal) { setTidySheet(false); setConfirmTidy(kind); return; }
     const success = await run(async () => {
       await queue.flush();
-      const payload = await (kind === "links" ? captureLinksPayload() : captureReorganisePayload());
+      const payload = await ({ links: captureLinksPayload, duplicates: captureDuplicatesPayload, reorganise: captureReorganisePayload }[kind]());
       if (!claudeSession.prepareProposal(payload)) throw new Error("Wait for Claude's current request to finish.");
     });
     if (success) { setTidySheet(false); setConfirmTidy(false); onOpen({ screen: "claude-review" }); }
@@ -119,6 +120,7 @@ export default function Ask({ notes, trash, folders, openNote, queue, run, busy,
       {disabledMessage && <p role="status">{disabledMessage}</p>}
       <button className="app-button w-full" disabled={disabled} onClick={() => prepareTidy("reorganise")}>Titles, tags and folders</button>
       <button className="app-button mt-2 w-full" disabled={disabled} onClick={() => prepareTidy("links")}>Links between notes</button>
+      <button className="app-button mt-2 w-full" disabled={disabled} onClick={() => prepareTidy("duplicates")}>Find duplicates to merge</button>
     </Dialog>}
     {confirmTidy && <Confirm title="Discard Claude's other proposal?" confirmLabel="Discard and continue" busy={disabled} onCancel={() => setConfirmTidy(false)} onConfirm={() => prepareTidy(confirmTidy, true)}>Only one proposal is kept at a time.</Confirm>}
     {prepared && <Disclosure prepared={prepared} busy={preparingImages} disabled={disabled} message={notice || disabledMessage} onImages={includeImages} onCancel={() => setPrepared(null)} onSend={sendFirst} />}

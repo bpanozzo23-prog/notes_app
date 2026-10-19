@@ -851,3 +851,99 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   checklist (Links between notes on their own notebook, unticking a link, Apply, an in-text link,
   the See-also line and "Linked from", Undo), together with the pending 3d check: "Phone checks
   pass".
+
+## Phase 3f implementation
+
+- 2026-10-18 — Find duplicates sends all live notes in creation-time/id order with N handles,
+  displayed titles, folders, tags and Claude text. Selecting 2–5 notes prepares a separate merge
+  disclosure: only their full handle HTML and metadata, plus folder names, tags in use and other
+  live titles. Split sends the same snapshot as tidy with its own task and optional instruction.
+  Captures are generation-checked reads; nothing is sent before Send. Backlinks, raw ids, Trash,
+  image bytes and preferences stay local. — Two separate disclosures make the scope checkable.
+- 2026-10-18 — Merge keeps the oldest selected note, breaking equal creation dates by id, and
+  pins it if any selected note was pinned. Images share one handle map across the group. Links
+  into the group lose their marks inside the HTML walk, preserving their words and the editor's
+  serialised form. Backlinks are rewritten at the string level, changing only matching href
+  attributes; writes advance rev without moving updatedAt. Apply rechecks the complete live
+  backlink set and every captured revision in its transaction. — Opening a result must not
+  silently save again, and a newly added or removed backlink must make the proposal stale.
+- 2026-10-18 — Split creates fresh ids only in its plan, inserts new notes after writing the
+  original, and uses the shared See-also insertion helper with the label “Split into:”. Folder
+  creation includes new-note destinations and groups case variants using the first spelling.
+  Each approval and its complete role-labelled Undo record commit together or roll back together.
+  — No half-merge, half-split or unused folder is left behind on failure.
+- 2026-10-18 — Owner-approved deviation from the direction file: if every note is exactly as
+  Claude left it, Undo restores the original content, brings merge sources out of Trash, restores
+  backlinks, or moves split-created notes to Trash, and removes unused created folders. After any
+  later change, Undo never overwrites or removes anything: it copies the content note's before
+  version, brings surviving sources out of Trash with their current text, copies purged sources,
+  and leaves already-restored sources, relinked notes and split-created notes alone. The offer is
+  a dry run; confirmation recomputes its decision list in the transaction and requires another
+  review if the list changed. Created folders stay on this path; revisions only advance.
+  — Restoring some notes in place could lose text the owner moved between them. Copies of notes
+  safe in Trash or only relinked would add clutter without protecting more writing.
+- 2026-10-18 — Merge and split are approved as a whole, without ticks. Review shows every result,
+  Trash and backlink consequences, image/link effects and word-for-word missing/added lines.
+  Line comparison uses sets, NFC and collapsed whitespace, splits hard breaks, and includes task
+  state; only app-shaped link lines are ignored. Split also counts characters carrying each mark
+  to disclose formatting changes. — Moving a line is not losing it, but rewording or changing a
+  checked task must remain visible. The first eight lines appear immediately; more are expandable.
+- 2026-10-18 — Duplicate replies allow at most ten groups. Unknown handles or malformed shape
+  void the proposal; repeated handles and overlaps are dropped, then groups smaller than two.
+  Groups larger than five remain reviewable with only the first five ticked. Split allows one to
+  ten new notes (zero means no split). Existing title/tag/folder rules apply; empty merged or new
+  split bodies are refused after HTML cleanup. — Harmless redundancy should not waste a paid
+  answer. The in-memory suggestions slot preserves group ticks across merge cancellation and
+  Ask again, and clears on imports or a new non-merge proposal.
+- 2026-10-18 — Version 0.3.8; schema stays 4, with no new table, dependency or backup-format
+  change. The public sample adds only the requested reading-list backlink in Recordatorio
+  suelto; projection/export snapshots reflect that sentence. Added streamed fixtures, screenshot
+  steps 135–160 before the destructive guard checks, and duplicates/merge/split reporting in
+  claude-check. The key-reading code is unchanged. — Browser scripts and phone checks remain for
+  Claude Code and the owner; this implementation does not run them or access private-data/key
+  files, make network requests, install packages, start servers, commit or push.
+- 2026-10-18 — Final local verification passed: `npm test` (62 files, 1,229 tests),
+  `npm run build`, syntax checks for both edited browser scripts and `git diff --check`.
+  Tests include atomic rollback, backlink-set freshness, every Undo decision-table state,
+  damaged/legacy records, image retention, real-editor no-update-on-open parity, disclosure,
+  guards and retained suggestions. The build retains Vite's large-chunk warning. Screenshots,
+  real Claude responses/costs, phone layout and Samsung Keyboard/Gboard were not run or seen.
+  — No network requests, private-data/key access, package installation, server start, commit
+  or push; phone verification remains at http://brent-dell-system-xps-l502x:5174/notes_app/.
+- 2026-10-18 — Review (Claude Code), before Codex started: a read-only planning pass checked the
+  first design against the code and found that a partial Undo after later edits could lose text the
+  owner had moved between notes (a merged note restored in place while a source had been restored
+  and trimmed), that a source still in Trash with a moved rev (folder deletion bumps it) was
+  uncovered, that the old copies path would have handled merge records, that links into the group
+  removed with `neutralizeNoteLinks` would make the editor re-save on open, that `anyOf` on
+  `linkedIds` returns a note once per matching source, and that folder creation ignored new notes
+  (every split into a new folder would have been refused as stale). The approved plan and Codex task
+  closed each of these.
+- 2026-10-18 — Review fix: an exact-duplicate merge, whose kept note would not change at all, was
+  refused ("An approved note change is empty"). It now applies: the kept note gets no write and no
+  Undo entry, the sources go to Trash and backlinks are redirected; a merge record may have no
+  content entry (a split still needs exactly one). Trashed and relinked entries that change nothing
+  still refuse the whole Apply. — The most natural duplicate (one note a subset of the other) must
+  merge.
+- 2026-10-18 — Review fixes: a duplicates group dropped for having one note no longer claims that
+  note from later groups; "1 new note" in the split review, result and Undo text; an empty
+  duplicates reply says "Claude found no duplicates to merge." rather than "No suggested merges
+  left."; screenshot steps: an exact heading selector, waiting for the backlink to open the kept
+  note (it read the previous note's title first), and the guard shot's first matching status.
+- 2026-10-18 — Real-request run with 3f (sample notebook, test key), one full run, 27.3¢ in total:
+  question 6.2¢, follow-up 1.9¢, tidy 2.1¢, titles/tags/folders 4.9¢, links 5.1¢, find
+  duplicates 2.8¢ (5,722 in, 237 out; estimate "about 6¢"), merge 1.6¢ (1,511 in, 500 out;
+  "about 3¢"), split 2.6¢ (2,359 in, 845 out; "about 4¢"). Claude grouped only the two reading
+  lists ("the rest are merely related"); the merge kept every line word for word; the split moved
+  the restaurant section into "Vocabulario — en el restaurante" and retitled the original. Apply,
+  opening the results, and both full Undos were clean. Find duplicates now has its own 800-token
+  reply allowance (estimate about 4¢ on the sample); merge and split keep tidy's formula, which
+  overestimates safely. — Real behaviour the fixtures can't show.
+- 2026-10-18 — Noted, not changed: Claude's reasons and summaries are shown as plain text, so a
+  stray mark in them appears literally (the real merge reason ended "Ficciones.](#)"). Residual
+  risks for the owner's checklist: a second tab holding the merged note open can overwrite it on
+  its next keystroke (the save queue has no rev check; the sources stay in Trash), and a merge
+  ends any Ask conversation that included a merged-away note (its liveness check sees Trash).
+- 2026-10-18 — Verification: `npm test` (62 files, 1,231 tests; one earlier run had a single
+  failure that two reruns did not reproduce), `npm run build`, `npm run shots` (171 PNGs read,
+  135–160 new), `npm run browser-checks` on 0.3.8 (15 of 15).

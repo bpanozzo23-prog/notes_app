@@ -117,6 +117,12 @@ LLM can read. The code may become public; the notes never are.
   once) or on a "See also:" line, a tick per link, all-or-nothing Apply, and Undo that skips notes
   edited since. Real-request runs on the sample: about 5¢ per links request. Owner-verified on
   the phone 2026-10-18.
+- **Phase 3f — committed 2026-10-18 (0.3.8).** Tidy the notebook → Find duplicates to merge, and
+  Split this note on a note's Claude button. Each is approved as a whole: the review shows the
+  result, what goes to Trash, which links are redirected, and every line not kept word for word.
+  Undo puts everything back if nothing changed since; otherwise it never overwrites anything and
+  brings earlier versions back as "(before Claude)" notes. Real-request run on the sample: find
+  duplicates 3¢, merge 2¢, split 3¢. Owner phone check pending.
 
 ## Running it
 

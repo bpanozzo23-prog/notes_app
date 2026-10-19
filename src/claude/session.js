@@ -4,7 +4,7 @@ import { newId } from "../lib/ids.js";
 export const canStartClaudeRequest = (access) => !access.readOnly && !access.replaced && !access.versionChange;
 
 export function createClaudeSession(access = notebookAccess) {
-  let snapshot = { conversation: null, proposal: null, request: null, pendingScope: { kind: "notebook" } };
+  let snapshot = { conversation: null, proposal: null, suggestions: null, request: null, pendingScope: { kind: "notebook" } };
   let current = null, controller;
   const listeners = new Set();
   const emit = (patch) => { snapshot = { ...snapshot, ...patch }; for (const listener of listeners) listener(); };
@@ -14,7 +14,7 @@ export function createClaudeSession(access = notebookAccess) {
     const previous = controller;
     controller = null;
     current = token(); // Invalidate before abort listeners can run.
-    emit({ conversation: null, proposal: null, request: null, pendingScope: { kind: "notebook" } });
+    emit({ conversation: null, proposal: null, suggestions: null, request: null, pendingScope: { kind: "notebook" } });
     previous?.abort();
   }
   const stop = access.subscribe(() => {
@@ -45,9 +45,15 @@ export function createClaudeSession(access = notebookAccess) {
     setPendingScope(scope) { emit({ pendingScope: { ...scope } }); },
     setConversation(value, conversation) { if (isCurrent(value)) emit({ conversation: conversation === null ? null : { ...conversation, token: value, generation: value.generation } }); },
     setProposal(value, proposal) { if (isCurrent(value)) emit({ proposal: proposal === null ? null : { ...proposal, token: value, generation: value.generation } }); },
-    prepareProposal(payload) {
+    prepareProposal(payload, { keepSuggestions = false } = {}) {
       if (snapshot.request) return false;
-      emit({ proposal: { id: newId(), kind: payload.kind, payload, handles: payload.handles, generation: payload.generation, status: "disclosure" } });
+      const suggestions = payload.kind !== "merge" ? null : keepSuggestions && snapshot.proposal?.kind === "duplicates" && snapshot.proposal.status === "ready" ? snapshot.proposal : snapshot.suggestions;
+      emit({ suggestions, proposal: { id: newId(), kind: payload.kind, payload, handles: payload.handles, generation: payload.generation, status: "disclosure" } });
+      return true;
+    },
+    restoreSuggestions() {
+      if (snapshot.request || !snapshot.suggestions) return false;
+      emit({ proposal: { ...snapshot.suggestions, status: "ready", dismissed: false }, suggestions: null });
       return true;
     },
     updateProposal(id, patch) { if (snapshot.proposal?.id === id) emit({ proposal: { ...snapshot.proposal, ...patch } }); },
@@ -62,7 +68,7 @@ export function createClaudeSession(access = notebookAccess) {
     clearSession: invalidateSession,
     invalidateSession,
     notebookReplaced: () => invalidateSession("local-import"),
-    hasContent: () => snapshot.conversation !== null || snapshot.proposal !== null,
+    hasContent: () => snapshot.conversation !== null || snapshot.proposal !== null || snapshot.suggestions !== null,
     isBusy: () => snapshot.request !== null,
     dispose: stop,
   };

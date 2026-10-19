@@ -71,11 +71,13 @@
     {
       "id": "a0000000-0000-4000-8000-000000000019",
       "title": "Recordatorio suelto",
-      "html": "<p>Llevar el cuaderno azul a la biblioteca el jueves.</p>",
-      "text": "Llevar el cuaderno azul a la biblioteca el jueves.",
+      "html": "<p>Llevar el cuaderno azul a la biblioteca el jueves y devolver los libros de la <a href=\"note:a0000000-0000-4000-8000-000000000017\">lista de lecturas</a>.</p>",
+      "text": "Llevar el cuaderno azul a la biblioteca el jueves y devolver los libros de la lista de lecturas.",
       "folderId": null,
       "tags": [],
-      "linkedIds": [],
+      "linkedIds": [
+        "a0000000-0000-4000-8000-000000000017"
+      ],
       "pinned": false,
       "rev": 1,
       "createdAt": "2026-10-20T09:00:00.000Z",

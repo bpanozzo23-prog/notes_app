@@ -98,13 +98,16 @@ export const PLAIN_TOKENS_PER_CHAR = 0.65;
 // 1,459–1,488 tokens, so they share these constants.
 export const NOTEBOOK_TOKENS_PER_CHAR = 0.5;
 const NOTEBOOK_OUTPUT_ALLOWANCE = 2000;
+// Find duplicates replies with a few short groups: 237 tokens measured on the sample (2026-10-18),
+// against 5,722 in (the notebook ratio holds). The allowance leaves room for a larger notebook.
+const DUPLICATES_OUTPUT_ALLOWANCE = 800;
 const QUESTION_OUTPUT_ALLOWANCE = 1000;
 export function estimateRequest({ kind = "question", payload, images, history = [], question = "", now = new Date() }) {
-  if (kind === "tidy" || kind === "notebook-proposal" || payload.kind === "links") {
-    const notebook = kind === "notebook-proposal" || payload.kind === "links";
+  if (["tidy", "reorganise", "links", "duplicates", "merge", "split"].includes(payload.kind) || kind === "tidy" || kind === "notebook-proposal") {
+    const notebook = ["reorganise", "links", "duplicates"].includes(payload.kind) || !payload.kind && kind === "notebook-proposal";
     const tokens = Math.ceil((payload.requestText.length + payload.system.length) * (notebook ? NOTEBOOK_TOKENS_PER_CHAR : PLAIN_TOKENS_PER_CHAR));
     // A tidy returns the whole note, plus thinking at high effort; a notebook proposal, a list of small changes.
-    const output = notebook ? NOTEBOOK_OUTPUT_ALLOWANCE : Math.ceil(payload.claudeHtml.length * PLAIN_TOKENS_PER_CHAR * 1.5) + 800;
+    const output = payload.kind === "duplicates" ? DUPLICATES_OUTPUT_ALLOWANCE : notebook ? NOTEBOOK_OUTPUT_ALLOWANCE : Math.ceil(payload.claudeHtml.length * PLAIN_TOKENS_PER_CHAR * 1.5) + 800;
     return { tokens, dollars: priceUsage(CLAUDE_MODEL, { input_tokens: tokens, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: output }) };
   }
   const documents = buildDocuments(payload);

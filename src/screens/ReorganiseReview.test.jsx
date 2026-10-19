@@ -31,7 +31,7 @@ async function ready() { await runReorganise({ payload, fetch: chunkedFetch(reor
 it('defaults every metadata row ticked, supports per-note and per-row untick, title editing and partial Apply without body changes', async () => {
   await ready(); const shared = props(); render(<ClaudeReview {...shared} />);
   await waitFor(() => expect(button('Apply 7 changes').disabled).toBe(false));
-  expect(screen.getAllByRole('checkbox').every((box) => box.checked)).toBe(true); expect(card('N18').getByText(note('N18').text)).toBeTruthy();
+  expect(screen.getAllByRole('checkbox').every((box) => box.checked)).toBe(true); expect(card('N18').getByText('Llevar el cuaderno azul a la biblioteca el jueves y devolver los libros de la lista de lecturas.')).toBeTruthy();
   fireEvent.click(card('N18').getByRole('button', { name: 'Untick this note' })); expect(button('Apply 4 changes')).toBeTruthy();
   fireEvent.click(card('N10').getByRole('checkbox')); expect(button('Apply 3 changes')).toBeTruthy();
   fireEvent.change(card('N7').getByRole('textbox'), { target: { value: 'x'.repeat(201) } }); expect(button('Apply 3 changes').disabled).toBe(true);

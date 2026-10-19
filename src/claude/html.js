@@ -26,8 +26,7 @@ function walk(node, visit) {
   if (next.content) next.content = next.content.map((child) => walk(child, visit)).filter(Boolean);
   return next;
 }
-export function toClaudeHtml(html, { noteHandles }) {
-  const imageHandles = new Map(); // id → handle, as for notes
+export function toClaudeHtml(html, { noteHandles, imageHandles = new Map() }) {
   const json = walk(parseBody(html), (node) => {
     if (node.type === "image") {
       const id = node.attrs.file;
@@ -43,7 +42,7 @@ export function toClaudeHtml(html, { noteHandles }) {
   });
   return { html: serializeBody(json), imageHandles };
 }
-export function fromClaudeHtml(html, { imageHandles, noteHandles }) {
+export function fromClaudeHtml(html, { imageHandles, noteHandles }, { dropLinksTo = new Set() } = {}) {
   const images = new Map([...imageHandles].map(([id, handle]) => [handle, id]));
   const notes = new Map([...noteHandles].map(([id, handle]) => [handle, id]));
   const report = [];
@@ -60,6 +59,7 @@ export function fromClaudeHtml(html, { imageHandles, noteHandles }) {
       if (/^note:/i.test(href)) {
         const id = notes.get(href.slice(5));
         if (!id) { report.push({ type: "removed-note-link", value: href }); return false; }
+        if (dropLinksTo.has(id)) { report.push({ type: "removed-group-link", value: id }); return false; }
         href = `note:${id}`;
       } else if (/^(https:|mailto:)/i.test(href)) report.push({ type: "web-link", value: href });
       else return false;

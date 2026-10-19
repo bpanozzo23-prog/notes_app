@@ -94,15 +94,19 @@ export function applyLinksToHtml(html, links, titleFor) {
   const markFor = (link) => noteSchema.marks.link.create({ href: `note:${link.targetId}` });
   for (const link of links) if (link.placement.kind === "inline") tr.addMark(link.placement.from, link.placement.to, markFor(link));
   const extras = links.filter((link) => link.placement.kind === "see-also");
-  if (extras.length) {
-    const content = extras.flatMap((link, index) => [...(index ? [noteSchema.text(" · ")] : []), noteSchema.text(titleFor(link.to), [markFor(link)])]);
-    let last, lastPos = 0;
-    tr.doc.forEach((node, pos) => { if (node.type.name !== "paragraph" || node.content.size) { last = node; lastPos = pos; } });
-    if (last?.type.name === "paragraph" && last.textContent.startsWith("See also:")) {
-      tr.insert(lastPos + last.nodeSize - 1, [noteSchema.text(last.textContent === "See also:" ? " " : " · "), ...content]);
-    } else tr.insert(last ? lastPos + last.nodeSize : 0, noteSchema.nodes.paragraph.create(null, [noteSchema.text("See also: "), ...content]));
-  }
+  appendLinkLine(tr, "See also:", extras.map((link) => ({ id: link.targetId, text: titleFor(link.to) })));
   return serializeBody(withTrailingParagraph(tr.doc.toJSON()));
+}
+// Shared by See also and Split into; keep trailing editor paragraphs after the inserted line.
+export function appendLinkLine(tr, label, links) {
+  if (!links.length) return tr;
+  const content = links.flatMap((link, index) => [...(index ? [noteSchema.text(" · ")] : []), noteSchema.text(link.text, [noteSchema.marks.link.create({ href: `note:${link.id}` })])]);
+  let last, lastPos = 0;
+  tr.doc.forEach((node, pos) => { if (node.type.name !== "paragraph" || node.content.size) { last = node; lastPos = pos; } });
+  if (last?.type.name === "paragraph" && last.textContent.startsWith(label)) {
+    tr.insert(lastPos + last.nodeSize - 1, [noteSchema.text(last.textContent === label ? " " : " · "), ...content]);
+  } else tr.insert(last ? lastPos + last.nodeSize : 0, noteSchema.nodes.paragraph.create(null, [noteSchema.text(`${label} `), ...content]));
+  return tr;
 }
 export const linksItemIds = (proposal) => proposal.links.map(({ from, to }) => `${from}>${to}`);
 export function linksPlan(payload, proposal, ticked) {
