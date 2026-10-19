@@ -17,7 +17,7 @@ export default function DuplicatesCard({ group, index, notes, selected, toggle, 
     {notes.map((note) => <div key={note.handle}><label className="flex min-h-11 items-center gap-3"><input type="checkbox" checked={selected.has(`g${index}:${note.handle}`)} onChange={() => toggle(`g${index}:${note.handle}`)} disabled={disabled} /><span>{noteTitle(note)}</span></label>
       {notePreview(note.text) !== noteTitle(note) && <p className="text-sm text-[var(--color-muted)]">{notePreview(note.text)}</p>}</div>)}
     <p>{group.reason}</p>
-    <button className="app-button" disabled={disabled || chosen.length < 2 || chosen.length > 5} onClick={merge}>Merge {chosen.length} notes…</button>
+    <button className="app-button primary" disabled={disabled || chosen.length < 2 || chosen.length > 5} onClick={merge}>Merge {chosen.length} notes…</button>
     {(chosen.length < 2 || chosen.length > 5) && <p className="text-sm">Choose 2–5 notes to merge.</p>}
   </article>;
 }

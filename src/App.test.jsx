@@ -197,7 +197,7 @@ it("does not claim persistence from an imported preference when this browser lac
   await setPref("storagePersisted", true);
   await start();
   await settings();
-  expect(screen.getByText("Persistent storage: Unavailable in this browser")).toBeTruthy();
+  expect(screen.getByText("Protected from automatic clearing: Not available in this browser")).toBeTruthy();
 });
 
 it("queues folder, tag and pin edits together with body edits, and reopens the saved metadata", async () => {
@@ -713,7 +713,7 @@ it("Settings shows images, estimated storage, large-backup guidance and image pr
   vi.spyOn(filesDb, "fileStats").mockResolvedValue({ count: 400, bytes: 160 * 1024 * 1024, base64Bytes: 214 * 1024 * 1024 });
   navigator.storage.estimate = vi.fn(async () => ({ usage: 170 * 1024 * 1024, quota: 1000 * 1024 * 1024 }));
   await start(); await settings();
-  await screen.findByText("Images: 400, 160.0 MB");
+  await screen.findByText("Images: 400 (160.0 MB)");
   await screen.findByText("Storage used: 170.0 MB of about 1000.0 MB available");
   expect(screen.getByText(/Your backup is getting large \(about 214.0 MB\)/)).toBeDefined();
   await upload(backupFixture({ schemaVersion: 4, notes: [noteFixture({ html: '<img data-file="image">' })],

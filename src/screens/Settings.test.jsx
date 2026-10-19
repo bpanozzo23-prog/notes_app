@@ -4,9 +4,62 @@ import Settings from "./Settings.jsx";
 import { db, getPref, setPref } from "../db/db.js";
 import { noteFixture, resetDatabase } from "../test/fixtures.js";
 import { readFileAsText } from "../lib/file.js";
+import * as filesDb from "../db/files.js";
 
 beforeEach(resetDatabase);
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+
+const props = () => ({
+  notebook: { notes: [], trash: [], folders: [], prefs: {}, refresh: vi.fn() },
+  queue: { status: "idle", flush: vi.fn() },
+});
+
+it.each([
+  [false, false], [true, false], [false, true], [true, true],
+])("opens the labelled hidden import input only when enabled (busy=%s, readOnly=%s)", async (busy, readOnly) => {
+  render(<Settings {...props()} busy={busy} readOnly={readOnly} />);
+  await screen.findByText("Images: 0 (1 KB)");
+  const input = screen.getByLabelText("Import backup");
+  const click = vi.spyOn(input, "click").mockImplementation(() => {});
+  const button = screen.getByRole("button", { name: "Choose a backup file…" });
+  expect(input.type).toBe("file");
+  expect(input.classList.contains("sr-only")).toBe(true);
+  expect(input.disabled).toBe(busy || readOnly);
+  expect(button.disabled).toBe(busy || readOnly);
+  fireEvent.click(button);
+  expect(click).toHaveBeenCalledTimes(busy || readOnly ? 0 : 1);
+});
+
+it("shows the image count with its formatted size in parentheses", async () => {
+  vi.spyOn(filesDb, "fileStats").mockResolvedValue({ count: 1, bytes: 5 * 1024, base64Bytes: 7 * 1024 });
+  render(<Settings {...props()} />);
+  expect(await screen.findByText("Images: 1 (5 KB)")).toBeTruthy();
+});
+
+it.each([
+  [true, "Yes"], [false, "No (export backups regularly)"],
+  [undefined, "Not asked yet"], ["unavailable", "Not available in this browser"],
+])("explains storage protection for %s", async (persisted, label) => {
+  const settings = props();
+  settings.notebook.persisted = persisted;
+  render(<Settings {...settings} />);
+  await screen.findByText("Images: 0 (1 KB)");
+  expect(screen.getByText(`Protected from automatic clearing: ${label}`)).toBeTruthy();
+});
+
+it.each([
+  ["idle", "Saved"], ["pending", "Saving…"], ["saving", "Saving…"], ["error", "Not saved — Disk full"],
+])("labels the App save status %s and retains any error detail", async (status, label) => {
+  const settings = props();
+  settings.queue.status = status;
+  settings.queue.error = new Error("Disk full");
+  render(<Settings {...settings} />);
+  await screen.findByText("Images: 0 (1 KB)");
+  const saved = screen.getByText(`Save status: ${label}`);
+  expect(saved.classList.contains("text-red-700")).toBe(status === "error");
+  expect(saved.classList.contains("font-semibold")).toBe(status === "error");
+  expect(saved.classList.contains("text-[var(--color-muted)]")).toBe(status !== "error");
+});
 
 it.each([false, true])("exports fresh text after flush, with no preference values or backup timestamp change (readOnly=%s)", async (readOnly) => {
   await db.notes.bulkAdd([noteFixture(), noteFixture({ id: "trash", title: "TRASH-SENTINEL", deletedAt: "2026-10-18" })]);

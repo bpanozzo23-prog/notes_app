@@ -7,6 +7,17 @@ import { stubEditorGeometry } from "../test/editor.js";
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 const queue = () => ({ setKnownRev: vi.fn(), onConflict: vi.fn(() => () => {}), schedule: vi.fn(), flush: vi.fn().mockResolvedValue(undefined), onBeforeFlush: vi.fn(() => () => {}) });
 
+it.each([
+  ["idle", "Saved"], ["pending", "Saving…"], ["saving", "Saving…"], ["error", "Not saved"],
+])("shows %s in the header as %s", (status, label) => {
+  render(<Note initialNote={noteFixture()} notes={[]} folders={[]} queue={queue()} status={status} />);
+  const saved = screen.getByRole("status");
+  expect(saved.textContent).toBe(label);
+  expect(saved.classList.contains("text-red-700")).toBe(status === "error");
+  expect(saved.classList.contains("font-semibold")).toBe(status === "error");
+  expect(saved.classList.contains("text-[var(--color-muted)]")).toBe(status !== "error");
+});
+
 it("lists only live backlinks in pinned/recent order, includes folders, and opens outside the editor surface", () => {
   const target = noteFixture();
   const source = (id, extra = {}) => noteFixture({ id, title: id, linkedIds: [target.id], ...extra });

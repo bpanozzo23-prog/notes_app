@@ -71,7 +71,7 @@ export default function ClaudeSettings({ busy, readOnly, onBack, run, refresh, e
         <div className="flex flex-wrap gap-2">
           <button className="app-button" disabled={disabled || !!session.request} onClick={check}>{checking ? "Checking…" : "Test key"}</button>
           <button className="app-button" disabled={disabled} onClick={() => run(async () => { await setClaudeEnabled(false); await changed(); })}>Turn off</button>
-          <button className="app-button" disabled={disabled} onClick={() => setConfirmRemove(true)}>Remove key</button>
+          <button className="app-button danger" disabled={disabled} onClick={() => setConfirmRemove(true)}>Remove key</button>
         </div>
         {result && <p role="status">{result}</p>}
         <p>This month on this phone: ${spend.toFixed(2)} (estimate)</p>
@@ -87,13 +87,13 @@ export default function ClaudeSettings({ busy, readOnly, onBack, run, refresh, e
           className="min-h-11 w-full rounded border border-[var(--color-line)] px-3" disabled={disabled}
           placeholder={status.hasKey ? "Leave blank to keep the saved key" : "sk-ant-…"}
           onChange={(event) => setTyped(event.target.value.trim() !== "")} />
-        <button className="app-button" disabled={disabled || !acknowledged || (!typed && !status.hasKey)} onClick={() => run(save)}>
+        <button className="app-button primary" disabled={disabled || !acknowledged || (!typed && !status.hasKey)} onClick={() => run(save)}>
           {status.hasKey && !typed ? "Turn on" : "Save key and turn on"}
         </button>
       </>}
       <ClaudeUndo settings run={run} queue={queue} refresh={refresh} disabled={disabled} />
     </div>
-    {confirmRemove && <Confirm title="Remove the API key from this phone?" confirmLabel="Remove key" busy={disabled} error={error}
+    {confirmRemove && <Confirm tone="danger" title="Remove the API key from this phone?" confirmLabel="Remove key" busy={disabled} error={error}
       onCancel={() => setConfirmRemove(false)} onConfirm={() => run(async () => {
         await removeClaudeKey(); setConfirmRemove(false); await changed();
       })}>Claude will be turned off.</Confirm>}

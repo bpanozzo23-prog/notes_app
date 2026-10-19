@@ -47,14 +47,14 @@ export default function ActionListEditor({ preference, formatting, perRow, run, 
           {action && <span className="flex w-6 shrink-0 justify-center"><ActionIcon action={action} size={18} /></span>}
           <span className="min-w-0 flex-1 truncate text-sm" title={action?.label}>{action?.label ?? "Unavailable button"}</span>
           {action ? <ListControls label={action.label} index={index} count={ids.length} disabled={disabled}
-            onMove={(target) => move(index, target)} onOptions={() => setOptions(index)} /> : <button className="app-button text-sm" disabled={disabled} onClick={() => change(ids.filter((_, i) => i !== index))}>Remove</button>}
+            onMove={(target) => move(index, target)} onOptions={() => setOptions(index)} /> : <button className="app-button danger text-sm" disabled={disabled} onClick={() => change(ids.filter((_, i) => i !== index))}>Remove</button>}
         </li>
       </Fragment>)}
     </ul>
     {!toolbar && known.length > perRow && <p className="mt-2 text-sm text-amber-800">These buttons take more than one row. After two rows, the rest are in ⋯ More.</p>}
     <div className="mt-4 flex gap-2">
       <button className="app-button" disabled={disabled} onClick={() => setAdding(true)}>+ Add buttons</button>
-      <button className="app-button" disabled={disabled} onClick={() => setReset(true)}>Reset</button>
+      <button className="app-button danger" disabled={disabled} onClick={() => setReset(true)}>Reset</button>
     </div>
     {adding && <Dialog title="Add buttons" sheet busy={busy} onClose={() => setAdding(false)}
       footer={<button className="app-button w-full" disabled={busy} onClick={() => setAdding(false)}>Done</button>}>
@@ -79,12 +79,12 @@ export default function ActionListEditor({ preference, formatting, perRow, run, 
       <div className="flex flex-col gap-2">
         <button className="app-button" disabled={disabled || options === 0} onClick={async () => { if (await move(options, 0)) setOptions(null); }}>Move to top</button>
         <button className="app-button" disabled={disabled || options === ids.length - 1} onClick={async () => { if (await move(options, ids.length - 1)) setOptions(null); }}>Move to bottom</button>
-        <button className="app-button text-red-700" disabled={disabled} onClick={async () => { if (await change(ids.filter((_, i) => i !== options))) setOptions(null); }}>Remove</button>
+        <button className="app-button danger" disabled={disabled} onClick={async () => { if (await change(ids.filter((_, i) => i !== options))) setOptions(null); }}>Remove</button>
         {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
         <button className="app-button" disabled={busy} onClick={() => setOptions(null)}>Cancel</button>
       </div>
     </Dialog>}
-    {reset && <Confirm title={toolbar ? "Reset toolbar?" : "Reset selection pop-up?"} confirmLabel="Reset" busy={busy} error={error}
+    {reset && <Confirm tone="danger" title={toolbar ? "Reset toolbar?" : "Reset selection pop-up?"} confirmLabel="Reset" busy={busy} error={error}
       onCancel={() => setReset(false)} onConfirm={resetDefaults}>
       {toolbar ? "Reset the toolbar to the default buttons and layout?" : "Reset the selection pop-up to the default buttons?"}
     </Confirm>}

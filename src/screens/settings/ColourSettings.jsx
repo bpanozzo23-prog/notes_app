@@ -52,12 +52,12 @@ export default function ColourSettings({ formatting, busy, readOnly, onBack, run
       </ul>
       <div className="mt-4 flex gap-2">
         <button className="app-button" disabled={disabled || entries.length >= 60} onClick={() => { setName(""); setColor(highlight ? "#fde68a" : "#2563eb"); setDuplicate(false); setAdding(true); }}>+ Add a colour</button>
-        <button className="app-button" disabled={disabled} onClick={() => setConfirmation("reset")}>Reset</button>
+        <button className="app-button danger" disabled={disabled} onClick={() => setConfirmation("reset")}>Reset</button>
       </div>
       {entries.length >= 60 && <p className="mt-2 text-sm">Up to 60 colours fit in this palette.</p>}
     </div>
     {adding && <Dialog title="Add a colour" sheet busy={busy} onClose={() => setAdding(false)}
-      footer={<div className="flex justify-end gap-2"><button className="app-button" disabled={busy} onClick={() => setAdding(false)}>Cancel</button><button className="app-button" disabled={disabled || !validName} onClick={add}>Add colour</button></div>}>
+      footer={<div className="flex justify-end gap-2"><button className="app-button" disabled={busy} onClick={() => setAdding(false)}>Cancel</button><button className="app-button primary" disabled={disabled || !validName} onClick={add}>Add colour</button></div>}>
       <fieldset disabled={disabled} className="space-y-3">
         <label className="block">Name<input className="app-input mt-1 w-full" maxLength={40} value={name} onChange={(event) => setName(event.target.value)} /></label>
         <label className="flex items-center gap-3">Colour<input type="color" className="h-11 w-16" value={color} onChange={(event) => { setColor(event.target.value.toLowerCase()); setDuplicate(false); }} /></label>
@@ -72,12 +72,12 @@ export default function ColourSettings({ formatting, busy, readOnly, onBack, run
       <div className="flex flex-col gap-2">
         <button className="app-button" disabled={disabled || selectedIndex === 0} onClick={async () => { if (await change(moveEntry(entries, selectedIndex, 0))) setOptions(null); }}>Move to top</button>
         <button className="app-button" disabled={disabled || selectedIndex === entries.length - 1} onClick={async () => { if (await change(moveEntry(entries, selectedIndex, entries.length - 1))) setOptions(null); }}>Move to bottom</button>
-        {selected.custom && <button className="app-button text-red-700" disabled={disabled} onClick={() => { setConfirmation(selected); setOptions(null); }}>Delete</button>}
+        {selected.custom && <button className="app-button danger" disabled={disabled} onClick={() => { setConfirmation(selected); setOptions(null); }}>Delete</button>}
         {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
         <button className="app-button" disabled={busy} onClick={() => setOptions(null)}>Cancel</button>
       </div>
     </Dialog>}
-    {confirmation && <Confirm title={confirmation === "reset" ? "Reset colours?" : "Delete colour?"} confirmLabel={confirmation === "reset" ? "Reset" : "Delete"}
+    {confirmation && <Confirm tone="danger" title={confirmation === "reset" ? "Reset colours?" : "Delete colour?"} confirmLabel={confirmation === "reset" ? "Reset" : "Delete"}
       busy={disabled} error={error} onCancel={() => setConfirmation(null)} onConfirm={async () => {
         if (disabled) return;
         const success = confirmation === "reset" ? await run(async () => { await delPref(preference); await refresh(); })

@@ -126,6 +126,9 @@ await button("Export notes as text").click();
 await (await textDownload).saveAs(`${out}/106-sample-export.md`);
 await back();
 await shot("04-list");
+await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+await shot("04b-list-end");
+await page.evaluate(() => window.scrollTo(0, 0));
 
 await page.getByRole("button", { name: "Español" }).click();
 await shot("05-list-folder-filter");
@@ -380,7 +383,7 @@ await page.locator(".note-image").last().evaluate((element) => element.scrollInt
 await shot("59-image-inserted");
 await back();
 await button("Settings").click();
-await page.getByText(/^Images: 2,/).scrollIntoViewIfNeeded();
+await page.getByText(/^Images: 2 \(/).scrollIntoViewIfNeeded();
 await shot("60-settings-images");
 // Phase 3a settings, before the destructive database-guard shots below.
 await page.evaluate(() => window.scrollTo(0, 0));

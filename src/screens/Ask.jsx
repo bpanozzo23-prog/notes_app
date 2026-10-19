@@ -115,7 +115,7 @@ export default function Ask({ notes, trash, folders, openNote, queue, run, busy,
       {conversation?.ended ? <p role="status">{conversation.ended}</p> : capped ? <p>Start a new question</p> : (!conversation || conversation.turns[0]?.status === "completed") && <div className="space-y-3">
         <label className="block text-sm" htmlFor="ask-question">{conversation ? "Follow-up question" : "Your question"}</label>
         <textarea id="ask-question" className="w-full resize-y rounded-lg border border-[var(--color-line)] bg-transparent p-3" rows={3} enterKeyHint="send" value={question} disabled={busy} onChange={(event) => setQuestion(event.target.value)} />
-        {!state.request && <button className="app-button" disabled={disabled || !question.trim()} onClick={conversation ? followUp : prepare}>{conversation ? `Send · ${aboutMoney(estimate.dollars)}` : "Send"}</button>}
+        {!state.request && <button className="app-button primary" disabled={disabled || !question.trim()} onClick={conversation ? followUp : prepare}>{conversation ? `Send · ${aboutMoney(estimate.dollars)}` : "Send"}</button>}
       </div>}
       <button className="app-button" disabled={disabled} onClick={() => setTidySheet(true)}>Tidy the notebook</button>
       {state.request?.kind === "ask" && <button className="app-button" onClick={() => claudeSession.cancelRequest()}>Cancel</button>}
@@ -126,8 +126,8 @@ export default function Ask({ notes, trash, folders, openNote, queue, run, busy,
       <button className="app-button mt-2 w-full" disabled={disabled} onClick={() => prepareTidy("links")}>Links between notes</button>
       <button className="app-button mt-2 w-full" disabled={disabled} onClick={() => prepareTidy("duplicates")}>Find duplicates to merge</button>
     </Dialog>}
-    {confirmTidy && <Confirm title="Discard Claude's other proposal?" confirmLabel="Discard and continue" busy={disabled} onCancel={() => setConfirmTidy(false)} onConfirm={() => prepareTidy(confirmTidy, true)}>Only one proposal is kept at a time.</Confirm>}
+    {confirmTidy && <Confirm tone="danger" title="Discard Claude's other proposal?" confirmLabel="Discard and continue" busy={disabled} onCancel={() => setConfirmTidy(false)} onConfirm={() => prepareTidy(confirmTidy, true)}>Only one proposal is kept at a time.</Confirm>}
     {prepared && <Disclosure prepared={prepared} busy={preparingImages} disabled={disabled} message={notice || disabledMessage} onImages={includeImages} onCancel={() => setPrepared(null)} onSend={sendFirst} />}
-    {confirmNew && <Confirm title="Clear this conversation?" confirmLabel="Clear conversation" onCancel={() => setConfirmNew(false)} onConfirm={() => { claudeSession.clearConversation(); setQuestion(""); setConfirmNew(false); }}>The answers will be cleared from this session.</Confirm>}
+    {confirmNew && <Confirm tone="danger" title="Clear this conversation?" confirmLabel="Clear conversation" onCancel={() => setConfirmNew(false)} onConfirm={() => { claudeSession.clearConversation(); setQuestion(""); setConfirmNew(false); }}>The answers will be cleared from this session.</Confirm>}
   </section>;
 }

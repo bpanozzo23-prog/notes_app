@@ -34,7 +34,7 @@ export default function Folders({ folders, notes, trash, refresh, run, busy, rea
             if (await change(() => renameFolder(folder.id, rename))) setRenaming(null);
           }}>
             <input autoFocus className="app-input w-full" aria-label="Folder name" value={rename} onChange={(event) => setRename(event.target.value)} />
-            <div className="flex gap-2"><button className="app-button" disabled={busy || !rename.trim()}>Save name</button><button type="button" className="app-button" onClick={() => setRenaming(null)}>Cancel</button></div>
+            <div className="flex gap-2"><button className="app-button primary" disabled={busy || !rename.trim()}>Save name</button><button type="button" className="app-button" onClick={() => setRenaming(null)}>Cancel</button></div>
           </form> : <div className="flex items-center gap-1">
             <p className="min-w-0 flex-1 break-words font-medium">{folder.name}</p>
             <div className="flex shrink-0">
@@ -47,7 +47,7 @@ export default function Folders({ folders, notes, trash, refresh, run, busy, rea
         </li>)}
       </ul>
     </fieldset>
-    {deleting && <Confirm title={`Delete folder “${deleting.name}”?`} confirmLabel="Delete folder" busy={busy} error={error} onCancel={() => setDeleting(null)} onConfirm={async () => {
+    {deleting && <Confirm tone="danger" title={`Delete folder “${deleting.name}”?`} confirmLabel="Delete folder" busy={busy} error={error} onCancel={() => setDeleting(null)} onConfirm={async () => {
       if (await change(() => deleteFolder(deleting.id))) setDeleting(null);
     }}>{count} {count === 1 ? "note" : "notes"} (including any in Trash) will move to no folder. The notes will be kept.</Confirm>}
   </section>;

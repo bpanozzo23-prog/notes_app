@@ -17,6 +17,7 @@ import { claudeSession } from "../claude/session.js";
 import Confirm from "../components/Confirm.jsx";
 import { noteTitle, tagsInUse, visibleNotes } from "../lib/notebookView.js";
 import { noteDates, nowIso } from "../lib/dates.js";
+import { saveStatusLabel } from "../lib/saveStatus.js";
 
 // The fields whose change counts as an edit, as in src/db/notes.js.
 const CONTENT_FIELDS = ["title", "html", "folderId", "tags"];
@@ -92,7 +93,7 @@ export default function Note({ initialNote, notes, folders, toolbarIds, formatti
   return <section className="flex flex-1 flex-col pb-24" onBlur={() => { queue.flush().catch(() => {}); }}>
     <ScreenHeader title="Note" onBack={onBack} busy={busy}>
       {claudeReady && <button className="icon-button" aria-label="Claude" disabled={busy} onClick={() => setClaudeSheet(true)}><Sparkles size={20} aria-hidden="true" /></button>}
-      <span role="status" className={`pr-1 text-xs ${status === "error" ? "font-semibold text-red-700" : "text-[var(--color-muted)]"}`}>{status === "error" ? "Not saved" : status}</span>
+      <span role="status" className={`pr-1 text-xs ${status === "error" ? "font-semibold text-red-700" : "text-[var(--color-muted)]"}`}>{saveStatusLabel(status)}</span>
     </ScreenHeader>
     {conflict && <aside role="status" className="mx-4 my-3 rounded bg-amber-50 p-3 text-sm">
       <p>This note was changed in another window, so your edits here were saved in a new note, “{conflict.copyTitle}”. Nothing was overwritten.</p>
@@ -135,11 +136,11 @@ export default function Note({ initialNote, notes, folders, toolbarIds, formatti
       <textarea id="split-instruction" disabled={busy} rows={3} maxLength={500} className="w-full rounded border p-2" value={splitInstruction} onChange={(event) => setSplitInstruction(event.target.value)} />
       <button className="app-button" disabled={busy || readOnly || !!session.request} onClick={() => tidyNote("split")}>Split…</button>
     </div></Dialog>}
-    {confirmTidy && <Confirm title="Discard Claude's other proposal?" confirmLabel="Discard and continue" busy={busy} onCancel={() => setConfirmTidy(false)} onConfirm={() => tidyNote(confirmTidy, true)}>Only one proposal is kept at a time.</Confirm>}
-    {confirmAsk && <Confirm title="Clear the current conversation and ask about this note?" confirmLabel="Clear and ask" onCancel={() => setConfirmAsk(false)} onConfirm={() => askNote(true)}>The current answers will be cleared.</Confirm>}
+    {confirmTidy && <Confirm tone="danger" title="Discard Claude's other proposal?" confirmLabel="Discard and continue" busy={busy} onCancel={() => setConfirmTidy(false)} onConfirm={() => tidyNote(confirmTidy, true)}>Only one proposal is kept at a time.</Confirm>}
+    {confirmAsk && <Confirm tone="danger" title="Clear the current conversation and ask about this note?" confirmLabel="Clear and ask" onCancel={() => setConfirmAsk(false)} onConfirm={() => askNote(true)}>The current answers will be cleared.</Confirm>}
     <p className="mx-4 mt-6 text-xs text-[var(--color-muted)]">{noteDates(note)}</p>
     {linkEditor && <LinkPicker editor={linkEditor} noteId={note.id} notes={notes} folders={folders} onClose={() => setLinkEditor(null)} />}
-    {confirmDelete && <Confirm title="Move note to Trash?" confirmLabel="Move to Trash" busy={busy} error={error} onCancel={() => setConfirmDelete(false)} onConfirm={() => onDelete(note.id)}>
+    {confirmDelete && <Confirm tone="danger" title="Move note to Trash?" confirmLabel="Move to Trash" busy={busy} error={error} onCancel={() => setConfirmDelete(false)} onConfirm={() => onDelete(note.id)}>
       You can restore this note for 30 days. After that, it is permanently deleted.
     </Confirm>}
   </section>;

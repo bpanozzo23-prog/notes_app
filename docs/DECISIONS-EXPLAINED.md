@@ -1020,3 +1020,26 @@ before the fix:
 which now gives you a conflict copy instead of a silent loss.
 
 **Lock-in: none.** A conflict copy is an ordinary note.
+
+### 61. Visual quick wins (your request, after Phase 3)
+
+**Chosen:** four small fixes from reading the app at phone size, the first step of the visual work.
+- **Save status:** "Saved", "Saving…" or "Not saved" instead of the internal word "idle".
+- **The end of the list** leaves room for the + button and the phone's gesture bar.
+- **Settings:**
+  - a proper **Choose a backup file…** button instead of the browser's raw file picker;
+  - "Images: 1 (5 KB)";
+  - "Protected from automatic clearing" instead of the technical "Persistent storage".
+- **Buttons** follow three rules:
+  - the action a screen or dialog exists for is filled dark (Send, Apply, Merge, Export backup,
+    Save);
+  - anything that deletes or replaces is red, and its final confirmation is filled red;
+  - everything else stays as it was.
+
+**Why these first:** they're small and low-risk, and they remove things that looked unfinished
+or made every button look equally important.
+
+**How visual work continues:** one area at a time, most-used screens first. For each, I show you
+before/after pictures at phone size before anything is published.
+
+**Lock-in: none.** All of this is styling and wording.

@@ -33,7 +33,7 @@ export default function Disclosure({ prepared, onImages, onCancel, onClose = onC
     </div>
     <div className="mt-5 flex justify-end gap-2">
       <button data-initial-focus className="app-button" disabled={busy} onClick={onCancel}>Cancel</button>
-      <button className="app-button" disabled={busy || disabled} onClick={onSend}>Send</button>
+      <button className="app-button primary" disabled={busy || disabled} onClick={onSend}>Send</button>
     </div>
   </Dialog>;
 }

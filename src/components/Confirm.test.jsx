@@ -8,7 +8,7 @@ it("focuses Cancel, traps Tab in both directions, cancels on Escape and restores
   const action = vi.fn();
   function Harness() {
     const [open, setOpen] = useState(false);
-    return <><button onClick={() => setOpen(true)}>Open</button>{open && <Confirm title="Delete?" confirmLabel="Delete" onConfirm={action} onCancel={() => setOpen(false)}>Cannot undo.</Confirm>}</>;
+    return <><button onClick={() => setOpen(true)}>Open</button>{open && <Confirm tone="danger" title="Delete?" confirmLabel="Delete" onConfirm={action} onCancel={() => setOpen(false)}>Cannot undo.</Confirm>}</>;
   }
   const view = render(<Harness />);
   const opener = screen.getByRole("button", { name: "Open" });
@@ -30,8 +30,18 @@ it("focuses Cancel, traps Tab in both directions, cancels on Escape and restores
 });
 it("disables both actions and Escape while confirmation is being applied", () => {
   const cancel = vi.fn();
-  render(<Confirm title="Replace?" busy onCancel={cancel} onConfirm={() => {}}>Working</Confirm>);
+  render(<Confirm tone="danger" title="Replace?" busy onCancel={cancel} onConfirm={() => {}}>Working</Confirm>);
   fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
   expect(cancel).not.toHaveBeenCalled();
   for (const button of screen.getAllByRole("button")) expect(button.disabled).toBe(true);
+});
+
+it.each([undefined, "primary", "danger"])("styles the confirming action for tone %s and keeps Cancel plain", (tone) => {
+  const action = vi.fn();
+  render(<Confirm title="Continue?" tone={tone} onConfirm={action} onCancel={() => {}}>Details</Confirm>);
+  const confirm = screen.getByRole("button", { name: "Confirm" });
+  expect(confirm.className).toBe(tone === "danger" ? "app-button danger primary" : "app-button primary");
+  expect(screen.getByRole("button", { name: "Cancel" }).className).toBe("app-button");
+  fireEvent.click(confirm);
+  expect(action).toHaveBeenCalledTimes(1);
 });

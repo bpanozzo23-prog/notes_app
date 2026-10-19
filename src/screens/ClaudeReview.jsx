@@ -137,7 +137,7 @@ export default function ClaudeReview({ run, queue, busy, onBack, refresh, claude
             : <ChangeCard key={change.id} change={change} index={++index} total={proposal.changes.filter((run) => run.id).length} checked={selected.has(change.id)} onToggle={() => toggle(change.id)} disabled={disabled} titles={titles} />)}
           </>}
           <div className="flex flex-wrap gap-2">{!whole && <button className="app-button" disabled={disabled} onClick={() => claudeSession.updateProposal(entry.id, { ticked: [] })}>Untick all</button>}
-            <button className="app-button" disabled={disabled || current !== true || !selected.size || !!titleError} onClick={apply}>{whole ? `Apply ${kind}` : `Apply ${selected.size} ${selected.size === 1 ? "change" : "changes"}`}</button></div>
+            <button className="app-button primary" disabled={disabled || current !== true || !selected.size || !!titleError} onClick={apply}>{whole ? `Apply ${kind}` : `Apply ${selected.size} ${selected.size === 1 ? "change" : "changes"}`}</button></div>
         </>}
       </>}
       {(entry?.status === "failed" || entry?.status === "ready" && current === false) && <button className="app-button" disabled={disabled || !!state.request} onClick={again}>Ask again</button>}

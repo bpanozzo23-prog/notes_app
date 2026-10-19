@@ -69,10 +69,10 @@ export default function StyleEditor({ style, initial, formatting, busy, readOnly
       footer={<div>
         {(validation || error) && <p role="alert" className="mb-2 text-sm text-red-700">{validation || error}</p>}
         <div className="flex items-center gap-2">
-          {style && <button className="app-button text-red-700" disabled={disabled} onClick={() => setDeleting(true)}>Delete</button>}
+          {style && <button className="app-button danger" disabled={disabled} onClick={() => setDeleting(true)}>Delete</button>}
           <div className="flex-1" />
           <button className="app-button" disabled={busy} onClick={onClose}>Cancel</button>
-          <button className="app-button" disabled={disabled} onClick={save}>Save</button>
+          <button className="app-button primary" disabled={disabled} onClick={save}>Save</button>
         </div>
       </div>}>
       <fieldset disabled={disabled} className="min-w-0 space-y-3">
@@ -98,7 +98,7 @@ export default function StyleEditor({ style, initial, formatting, busy, readOnly
         <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" role="switch" checked={inToolbar} onChange={(event) => setInToolbar(event.target.checked)} />Button in the toolbar</label>
       </fieldset>
     </Dialog>
-    {deleting && <Confirm title="Delete style?" confirmLabel="Delete" busy={disabled} error={error} onCancel={() => setDeleting(false)}
+    {deleting && <Confirm tone="danger" title="Delete style?" confirmLabel="Delete" busy={disabled} error={error} onCancel={() => setDeleting(false)}
       onConfirm={async () => { if (!disabled && await run(async () => { await deleteNamedStyle(style.id); await refresh(); })) onClose(); }}>
       {deleteStyleMessage(style.name)}
     </Confirm>}

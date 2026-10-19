@@ -18,12 +18,12 @@ export default function Trash({ trash, refresh, run, busy, readOnly, onBack, err
           <p className="mt-1 text-xs text-[var(--color-muted)]">Deleted {new Date(note.deletedAt).toLocaleDateString()} · expires in {Math.max(0, Math.ceil((Date.parse(note.deletedAt) + TRASH_RETENTION_MS - Date.now()) / 86400000))} days</p>
           <div className="mt-3 flex gap-2">
             <button className="app-button" disabled={busy || readOnly} onClick={() => change(() => restoreNote(note.id))}>Restore</button>
-            <button className="app-button text-red-700" disabled={busy || readOnly} onClick={() => setDeleting(note)}>Delete now</button>
+            <button className="app-button danger" disabled={busy || readOnly} onClick={() => setDeleting(note)}>Delete now</button>
           </div>
         </li>)}
       </ul>
     </div>
-    {deleting && <Confirm title="Permanently delete note?" confirmLabel="Delete now" busy={busy} error={error} onCancel={() => setDeleting(null)} onConfirm={async () => {
+    {deleting && <Confirm tone="danger" title="Permanently delete note?" confirmLabel="Delete now" busy={busy} error={error} onCancel={() => setDeleting(null)} onConfirm={async () => {
       if (await change(() => purgeNow(deleting.id))) setDeleting(null);
     }}>“{noteTitle(deleting)}” will be deleted immediately. This cannot be undone.</Confirm>}
   </section>;

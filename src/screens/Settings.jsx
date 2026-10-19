@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { COMFORTABLE_BACKUP_BYTES, buildBackup, backupFilename, importBackup, validateBackup } from "../db/backup.js";
 import { fileStats } from "../db/files.js";
 import { db, setPref } from "../db/db.js";
@@ -7,6 +7,7 @@ import { allFolders } from "../db/folders.js";
 import { downloadJson, downloadText, readFileAsText } from "../lib/file.js";
 import { notebookToText } from "../lib/textExport.js";
 import { nowIso } from "../lib/dates.js";
+import { saveStatusLabel } from "../lib/saveStatus.js";
 import { APP_VERSION, SCHEMA_VERSION } from "../version.js";
 import ScreenHeader from "../components/ScreenHeader.jsx";
 import { requestPersistence } from "../lib/persistence.js";
@@ -25,6 +26,7 @@ const imageCount = (count) => `${count} ${count === 1 ? "image" : "images"}`;
 export default function Settings({ cleanupError, notebook, queue, run, busy, readOnly, onBack, onOpen, setMessage, updateState, error }) {
   const claude = useClaudeStatus(notebook.prefs);
   const [preview, setPreview] = useState(null);
+  const backupInput = useRef(null);
   const [confirmImport, setConfirmImport] = useState(false);
   const { notes, trash, folders, prefs, persisted, refresh } = notebook;
   const [images, setImages] = useState(null), [storage, setStorage] = useState(null);
@@ -81,14 +83,15 @@ export default function Settings({ cleanupError, notebook, queue, run, busy, rea
       </section>
       <div className="space-y-2">
         <h2 className="font-semibold">Backup</h2>
-        <button className="app-button" disabled={busy || readOnly} onClick={() => run(exportFile)}>Export backup</button>
+        <button className="app-button primary" disabled={busy || readOnly} onClick={() => run(exportFile)}>Export backup</button>
         <p className="text-sm text-[var(--color-muted)]">Last backup: {prefs.lastBackupAt ? new Date(prefs.lastBackupAt).toLocaleString() : "Not yet exported"}</p>
         <button className="app-button" disabled={busy} onClick={() => run(exportText)}>Export notes as text</button>
         <p className="text-sm text-[var(--color-muted)]">A readable file of your notes for other apps and AI tools. No pictures or settings.</p>
       </div>
       <div className="space-y-3">
         <label className="block font-semibold" htmlFor="backup-file">Import backup</label>
-        <input id="backup-file" type="file" accept=".json,application/json" disabled={busy || readOnly} className="block w-full text-sm"
+        <button className="app-button" disabled={busy || readOnly} onClick={() => backupInput.current?.click()}>Choose a backup file…</button>
+        <input ref={backupInput} id="backup-file" type="file" accept=".json,application/json" disabled={busy || readOnly} className="sr-only" tabIndex={-1}
           onChange={(event) => {
             const file = event.target.files?.[0];
             event.target.value = "";
@@ -106,22 +109,22 @@ export default function Settings({ cleanupError, notebook, queue, run, busy, rea
           {preview.result.summary.willUpgrade && <p>This file will be upgraded to the current format.</p>}
           {preview.result.errors.map((error, index) => <p role="alert" className="text-red-700" key={index}>{error}</p>)}
           {preview.result.warnings.map((warning, index) => <p className="text-amber-800" key={index}>{warning}</p>)}
-          {preview.result.ok && <button className="app-button" disabled={busy || readOnly} onClick={() => setConfirmImport(true)}>Replace notebook</button>}
+          {preview.result.ok && <button className="app-button danger" disabled={busy || readOnly} onClick={() => setConfirmImport(true)}>Replace notebook</button>}
         </div>}
       </div>
       <div className="space-y-2 text-sm">
         <h2 className="font-semibold">App</h2>
-        {images && <p>Images: {images.count}, {formatSize(images.bytes)}</p>}
+        {images && <p>Images: {images.count} ({formatSize(images.bytes)})</p>}
         {Number.isFinite(storage?.usage) && Number.isFinite(storage?.quota) && <p>Storage used: {formatSize(storage.usage)} of about {formatSize(storage.quota)} available</p>}
         {backupBytes > COMFORTABLE_BACKUP_BYTES && <p>Your backup is getting large (about {formatSize(backupBytes)}). Exports and imports may be slow on the phone.</p>}
         {cleanupError && <p role="alert">Image cleanup: {cleanupError}</p>}
         <p>App version: {APP_VERSION} · Schema version: {SCHEMA_VERSION}</p>
-        <p>Persistent storage: {persisted === "unavailable" ? "Unavailable in this browser" : persisted === undefined ? "Not requested yet" : persisted ? "Granted" : "Not granted"}</p>
+        <p>Protected from automatic clearing: {persisted === "unavailable" ? "Not available in this browser" : persisted === undefined ? "Not asked yet" : persisted ? "Yes" : "No (export backups regularly)"}</p>
         <p>{updateState}</p>
-        <p>Save status: {queue.status === "error" ? `Not saved — ${queue.error?.message}` : queue.status}</p>
+        <p className={queue.status === "error" ? "font-semibold text-red-700" : "text-[var(--color-muted)]"}>Save status: {saveStatusLabel(queue.status)}{queue.status === "error" && ` — ${queue.error?.message}`}</p>
       </div>
     </div>
-    {confirmImport && <Confirm title="Replace notebook?" confirmLabel="Import and replace" busy={busy} error={error} onCancel={() => setConfirmImport(false)} onConfirm={() => run(replaceFromPreview)}>
+    {confirmImport && <Confirm tone="danger" title="Replace notebook?" confirmLabel="Import and replace" busy={busy} error={error} onCancel={() => setConfirmImport(false)} onConfirm={() => run(replaceFromPreview)}>
       Replace {notes.length + trash.length} notes and {folders.length} folders with {preview.result.envelope.notes.length} notes and {preview.result.envelope.folders.length} folders? A safety backup of the current notebook will download first. Your toolbar, colours and styles will be replaced by the backup's.
     </Confirm>}
   </section>;

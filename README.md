@@ -129,6 +129,9 @@ LLM can read. The code may become public; the notes never are.
   link to a note deleted meanwhile; a citation is marked edited after an Undo. Owner-verified on
   the phone 2026-10-18. **Phase 3 is complete** apart from the owner's merge/split (3f) phone
   check, still pending.
+- **Visual quick wins — 2026-10-18 (0.3.10).** "Saved" instead of "idle"; the list's end clears
+  the + button; a proper Import button and plain wording in Settings; one filled main action per
+  screen and red for anything that deletes. Approved by the owner from before/after screenshots.
 
 ## Running it
 

@@ -983,3 +983,37 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   note edited in the installed app and a browser tab gave a conflict copy with nothing lost; Ask
   and Tidy this note still work): "Checks pass". Asked, the owner said the 3f merge/split
   checklist has not been tried on the phone yet; it stays pending.
+
+## Visual quick wins (0.3.10)
+
+- 2026-10-18 — Note and Settings share `saveStatusLabel`: Saved, Saving… and Not saved; Settings
+  retains the error detail, and failed saves stay red and bold. — Plain words describe the result
+  without exposing save-queue states; internal values, comparisons and save behavior stay intact.
+- 2026-10-18 — The notes list ends with `6rem + env(safe-area-inset-bottom)` of padding; the +
+  button keeps its size and position. Screenshot `04b-list-end` scrolls to the bottom after 04,
+  then restores the top for the existing shots. — The last note and Trash link need clearance
+  above the button even on phones with a gesture bar.
+- 2026-10-18 — Settings offers “Choose a backup file…” through the existing labelled input,
+  now visually hidden, with the same busy/read-only guard. Images show count (size); persistence
+  reads “Protected from automatic clearing” with the same four states. — Familiar controls and
+  plain wording explain backup and storage without changing the import preview or data flow.
+- 2026-10-18 — Buttons use one dark primary action per screen, dialog, sheet or card; destructive
+  actions have red outlines and their confirmations are filled red. Confirm defaults to primary,
+  so Undo is no longer red. Send, Apply, Merge, Export backup, Save key/Turn on, Save style, Add
+  colour and Save name receive the primary style. Remove and Reset use danger for button lists,
+  palettes and styles. Equal choices,
+  Cancel and proposal Discard stay plain; icon buttons stay as they are. The link picker inserts
+  on a note tap and has no separate confirming button. — The main action should be easy to find,
+  and red should consistently signal loss. Version is 0.3.10; schema stays 4, with no dependency
+  change. Screenshot edits are written for Claude Code to run; phone layout remains owner-checked.
+- 2026-10-18 — Verification passed: `npm test` (67 files, 1,318 tests; 24 added), `npm run build`,
+  `node --check scripts/screenshot.mjs` and `git diff --check`. The build retains its large-chunk
+  warning; generated CSS includes the safe-area padding and all button variants. — These checks
+  cover wording, picker guards and confirmation tones; screenshots and phone layout were not
+  run or seen. No network requests, private-data/key access, installs, server start, commit or push.
+- 2026-10-18 — Review fix (Claude Code): New question stays a plain button; only its
+  confirmation, Clear conversation, is red. — Starting a new question is an everyday action; red
+  there would read as a warning every time.
+- 2026-10-18 — The owner approved the look from before/after screenshots (note header, Settings,
+  a red confirmation, the Send button, the list's end): "Looks good". Verification: `npm test`
+  (67 files, 1,318 tests), `npm run build`, `npm run shots` (174 PNGs, new `04b-list-end`).
