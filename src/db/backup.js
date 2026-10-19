@@ -11,6 +11,8 @@ import { clearFileUrls } from "../editor/fileUrls.js";
 import { claudeApiKey, claudeEnabled, claudeSpend, claudeLastChange } from "../claude/prefs.js";
 import { claudeSession } from "../claude/session.js";
 
+// Measured on the owner's phone (2026-10-18): 40 MB and 118 MB backups each took about 1–2 s to
+// import and export. The warning starts just above the largest size proven comfortable.
 export const COMFORTABLE_BACKUP_BYTES = 150 * 1024 * 1024;
 const V1_EXPORTED_PREFS = Object.freeze(["lastBackupAt", "toolbar"]);
 export const EXPORTED_PREFS = Object.freeze(["lastBackupAt", ...FORMATTING_KEYS]);

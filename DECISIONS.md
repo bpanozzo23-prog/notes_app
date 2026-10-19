@@ -483,6 +483,13 @@ Append-only. One dated line per decision: what was decided, then why, after the 
 - 2026-10-18 — Line spacing captures stored typing marks before changing blocks and restores them with only inline spacing removed. — Review finding 5: changing spacing, including Default, must retain bold, colour and size prepared for typing.
 - 2026-10-18 — Named styles gains a confirmed Reset that deletes its preference and removes nondefault style references from toolbar and selection pop-up in one guarded transaction. — Review's Named styles Reset finding (7 in the report, task item 6): restore defaults without leaving dangling buttons or partially saved preferences.
 - 2026-10-18 — The owner verified 0.2.5 on the published app (version shown, the heading panel inside a callout, deleting a style from its edit screen): "The phone checklist checks out."
+- 2026-10-18 — Backup size measured on the owner's phone (dev address, generated image backups):
+  the 100-image file (about 40 MB) and the 300-image file (about 118 MB) each imported and
+  exported in about 1–2 seconds. `COMFORTABLE_BACKUP_BYTES` stays at 150 MB, now as a measured
+  value rather than a guess: just above the largest size proven comfortable; beyond it the phone
+  is untested, which is what the warning says. The first 300-image downloads were cut off because
+  the phone's browser tried to display the 118 MB file; the temporary server was restarted to send
+  it as a download. — Closes the Phase 2 closeout's open P2; the temporary server is stopped.
 
 ## Phase 3 (planned, Codex-reviewed and approved 2026-10-18)
 

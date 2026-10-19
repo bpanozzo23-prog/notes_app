@@ -65,17 +65,16 @@ LLM can read. The code may become public; the notes never are.
   2,560 px (WebP, or JPEG where WebP can't be made), stored once in their own tables and
   referenced from the note by id; tap an image for View (full screen, fit or actual size) and
   Delete. Images unused by any note are deleted after 30 days. Backups carry the images notes
-  use, as text inside the same JSON file. Settings shows image count, size and storage. The
-  comfortable backup size is being measured on the phone with generated 100- and 300-image
-  backups (about 40 and 118 MB). Also in this release: one Heading button (Normal text, Heading
+  use, as text inside the same JSON file. Settings shows image count, size and storage. Backups
+  of 100 and 300 generated images (about 40 and 118 MB) import and export on the phone in about
+  1–2 seconds; Settings warns above 150 MB. Also in this release: one Heading button (Normal text, Heading
   1–3) at the owner's request. Deployed 2026-10-18; owner phone check pending.
 - **Phase 2f — closeout, 2026-10-18 (0.2.5).** Codex reviewed the whole Phase 2 diff; fixes
   landed for its two serious findings (an image being added during an upgrade in another
   window, and a re-used image's stale cleanup mark) and four smaller ones (nested dialogs, the
   heading panel inside callouts and lists, line spacing on an empty line, a Reset for Named
-  styles). **Phase 2 is complete** apart from one owner measurement: export/import of the
-  generated 100- and 300-image backups on the phone's dev address, which sets the
-  "backup is getting large" warning (provisionally 150 MB). Owner-verified on the phone
+  styles). **Phase 2 is complete**; the owner's backup-size measurement (2026-10-18:
+  about 1–2 seconds each way for 118 MB) keeps the "backup is getting large" warning at 150 MB. Owner-verified on the phone
   2026-10-18. Next is Phase 3 (Claude: questions across the notebook, tidy with approval).
 - **Phase 3 — planned and approved, 2026-10-18.** Contract: `docs/PHASE-3-DIRECTION.md`
   (Codex-reviewed); plain-language lock-in review in `docs/DECISIONS-EXPLAINED.md` §38–50. Claude
