@@ -222,3 +222,8 @@ it("doesn't repeat Ask again when the banner's button says it", () => {
   expect(screen.getByRole("alert").querySelector("p").textContent).toBe("This note changed since Claude read it.");
   expect(screen.getByRole("button", { name: "Ask again" })).toBeTruthy();
 });
+
+it("tolerates a banner without a text message", () => {
+  render(<StaleBanner message={undefined} action={{ label: "Ask again", onClick: () => {} }} />);
+  expect(screen.getByRole("button", { name: "Ask again" })).toBeTruthy();
+});

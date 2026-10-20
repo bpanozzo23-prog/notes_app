@@ -5,6 +5,7 @@ import { newId, isSafeId } from "../lib/ids.js";
 import { nowIso } from "../lib/dates.js";
 import { noteTitle } from "../lib/notebookView.js";
 import { extractNoteLinks, neutralizeNoteLinks } from "../lib/text.js";
+import { appendOutboxInTransaction } from "../sync/prefs.js";
 
 export const STALE_PROPOSAL = "This note changed since Claude read it. Ask again.";
 const stale = () => { throw new Error(STALE_PROPOSAL); };
@@ -26,7 +27,7 @@ async function checkPlan(plan) {
   }
   for (const note of plan.createNotes ?? []) for (const id of extractNoteLinks(note.html)) targets.add(id);
   const linked = await db.notes.bulkGet([...targets].filter((id) => !createdIds.has(id)));
-  if (linked.some((note) => !note)) stale();
+  if (linked.some((note) => !note || plan.kind === "xps" && note.deletedAt !== null)) stale();
   for (const expected of plan.folderChecks ?? []) {
     const folder = await db.folders.get(expected.id);
     if (!folder || folder.name !== expected.name) stale();
@@ -82,6 +83,7 @@ export function applyClaudeChanges(plan) {
     }
     if (!isClaudeChange(undo)) throw new Error("Invalid Claude change.");
     await db.prefs.put({ key: "claudeLastChange", value: undo });
+    if (plan.outbox) await appendOutboxInTransaction(plan.outbox);
     return { changeId: undo.changeId, applied: undo.notes.length, created: undo.createdNotes.map((note) => note.id) };
   });
 }
@@ -101,7 +103,7 @@ export function isClaudeChange(record) {
         Number.isSafeInteger(before.rev) && before.rev > 0 && Number.isSafeInteger(entry.writtenRev) && entry.writtenRev > before.rev &&
         Array.isArray(entry.fields) && entry.fields.length > 0 && new Set(entry.fields).size === entry.fields.length && entry.fields.every((field) => fields.includes(field));
     });
-  if (!valid || ![undefined, "links", "merge", "split"].includes(record.kind)) return false;
+  if (!valid || ![undefined, "xps", "links", "merge", "split"].includes(record.kind)) return false;
   if (!["merge", "split"].includes(record.kind)) return !record.createdNotes.length && !record.trashedNotes.length && record.notes.every((entry) => !Object.hasOwn(entry, "role"));
   const content = record.notes.filter((entry) => entry.role === "content"), trashed = record.notes.filter((entry) => entry.role === "trashed");
   if (content.length > 1 || (record.kind === "split" && content.length !== 1) || record.notes.some((entry) => !["content", "trashed", "relinked"].includes(entry.role))) return false;

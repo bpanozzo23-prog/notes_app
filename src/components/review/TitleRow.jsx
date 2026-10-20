@@ -1,8 +1,10 @@
 import { useId, useState } from "react";
 import ReviewRow from "./ReviewRow.jsx";
+import { useOverlay } from "../../lib/overlays.jsx";
 
 export default function TitleRow({ before, title, onEdit, error, inputLabel = "Proposed title", reason, checked, onToggle, disabled }) {
   const [editing, setEditing] = useState(false), inputId = useId(), errorId = useId();
+  useOverlay(editing, () => setEditing(false));
   return <ReviewRow label="Title" checkboxLabel={`Title: ${before || "Untitled"} → ${title || "Untitled"}`} checked={checked} onToggle={onToggle} disabled={disabled} reason={reason}>
     <div><ins className="review-added"><span className="sr-only">added: </span>{title || "Untitled"}</ins>
       <button type="button" className="ml-1.5 min-h-11 min-w-11 text-sm text-[var(--color-accent)]" aria-expanded={editing} aria-controls={inputId} disabled={disabled} onClick={() => setEditing(!editing)}>Edit</button>

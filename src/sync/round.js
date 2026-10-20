@@ -34,8 +34,8 @@ export function captureNotebook() {
 
 // The only write in a round is an exact acknowledgement of captured outbox entries.
 // A confirmation keeps this operation alive; invalidate() also aborts that suspended work.
-export async function runSyncRound({ clientFactory = createSyncClient, onState = () => {}, offerRestore = false } = {}) {
-  const options = { clientFactory, onState, offerRestore };
+export async function runSyncRound({ clientFactory = createSyncClient, onState = () => {}, onHandled = () => {}, offerRestore = false } = {}) {
+  const options = { clientFactory, onState, onHandled, offerRestore };
   const operation = syncLifecycle.begin(), signal = operation.controller.signal;
   let retained = false, changes = 0, config;
   const mutated = (parts) => { if (affectsSync(parts)) changes++; };
@@ -85,6 +85,7 @@ export async function runSyncRound({ clientFactory = createSyncClient, onState =
       const recorded = (response.body.recorded ?? []).filter((id) => sent.has(outboxId(id)));
       await acknowledgeOutbox(recorded, checkGeneration, signal);
       current();
+      onHandled(recorded);
       return success;
     }
 

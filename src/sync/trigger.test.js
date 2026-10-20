@@ -71,6 +71,19 @@ it("syncs on start, visibility and Sync now, flushing without a navigation lock"
   expect(session.getSnapshot()).toMatchObject({ connected: true, running: false, lastSyncedAt: AT, error: null });
 });
 
+it("retires acknowledged proposal versions even when no review or list bar is mounted", async () => {
+  const proposal = { proposal: "p-fixture", hash: "a".repeat(64), status: "pending" };
+  await start(vi.fn(async ({ onState, onHandled }) => {
+    onState({ proposals: [proposal] });
+    expect(session.getSnapshot().proposals).toEqual([proposal]);
+    onHandled([proposal]);
+    return ok();
+  }));
+  expect(session.getSnapshot().proposals).toEqual([]);
+  session.update({ proposals: [proposal] });
+  expect(session.getSnapshot().proposals).toEqual([]);
+});
+
 it("debounces 10 seconds of quiet with a 60-second maximum", async () => {
   const round = await start();
   fire();

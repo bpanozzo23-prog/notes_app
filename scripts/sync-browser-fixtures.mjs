@@ -1,10 +1,44 @@
 // Shared fixture/UI steps only. No app hooks and no owner data.
 import assert from "node:assert/strict";
 import { setTimeout as delay } from "node:timers/promises";
+import fs from "node:fs/promises";
+import path from "node:path";
 
 export const button = (page, name) => page.getByRole("button", { name, exact: true });
 export const confirmation = (page) => page.getByRole("heading", { name: "The XPS copy has notes this phone doesn't", exact: true });
 export const unreachable = "Couldn't reach the XPS. Check that Tailscale is on. Trying again shortly.";
+export const staleSuggestion = "You edited this note after Claude Code read it, so this suggestion can't be applied. Claude Code's version is kept on the XPS.";
+
+// Callers pass only their temporary fixture view. Write exactly the files Claude Code writes;
+// ingestion and hashes always belong to the real service, never fabricated browser state.
+export async function writeProposalPair(viewDir, pid, note, generation, changes = {}) {
+  assert.match(pid, /^p-[a-z0-9-]{3,80}$/);
+  const { body = note.html, ...metadata } = changes;
+  const details = { note: note.id, basedOnRev: note.rev, generation, title: note.title,
+    folderId: note.folderId, tags: [...note.tags], why: "Make this fixture clearer.", ...metadata };
+  await fs.writeFile(path.join(viewDir, `inbox/${pid}.html`), body);
+  await fs.writeFile(path.join(viewDir, `inbox/${pid}.json`), JSON.stringify(details));
+}
+
+export async function writeReviewFixtures(viewDir, snapshot) {
+  const find = (title) => {
+    const note = snapshot.notes.find((note) => note.title === title && note.deletedAt === null);
+    assert.ok(note, `sample needs ${title}`); return note;
+  };
+  const text = find("Notas de clase"), metadata = find("Ideas para la próxima clase"), stale = find("Lista de lecturas");
+  const generation = snapshot.meta.generation;
+  await writeProposalPair(viewDir, "p-phone-001-text", text, generation, {
+    title: "Notas de clase — revisadas", why: "Fixed accents in the first paragraph and made the title clearer.",
+    body: text.html.replace("ojala que tu vengas", "Ojalá que tú vengas").replace("recivir", "recibir").replace("<p>", '<p style="text-align: justify">'),
+  });
+  await writeProposalPair(viewDir, "p-phone-002-metadata", metadata, generation, {
+    tags: ["clase"], folderId: null, why: "Added the class tag and kept this plan outside a folder.",
+  });
+  await writeProposalPair(viewDir, "p-phone-003-stale", stale, generation, {
+    body: stale.html.replace("Ficciones.", "Ficciones de Borges."), why: "Added the author's name.",
+  });
+  return { text, metadata, stale };
+}
 
 // Only for screen navigation with no open overlay (Back closes overlays first).
 export async function backFromScreen(page) {

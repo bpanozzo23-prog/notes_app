@@ -39,7 +39,7 @@ export default function ClaudeReview({ run, queue, busy, onBack, refresh, claude
   const state = useSyncExternalStore(claudeSession.subscribe, claudeSession.getSnapshot);
   const access = useSyncExternalStore(notebookAccess.subscribe, notebookAccess.getSnapshot);
   const entry = state.proposal, proposal = entry?.proposal, payload = entry?.payload;
-  const kind = payload?.kind, actions = kinds[kind], staleMessage = actions?.stale;
+  const kind = payload?.kind, actions = kinds[kind], staleMessage = actions?.stale ?? STALE_REORGANISE;
   const [clock, setClock] = useState(Date.now()), [online, setOnline] = useState(navigator.onLine !== false);
   const [current, setCurrent] = useState(null);
   useEffect(() => {

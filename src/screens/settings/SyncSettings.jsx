@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import ScreenHeader from "../../components/ScreenHeader.jsx";
 import Confirm from "../../components/Confirm.jsx";
+import ClaudeUndo from "../../components/ClaudeUndo.jsx";
 import BackupImport from "../../components/BackupImport.jsx";
 import { db, notebookAccess, ReadOnlyNotebookError, NotebookReplacedError, DATABASE_UPDATED } from "../../db/db.js";
 import { useOverlay } from "../../lib/overlays.jsx";
@@ -23,7 +24,7 @@ function Titles({ label, rows }) {
   </div>;
 }
 
-export default function SyncSettings({ busy, readOnly, onBack, notebook, queue, run, error, setMessage }) {
+export default function SyncSettings({ busy, readOnly, onBack, notebook, queue, run, refresh, error, setMessage }) {
   const status = useSyncExternalStore(syncSession.subscribe, syncSession.getSnapshot);
   const access = useSyncExternalStore(notebookAccess.subscribe, notebookAccess.getSnapshot);
   const [validCode, setValidCode] = useState(false), [confirmDisconnect, setConfirmDisconnect] = useState(false);
@@ -134,6 +135,7 @@ export default function SyncSettings({ busy, readOnly, onBack, notebook, queue, 
       </div>}
       {preview && <BackupImport preview={preview} onClose={closePreview} onImported={() => finishRestore({ imported: true })}
         notebook={notebook} queue={queue} run={run} busy={busy} readOnly={guarded} error={error} setMessage={setMessage} />}
+      <ClaudeUndo settings run={run} queue={queue} refresh={refresh} disabled={disabled} />
     </div>
     {confirmDisconnect && <Confirm tone="danger" title="Disconnect from the XPS?" confirmLabel="Disconnect" busy={disabled}
       onCancel={() => setConfirmDisconnect(false)} onConfirm={() => {

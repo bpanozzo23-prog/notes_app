@@ -52,14 +52,16 @@ export async function readOutbox() {
   return Array.isArray(saved) ? saved : [];
 }
 export function appendOutbox(entries) {
-  return writeTransaction([db.prefs], async () => {
-    const saved = await readOutbox(), ids = new Set(saved.map(outboxId));
-    for (const entry of Array.isArray(entries) ? entries : [entries]) {
-      // The server records the first outcome for an immutable proposal version.
-      if (!ids.has(outboxId(entry))) { saved.push(entry); ids.add(outboxId(entry)); }
-    }
-    await db.prefs.put({ key: syncOutbox, value: saved });
-  });
+  return writeTransaction([db.prefs], () => appendOutboxInTransaction(entries));
+}
+// Apply uses this inside its notes + Undo transaction. Dismiss uses the guarded wrapper.
+export async function appendOutboxInTransaction(entries) {
+  const saved = await readOutbox(), ids = new Set(saved.map(outboxId));
+  for (const entry of Array.isArray(entries) ? entries : [entries]) {
+    // The server records the first outcome for an immutable proposal version.
+    if (!ids.has(outboxId(entry))) { saved.push(entry); ids.add(outboxId(entry)); }
+  }
+  await db.prefs.put({ key: syncOutbox, value: saved });
 }
 export function acknowledgeOutbox(ids, check = () => {}, signal) {
   return cancellableWrite(async () => {

@@ -286,7 +286,7 @@ it.each([false, true])("Settings entry reads the connection state: %s", async (c
   await click(`Sync · ${connected ? "Connected" : "Off"}`);
   expect(onOpen).toHaveBeenCalledWith({ screen: "settings-sync" });
 });
-it("SyncBar ignores errors and proposals until Phase 4c", () => {
+it("SyncBar ignores connection errors and records that aren't pending proposals", () => {
   syncSession.update({ error: { kind: "blocked" }, proposals: [{ id: "fixture" }] });
   const { container } = render(<SyncBar onOpen={vi.fn()} />);
   expect(container.textContent).toBe("");

@@ -4,6 +4,7 @@ import { htmlToText } from "../../lib/text.js";
 import ReviewRow from "./ReviewRow.jsx";
 import InlineDiff, { changedWordCount } from "./InlineDiff.jsx";
 import ReadOnlyBody from "./ReadOnlyBody.jsx";
+import { useOverlay } from "../../lib/overlays.jsx";
 
 export { ReadOnlyBody };
 export function effectLabel(effect, titles = new Map()) {
@@ -25,6 +26,7 @@ const shown = (blocks) => {
 
 export default function ChangeRow({ change, checked, onToggle, disabled, titles }) {
   const [expanded, setExpanded] = useState(false), previewId = useId();
+  useOverlay(expanded, () => setExpanded(false));
   const added = !change.before.length, removed = !change.after.length;
   const structural = change.formatting.some((label) => label.startsWith("now ") || label.startsWith("new heading"));
   const count = changedWordCount(change.words);

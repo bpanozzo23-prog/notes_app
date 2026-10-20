@@ -4,6 +4,7 @@ const initial = () => ({
 });
 export function createSyncSession() {
   let snapshot = initial();
+  const handled = new Set(), key = ({ proposal, hash }) => JSON.stringify([proposal, hash]);
   const listeners = new Set();
   const emit = () => { for (const listener of listeners) listener(); };
   return {
@@ -12,9 +13,15 @@ export function createSyncSession() {
     update(patch) {
       // Explicit field list: connection credentials can never enter the external store.
       snapshot = { ...snapshot, ...Object.fromEntries(Object.keys(initial()).filter((key) => Object.hasOwn(patch, key)).map((key) => [key, patch[key]])) };
+      if (Object.hasOwn(patch, "proposals")) snapshot.proposals = snapshot.proposals.filter((entry) => !handled.has(key(entry)));
       emit();
     },
-    reset() { snapshot = initial(); emit(); },
+    hideProposals(entries) {
+      for (const entry of entries) handled.add(key(entry));
+      const proposals = snapshot.proposals.filter((entry) => !handled.has(key(entry)));
+      if (proposals.length !== snapshot.proposals.length) { snapshot = { ...snapshot, proposals }; emit(); }
+    },
+    reset() { snapshot = initial(); handled.clear(); emit(); },
   };
 }
 export const syncSession = createSyncSession();

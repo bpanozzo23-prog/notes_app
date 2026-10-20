@@ -1477,3 +1477,53 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   banner no longer repeats "Ask again." before its Ask again button (tests and shot waits follow
   the shortened text). Test edits in run G only add checks (Tick all, disabled rows when stale).
   Verification: `npm test` (86 files, 1,968 tests), `npm run build`.
+
+- 2026-10-20 — Phase 4c, run H adds the phone inbox at 0.4.1, using run G's shared review
+  cards, rows, amber warning and action bar. The HTML audit walks an inert DOM before cleaning;
+  its vocabulary comes from the editor schema and supported HTML samples, including the
+  editor's own serialized markup. It counts authored CSS declarations once and combines its
+  removals with the cleaner's report without counting the same reference twice. Images can
+  refer only to images already in that note, and note links only to live notes.
+- 2026-10-20 — Each reviewed proposal version keeps its exact diff and tick ids while the
+  screen is open. Later saves only mark that card stale; they never silently give an existing
+  tick different text. Apply captures the selected current cards before flushing the save queue,
+  then checks all revisions and the generation in one transaction. Its `kind: "xps"` record
+  uses the existing Undo slot, and its proposal outcomes are appended in that same transaction.
+  A target moved to Trash also refuses any newly added note link. A failed batch refreshes the
+  review and applies nothing.
+- 2026-10-20 — Handled proposal versions are hidden for the rest of the in-memory sync session
+  as well as while their outcomes wait in the durable outbox. A late GET result or an outcome
+  acknowledgement cannot resurrect a card. Dismiss records `dismissed`, or `stale` when its
+  note changed, and keeps the proposal on the XPS. The next sync reports outcomes through the
+  existing engine. Reload starts with an empty review until sync supplies pending proposals.
+- 2026-10-20 — Shared title-edit and formatted Before/After panels register with the existing
+  overlay stack so Android Back closes the last opened panel before leaving either review.
+  Settings → Sync exposes the same durable Undo as Settings → Claude, with the source-specific
+  "Undo Claude Code's last change" label. Browser scripts now write proposal HTML/JSON pairs
+  only into their temporary view, exercising ingestion, partial Apply, stale review, Dismiss
+  and Undo. No server runtime, schema, dependencies or owner data are changed.
+- 2026-10-20 — Run H final verification passed: `npm test` (89 files, 2,050 tests),
+  `npm run build`, `node --check` for every script and `git diff --check`. The production build
+  retains the existing large-chunk warning. Tests cover every supported HTML sample and its
+  serialized form, identity-reference cleaning, all stale cases, partial multi-note Apply,
+  transactional outcome writes and rollback, Undo, Dismiss, exact server acknowledgements,
+  review/bar states and Android Back. Round tests use the real request handler with temporary
+  stores and no sockets. Screenshots and `npm run sync-check` were extended but not run under
+  this run's no-network rule; the implementation's phone layout and keyboard behavior have
+  not been seen. The approved mockup PNGs were inspected (the referenced `xps.html` was absent).
+  No paid requests, protected owner data, live-service changes, commit or deployment.
+- 2026-10-20 — Claude Code reviewed run H (the suggestions screen, the proposal models, the plan
+  builder, the apply-path change: kind `"xps"`, the live-target rule, the outbox written in the
+  Apply transaction) and ran what Codex couldn't. Fixed: the stale-banner change from run G
+  crashed when a review had no message of its own (a one-frame state when leaving a stale merge
+  for the duplicates list); the review now falls back to the general stale sentence and the
+  banner accepts any message. The suggestions screen hides its Apply bar when only stale or
+  unusable suggestions are left and shows "Nothing ticked" when nothing is selected (it said
+  "Apply 0 changes to 0 notes"); a `sync-check` assertion assumed one checkbox per stale card.
+  Verification: `npm test` (89 files, 2,052 tests), `npm run build`, `npm run sync-check` 19/19
+  (10 server, 9 browser, including a proposal pair through review, partial Apply, Undo, a stale
+  card and Dismiss), `npm run shots` (198), `npm run browser-checks` 15/15. The dev server was
+  restarted once (it had stopped settling after many file changes).
+- 2026-10-20 — **4c released as 0.4.1** (schema 4): the new review look for every Claude review,
+  and Claude Code's suggestions on the phone. No server change; the XPS service stays at its
+  4a deploy. Owner's phone check pending.

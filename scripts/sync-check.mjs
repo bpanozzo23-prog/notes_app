@@ -14,9 +14,10 @@ import { isEntryPoint, keyFor, readJson, sha256 } from "../server/fsutil.mjs";
 import { EXPORTED_PREFS, extractFileIds } from "../server/constants.mjs";
 import { IMAGE_EXT } from "../server/view.mjs";
 import { openStore } from "../server/store.mjs";
+import { readProposals } from "../server/proposals.mjs";
 import { guardTailnet } from "./tailnet-guard.mjs";
 import { makePng } from "./image-fixture.mjs";
-import { acceptImport, backFromScreen, button, changedSample, checkPreview, confirmation, importNotebook, until, unreachable, waitSynced } from "./sync-browser-fixtures.mjs";
+import { acceptImport, backFromScreen, button, changedSample, checkPreview, confirmation, importNotebook, until, unreachable, waitSynced, writeProposalPair, staleSuggestion } from "./sync-browser-fixtures.mjs";
 
 const run = promisify(execFile);
 const MAIN = fileURLToPath(new URL("../server/main.mjs", import.meta.url));
@@ -552,6 +553,66 @@ export async function browserSyncCheck(print = console.log) {
     assert.ok(recovered.html.includes("Crash recovery fixture."));
     await verifyCopy({ ...uploadB, notes: journal.payload.next.notes });
     assertHealthy(); pass("commit crash shows unreachable; restart resolves the journal and the next browser round succeeds");
+
+    activeCheck = "proposal review, partial Apply and Undo";
+    const reviewCopy = await storeSnapshot(), reviewNote = reviewCopy.notes.find((note) => note.id === edited.id);
+    const proposalRecords = async () => (await readProposals(config.storeDir)).map(({ record }) => record);
+    const proposalRecord = async (pid) => (await proposalRecords()).find((record) => record.proposal === pid);
+    const pid = "p-browser-review";
+    await writeProposalPair(config.viewDir, pid, reviewNote, reviewCopy.meta.generation, {
+      title: "Browser proposal title", body: `${reviewNote.html}<p>Proposed browser addition.</p>`,
+      why: "Add a fixture sentence and clarify the title.",
+    });
+    await until("proposal file pair ingested", () => proposalRecord(pid), (record) => record?.status === "pending");
+    await button(page, "Sync now").click(); await waitSynced(page);
+    await back(); await back();
+    await button(page, "Claude Code suggests changes to 1 note · Review").click();
+    await page.getByRole("heading", { name: "Claude Code's suggestions", exact: true }).waitFor();
+    await page.getByRole("checkbox", { name: /^Title:/ }).uncheck();
+    await button(page, "Apply 1 change to 1 note").click();
+    await page.getByText("Applied 1 change to 1 note.", { exact: true }).waitFor();
+    const recorded = await until("selected proposal ticks reported", () => proposalRecord(pid), (record) => record?.status === "applied", 75_000);
+    assert.deepEqual(recorded.outcome.applied, [`${pid}:${recorded.hash}:body-1`]);
+    const appliedNote = (await storeSnapshot()).notes.find((note) => note.id === reviewNote.id);
+    assert.equal(appliedNote.title, reviewNote.title);
+    assert.ok(appliedNote.html.includes("Proposed browser addition."));
+    // Verify the actual app editor too, then use the durable Undo in Settings.
+    await back(); await button(page, reviewNote.title).click();
+    assert.ok((await page.getByLabel("Note body", { exact: true }).textContent()).includes("Proposed browser addition."));
+    await back(); await button(page, "Settings").click(); await openSync();
+    await button(page, "Undo Claude Code's last change").click();
+    await page.getByRole("dialog", { name: "Undo Claude Code's last change?", exact: true }).getByRole("button", { name: "Undo", exact: true }).click();
+    await page.getByText("Earlier version restored.", { exact: true }).waitFor();
+    await until("Undo synced", async () => (await storeSnapshot()).notes.find((note) => note.id === reviewNote.id),
+      (note) => note.html === reviewNote.html && note.rev > appliedNote.rev, 75_000);
+    await back(); await back(); await button(page, reviewNote.title).click();
+    assert.ok(!(await page.getByLabel("Note body", { exact: true }).textContent()).includes("Proposed browser addition."));
+    await back(); await button(page, "Settings").click(); await openSync();
+    assertHealthy(); pass("proposal pair → review → partial Apply records exact ticks → app editor → Undo");
+
+    activeCheck = "stale proposal and Dismiss outcomes";
+    const staleCopy = await storeSnapshot(), staleNote = staleCopy.notes.find((note) => note.id === reviewNote.id);
+    const dismissNote = staleCopy.notes.find((note) => note.deletedAt === null && note.id !== staleNote.id);
+    await writeProposalPair(config.viewDir, "p-browser-stale", staleNote, staleCopy.meta.generation, { title: "Stale fixture title" });
+    await writeProposalPair(config.viewDir, "p-browser-dismiss", dismissNote, staleCopy.meta.generation, { title: "Dismissed fixture title" });
+    for (const id of ["p-browser-stale", "p-browser-dismiss"]) await until("second file pair ingested", () => proposalRecord(id), (record) => record?.status === "pending");
+    await button(page, "Sync now").click(); await waitSynced(page);
+    await back(); await back(); await button(page, staleNote.title).click();
+    const staleBody = page.getByLabel("Note body", { exact: true });
+    await staleBody.click(); await staleBody.press("Control+End"); await staleBody.press("End");
+    await staleBody.pressSequentially(" Local edit after the proposal.");
+    await back(); await button(page, "Claude Code suggests changes to 2 notes · Review").click();
+    const staleCard = page.getByRole("article", { name: staleNote.title, exact: true });
+    await staleCard.getByText(staleSuggestion, { exact: true }).waitFor();
+    const staleBoxes = await staleCard.getByRole("checkbox").all();
+    assert.ok(staleBoxes.length > 0);
+    for (const box of staleBoxes) assert.ok(await box.isDisabled());
+    await page.getByRole("article", { name: dismissNote.title, exact: true }).getByRole("button", { name: "Dismiss", exact: true }).click();
+    await staleCard.getByRole("button", { name: "Dismiss", exact: true }).click();
+    await page.getByText("No suggestions waiting.", { exact: true }).waitFor();
+    await until("Dismiss reported", () => proposalRecord("p-browser-dismiss"), (record) => record?.status === "dismissed", 75_000);
+    await until("stale Dismiss reported", () => proposalRecord("p-browser-stale"), (record) => record?.status === "stale", 75_000);
+    assertHealthy(); pass("phone edit makes a proposal stale; Dismiss reports dismissed and stale outcomes");
     print(`PASS ${passed}/${passed} browser checks; temporary loopback services only.`);
   } catch (error) {
     // Never print arbitrary Playwright/child-process errors: they can contain headers/codes.

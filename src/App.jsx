@@ -9,6 +9,7 @@ import { activeEntry, createNavigationController, initialNavigation } from "./li
 import { resolveFormatting } from "./editor/formatting.js";
 import { notebookAccess, ReadOnlyNotebookError, NotebookReplacedError, DATABASE_UPDATED } from "./db/db.js";
 import ClaudeReview from "./screens/ClaudeReview.jsx";
+import SyncReview from "./screens/SyncReview.jsx";
 import ClaudeReadyBar from "./components/ClaudeReadyBar.jsx";
 import SyncBar from "./components/SyncBar.jsx";
 import SyncSettings from "./screens/settings/SyncSettings.jsx";
@@ -227,6 +228,7 @@ export default function App() {
       {route.screen === "note" && selected && <Note key={route.key} {...shared} onImageError={setMessage} initialNote={selected} notes={notebook.notes} folders={notebook.folders} queue={queue} status={status} onDelete={deleteNote} onOpenNote={openNote}
         formatting={formatting} claudeReady={claudeReady} onOpen={open} setMessage={setMessage} />}
       {route.screen === "claude-review" && <ClaudeReview openNote={openNote} {...notebook} {...shared} queue={queue} claudeReady={claudeReady} />}
+      {route.screen === "sync-review" && <SyncReview {...shared} queue={queue} />}
       {route.screen === "ask" && <Ask {...notebook} {...shared} claudeReady={claudeReady} openNote={openNote} onOpen={open} queue={queue} />}
       {route.screen === "folders" && <Folders {...notebook} {...shared} />}
       {route.screen === "trash" && <Trash trash={notebook.trash} {...shared} />}

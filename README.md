@@ -158,6 +158,14 @@ LLM can read. The code may become public; the notes never are.
   sentences. If the XPS copy would lose notes or get older versions (after an import, or on a new
   phone), the app asks first. Verified with 1,948 tests, a 17-step end-to-end check and 190
   screenshots. Owner phone check pending; **export a backup before connecting.**
+- **Phase 4c — Claude Code's suggestions on the phone, 0.4.1, released 2026-10-20.** Every
+  Claude review has a new look the owner approved from mockups: changed words shown inline
+  (struck red, added green), Before/After on demand, compact rows with ticks, tag chips, the Apply
+  bar always at the bottom, and an amber warning when a note changed after Claude read it.
+  Suggestions Claude Code writes on the XPS (`claude-notes`) arrive as "Claude Code suggests
+  changes to N notes · Review": one card per note with its reason and Dismiss; Apply changes the
+  ticked ones together, with Undo (also in Settings → Sync); outcomes go back to the XPS.
+  Owner phone check pending.
 
 ## Running it
 

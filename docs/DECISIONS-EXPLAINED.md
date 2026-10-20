@@ -5,7 +5,7 @@ this one is for the owner: what was chosen, why, what it means for the app, what
 and how hard it would be to reverse ("lock-in"). Ordered by lock-in, hardest first. Updated whenever
 `DECISIONS.md` gains an entry with consequences for how the app behaves.
 
-Last updated 2026-10-20, at step 4b (§76).
+Last updated 2026-10-20, at step 4c (§77).
 
 ---
 
@@ -1322,3 +1322,31 @@ preview). The "Your notes go to Anthropic" sentence in Claude settings now begin
 app", because Claude Code on the XPS is a separate path.
 
 **Lock-in: low.** Disconnect stops it. The XPS keeps its copy and history until deleted.
+
+### 77. Step 4c: Claude Code's suggestions on your phone, and a clearer review (0.4.1)
+
+**What you'll see:**
+- **Every Claude review looks new.** That covers Tidy, titles, tags and folders, links, and
+  Claude Code's suggestions:
+  - a changed paragraph shows once, with removed words struck through on red and added words on
+    green;
+  - **Show before and after** brings back the full formatted versions;
+  - each change is one row with a tick and a short label, tags show as chips, and a new title
+    shows first with "was: …" under it;
+  - the Apply button stays at the bottom of the screen.
+- **When a note changed after Claude read it,** an amber box says so, and its rows are greyed and
+  can't be applied.
+- **Claude Code's suggestions.** Run `claude-notes` on the XPS and ask it to change some notes.
+  Within seconds of your next sync, the notes list says "Claude Code suggests changes to N notes
+  · Review".
+  - Each note gets a card with Claude Code's one-line reason and a **Dismiss** button.
+  - **Apply** changes everything ticked, across notes, in one go. **Undo Claude Code's last
+    change** puts it back, from the success message or Settings → Sync.
+  - What you applied or dismissed goes back to the XPS, so Claude Code can see it.
+- **Nothing changes on its own.** A suggestion for a note you edited since can't be applied. Its
+  card shows what applying it would have undone, and Claude Code's version stays on the XPS.
+
+**What Claude Code can suggest in 4c:** an existing note's title, text, tags and folder. New
+notes, moving notes to Trash and new pictures are 4d, if you want them.
+
+**Lock-in: none.** It's presentation, plus a review that can only apply what you tick.

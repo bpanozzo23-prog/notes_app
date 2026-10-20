@@ -30,6 +30,7 @@ export default function ClaudeUndo({ changeId, settings = false, run, queue, ref
     return () => subscription.unsubscribe();
   }, []);
   const current = isClaudeChange(record) && (!changeId || record.changeId === changeId);
+  const label = record?.kind === "xps" ? "Undo Claude Code's last change" : "Undo Claude's last change";
   const undo = (id = record.changeId, unchangedOnly = false, keepEdits = false) => run(async () => {
     await queue?.flush();
     const result = await undoClaudeChange(id, { unchangedOnly, keepEdits, ...(keepEdits ? { expected: conflict.decisions } : {}) });
@@ -49,7 +50,7 @@ export default function ClaudeUndo({ changeId, settings = false, run, queue, ref
   return <div className="space-y-2 text-sm">
     {current && <>
       {settings && <p>{new Date(record.at).toLocaleString("en-GB")} · {description(record)}</p>}
-      <button className="app-button" disabled={disabled} onClick={() => settings ? setConfirm(record.changeId) : undo()}>{settings ? "Undo Claude's last change" : "Undo"}</button>
+      <button className="app-button" disabled={disabled} onClick={() => settings ? setConfirm(record.changeId) : undo()}>{settings || record.kind === "xps" ? label : "Undo"}</button>
       {conflict?.id === record.changeId && <div role="status" className="space-y-2">{conflict.keepEdits ? <>
         <p>Some notes changed after Claude's {record.kind}. Undo won't overwrite anything:</p>
         {conflict.changedAgain && <p>Something changed again; check the list.</p>}
@@ -58,6 +59,6 @@ export default function ClaudeUndo({ changeId, settings = false, run, queue, ref
       </> : <><p>A note changed after Claude's edit. Your later edits will be kept.</p>{conflict.partial ? <button className="app-button" disabled={disabled} onClick={() => undo(conflict.id, true)}>Undo the {conflict.unchanged} unchanged {conflict.unchanged === 1 ? "note" : "notes"}</button> : <button className="app-button" disabled={disabled} onClick={copies}>Restore the earlier versions as new notes</button>}</>}</div>}
     </>}
     {message && <p role="status">{message}</p>}
-    {current && confirm === record.changeId && <Confirm title="Undo Claude's last change?" confirmLabel="Undo" busy={disabled} onCancel={() => setConfirm(false)} onConfirm={() => undo(confirm)}>{description(record, true)}</Confirm>}
+    {current && confirm === record.changeId && <Confirm title={`${label}?`} confirmLabel="Undo" busy={disabled} onCancel={() => setConfirm(false)} onConfirm={() => undo(confirm)}>{description(record, true)}</Confirm>}
   </div>;
 }

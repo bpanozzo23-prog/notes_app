@@ -91,6 +91,9 @@ export function startSync({
         onState: (state) => {
           if (valid()) session.update({ proposals: state.proposals ?? [], counts: state.counts, missingImages: state.missingImages ?? [] });
         },
+        // Outcomes may have been queued in another window while this one shows a note.
+        // Retire its old state snapshot even when no review/bar is mounted here.
+        onHandled: (entries) => { if (valid()) session.hideProposals(entries); },
       });
     };
     // Assign before the first await, including before navigator.locks' callback.
