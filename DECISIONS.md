@@ -1422,3 +1422,8 @@ Append-only. One dated line per decision: what was decided, then why, after the 
 - 2026-10-20 — **4b released as 0.4.0** (schema 4). Nothing syncs until the owner connects in
   Settings → Sync; the live XPS service is unchanged (no server code changed in 4b). Owner's
   phone check pending; before connecting, the owner exports a backup on the published app.
+- 2026-10-20 — Owner's first real sync: the published app (0.4.0) paired with the XPS on the first
+  code and synced three rounds; `notes-sync status` showed 14 notes (11 live, 3 in Trash), 6
+  folders, 2 pictures, none missing, history recording, no journal left; the request log showed
+  only 200/204 answers. The owner confirmed the counts match the phone. — The XPS is now an
+  automatic backup of the real notebook.
