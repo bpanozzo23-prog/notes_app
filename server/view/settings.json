@@ -2,13 +2,13 @@
   "permissions": {
     "defaultMode": "dontAsk",
     "disableBypassPermissionsMode": "disable",
-    "allow": ["Edit(/inbox/**)", "Bash(./propose *)"],
+    "allow": ["Edit(/inbox/**)"],
     "deny": [
-      "WebFetch", "WebSearch", "mcp__*",
+      "Bash", "WebFetch", "WebSearch", "mcp__*",
       "Edit(/notebook/**)", "Edit(/CLAUDE.md)", "Edit(/AGENTS.md)",
-      "Edit(/propose)", "Edit(/.claude/**)",
+      "Edit(/.claude/**)",
       "Edit(/{{STORE}}/**)", "Edit(/{{CONFIG}}/**)",
-      "Edit(/{{HOME}}/.local/bin/claude-notes)", "Edit(/{{LIB}}/**)",
+      "Edit(/{{HOME}}/.local/bin/claude-notes)", "Edit(/{{HOME}}/.local/bin/notes-sync)", "Edit(/{{LIB}}/**)",
       "Read(~/.ssh/**)", "Read(~/.config/notes_app/**)", "Read(/{{CONFIG}}/**)",
       "Read(/{{STORE}}/**)", "Read(~/.claude/.credentials.json)"
     ]
@@ -25,8 +25,8 @@
     "filesystem": {
       "denyWrite": [
         "{{VIEW}}/notebook", "{{VIEW}}/CLAUDE.md", "{{VIEW}}/AGENTS.md",
-        "{{VIEW}}/propose", "{{VIEW}}/.claude",
-        "{{STORE}}", "{{CONFIG}}", "{{HOME}}/.local/bin/claude-notes", "{{LIB}}"
+        "{{VIEW}}/.claude",
+        "{{STORE}}", "{{CONFIG}}", "{{HOME}}/.local/bin/claude-notes", "{{HOME}}/.local/bin/notes-sync", "{{LIB}}"
       ],
       "denyRead": [
         "~/.ssh", "~/.config/notes_app", "{{CONFIG}}", "{{STORE}}", "~/.claude/.credentials.json"

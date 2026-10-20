@@ -8,11 +8,11 @@ import { readProposals } from "./proposals.mjs";
 import { loadViewTemplates } from "./templates.mjs";
 import { withDirectory, readViewFile, writeViewFile, unlinkInDirectory } from "./view-fs.mjs";
 
-const DIRECTORIES = ["", "notebook", "notebook/notes", "notebook/images", ".claude", "inbox", "inbox/drafts", "inbox/pending"];
+const DIRECTORIES = ["", "notebook", "notebook/notes", "notebook/images", ".claude", "inbox"];
 const NOTE_NAME = /^[a-f0-9]{64}\.html$/;
 const IMAGE_NAME = /^[a-f0-9]{64}\.(?:webp|jpg|png|gif)$/;
 const FIXED = ["notebook/notebook.md", "notebook/index.json", "notebook/folders.json",
-  "notebook/proposals.json", "notebook/proposals-log.md", "CLAUDE.md", "AGENTS.md", ".claude/settings.json", "propose"];
+  "notebook/proposals.json", "notebook/proposals-log.md", "CLAUDE.md", "AGENTS.md", ".claude/settings.json"];
 const expected = (name) => FIXED.includes(name) ||
   name.startsWith("notebook/notes/") && NOTE_NAME.test(name.slice(15)) ||
   name.startsWith("notebook/images/") && IMAGE_NAME.test(name.slice(16));
@@ -33,7 +33,7 @@ export async function rebuildView({ storeDir, viewDir, templates, now = new Date
   const snapshot = await store.readSnapshot();
   templates ??= await loadViewTemplates({ storeDir, viewDir, configDir: path.join(path.dirname(viewDir), ".config/notes_app-sync") });
   const files = new Map();
-  for (const name of ["CLAUDE.md", "AGENTS.md", ".claude/settings.json", "propose"]) {
+  for (const name of ["CLAUDE.md", "AGENTS.md", ".claude/settings.json"]) {
     if (typeof templates[name] !== "string") throw new Error("missing-view-template");
     files.set(name, templates[name]);
   }
@@ -65,6 +65,7 @@ export async function rebuildView({ storeDir, viewDir, templates, now = new Date
   files.set("notebook/proposals.json", json(proposals));
   files.set("notebook/proposals-log.md", "# Proposal outcomes\n\n" + proposals.filter((p) => p.status !== "pending").map((p) =>
     `- ${oneLine(p.outcome?.at ?? p.handledAt ?? p.ingestedAt)} · ${oneLine(p.title || "(note unavailable)")} · ${oneLine(p.status)}` +
+    (p.reason ? ` · reason: ${oneLine(p.reason)}` : "") +
     ` · applied: ${(p.outcome?.applied ?? []).map(oneLine).join(", ") || "none"}\n`).join(""));
 
   for (const directory of DIRECTORIES) {
@@ -84,7 +85,7 @@ export async function rebuildView({ storeDir, viewDir, templates, now = new Date
   for (const [name, contents] of files) {
     // A file that is intact and already holds this content isn't rewritten (pictures add up).
     if (intact.has(name) && manifest[name] === sha256(contents)) continue;
-    try { await writeViewFile(viewDir, name, contents, name === "propose" ? 0o555 : 0o444); }
+    try { await writeViewFile(viewDir, name, contents, 0o444); }
     catch (error) { await viewLog(storeDir, "write-refused", name, now); throw error; }
   }
   for (const [directory, pattern] of [["notebook/notes", NOTE_NAME], ["notebook/images", IMAGE_NAME]]) {
@@ -96,5 +97,12 @@ export async function rebuildView({ storeDir, viewDir, templates, now = new Date
       }
     });
   }
+  // Retire the old executable on rebuild without following a replaced link.
+  await withDirectory(viewDir, "", async (dir) => {
+    try {
+      const stat = await fs.lstat(path.join(dir.directory, "propose"));
+      if (stat.isFile() || stat.isSymbolicLink()) await unlinkInDirectory(dir, "propose");
+    } catch (error) { if (error.code !== "ENOENT") throw error; }
+  });
   await writeJson(path.join(storeDir, "view-manifest.json"), Object.fromEntries([...files].map(([name, contents]) => [name, sha256(contents)])));
 }

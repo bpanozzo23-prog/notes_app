@@ -1233,3 +1233,65 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   recovery after apply and after publish), and a real-socket smoke test (pairing, push, git
   commit, daily backup, 403 for another origin, 401 for a wrong token, counts-only status and
   log). All on temporary data; no owner's notes involved.
+- 2026-10-19 — The service's first install failed its health check: the `current` symlink made
+  every entry-point check false, so `main.mjs` exited without doing anything. Fixed with a
+  real-path comparison and a test (`b6e91eb`); then installed (linger on, user unit enabled,
+  Serve `:8443` → `127.0.0.1:8790`, Funnel off, empty store, view built), restarted by systemd
+  within seconds of `SIGKILL`, and passed a 10-step live check through the real Tailscale address
+  on a temporary store with the made-up sample notebook (pairing, other origin 403, wrong token
+  401, picture upload, 19-note push, backup with matching picture bytes, disconnect). The real
+  store stayed empty and unpaired.
+- 2026-10-19 — Lock-down test in real `claude-notes` sessions (Haiku, stream-json evidence): the
+  session had exactly Bash, Edit, Glob, Grep, Read and Write, no MCP servers, `dontAsk`; Write
+  and Edit were refused in `notebook/`, on `CLAUDE.md` and in the store; Read was refused for a
+  sentinel file in `~/.config/notes_app-sync/` (never read); Read of the notebook and Write into
+  `inbox/` worked. Two failures: `CLAUDE.md` does not load under `--restricted` (passing it with
+  `--append-system-prompt-file` works), and every Bash command failed with "apply-seccomp: write
+  /proc/self/setgroups (nested userns is capability-restricted …)": Ubuntu's
+  `bwrap-userns-restrict` profile moves everything bubblewrap starts into `unpriv_bwrap`, which
+  denies all capabilities. The documented fix (a `bwrap` AppArmor profile) clashes with Ubuntu's
+  own and would loosen a system-wide protection, with sudo. — The sandbox fails closed, but the
+  helper and any shell command can't run.
+- 2026-10-19 — Owner's choice: **no shell commands in note sessions.** `claude-notes` gives
+  Claude Code only Read, Edit, Write, Glob and Grep (Bash also denied in the policy). The
+  `./propose` helper is replaced by a file protocol: Claude Code writes `inbox/<id>.html` (the
+  proposed body) then `inbox/<id>.json` (its details); the service polls the inbox every few
+  seconds, ingests a pair once both files have stopped changing, checks it against the private
+  store (shape, sizes, the note's current `rev` and the generation, folder, links, pictures),
+  records the version as pending or refused with a reason in `notebook/proposals.json`, and
+  removes the two files through the symlink-safe pinned-directory helpers. A new proposal for a
+  note with one pending replaces it (superseded). — The tightest lock-down: no command runs, so
+  nothing needs sandboxing and nothing on the machine is loosened. Lost: Claude Code running
+  scripts on the notes; reading, searching and proposing remain.
+- 2026-10-19 — Run C replaces the command helper with an HTML/details file pair. The service
+  observes each pair twice, checks revisions, generation and references against the private
+  published store, and journals versions before rebuilding status files and removing inbox
+  files. A valid replacement supersedes the pending version for its note, including at the
+  50-pending limit; a refusal never supersedes it. — The owner chose a note session with no
+  shell after the real sandbox failure; proposal safety must therefore live in the service.
+- 2026-10-19 — Inbox observations and ten-minute half-pair timers are process-local and restart
+  after a service restart. Reads recheck size/time/inode, and cleanup rechecks them after commit
+  so intervening edits survive. Repeated pid/hash pairs only repeat cleanup. Nonregular entries
+  and legacy inbox subdirectories remain untouched, while rebuild retires the old root helper
+  file. — The protocol permits only regular pairs and explicitly forbids deleting unrelated
+  inbox contents; a changed or unavailable inbox is never evidence of withdrawal.
+- 2026-10-19 — The 3-second timer shares the mutation queue with state requests and skips ticks
+  while any scan is queued or running; it is unreferenced and stops on server close. It resolves
+  the journal and retries history before scanning. Both policies deny Bash, and the launcher
+  exposes exactly Read, Edit, Write, Glob and Grep and passes CLAUDE.md explicitly. — Polling
+  must work without the phone, must not pile up behind a slow commit, and must not keep tests
+  alive or depend on the unavailable Bash sandbox.
+- 2026-10-19 — Run C verification passed: `npm test` (77 files, 1,794 tests), `node --check`
+  on all nine changed `.mjs` files, and whitespace checks. The existing symlink-entry CLI test
+  now captures stderr in a temporary file because this sandbox suppresses child-process pipes;
+  it still checks the actual exit code and JSON error. The socket-based `sync-check` was updated
+  for timer ingestion, refusal and superseding but was not run. No owner paths, app sources,
+  network, sockets, deployment or repository commit were used. Real Claude Code enforcement
+  and the live service remain untested in this run.
+- 2026-10-20 — The installer adds a `notes-sync` command (`~/.local/bin/notes-sync`, bound to the
+  live config) for `pair` and `status`, removed by `--uninstall` and protected in both policies
+  like `claude-notes`. — The contract and AGENTS.md name `notes-sync pair` and `notes-sync
+  status`; the first installer didn't create them.
+- 2026-10-20 — Run C reviewed by Claude Code; verification before redeploying: `npm test` (77
+  files, 1,795 tests), `npm run sync-check` (10/10, including timer ingestion of a file pair, a
+  `changed-since-read` refusal and superseding), all on temporary data.

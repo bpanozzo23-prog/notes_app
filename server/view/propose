@@ -1,2 +1,0 @@
-#!/bin/sh
-exec node "{{LIB}}/current/server/propose.mjs" "$@"

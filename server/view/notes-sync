@@ -1,0 +1,5 @@
+#!/bin/sh
+# notes-sync: the sync service's command line (pair, status). The service itself runs under systemd.
+NOTES_SYNC_CONFIG="{{CONFIG}}/config.json"
+export NOTES_SYNC_CONFIG
+exec node "{{LIB}}/current/server/main.mjs" "$@"

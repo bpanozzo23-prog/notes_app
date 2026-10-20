@@ -1,4 +1,4 @@
-# Sync service — Phase 4a, runs A and B
+# Sync service — Phase 4a, runs A–C
 
 The runtime imports only Node built-ins and other `.mjs` files here. Nothing imports the app
 at runtime. `compatibility.test.js` compares the copied constants and image-reference parser
@@ -7,7 +7,7 @@ against the app and validates generated backups with the app's validator.
 `main.mjs` exposes `serve`, `pair`, `status` and `init-store`. The configuration path comes
 from `NOTES_SYNC_CONFIG`; its default is the owner's private configuration, so **tests must
 always supply temporary paths**. No installation or live configuration was accessed during
-either implementation run.
+these implementation runs.
 The full contract remains [`docs/PHASE-4-DIRECTION.md`](../docs/PHASE-4-DIRECTION.md).
 
 ## Embedding and hooks
@@ -15,7 +15,7 @@ The full contract remains [`docs/PHASE-4-DIRECTION.md`](../docs/PHASE-4-DIRECTIO
 - `initStore(storeDir, { git })` creates a new store; `openStore` reads an existing one without
   filling in missing files. Missing or malformed required files fail closed.
 - `createContext(config, overrides)` accepts `store`, `git`, `now`, `logger`, `afterStep`,
-  `rebuildView` and `ingestPendingProposals`. `createHandler(context)` returns the plain async
+  `rebuildView` and `scanInbox`. `createHandler(context)` returns the plain async
   request handler. `readBody(limit)` must return bytes; it is never called before boundary checks.
 - `context.enqueue(task)` owns the mutation queue. Recovery, history retries, pairing, uploads,
   pushes, outcomes and ingestion share it. Reads also pass through it, so they wait for an active
@@ -24,10 +24,13 @@ The full contract remains [`docs/PHASE-4-DIRECTION.md`](../docs/PHASE-4-DIRECTIO
 - `rebuildView(snapshot)` runs after publication, during recovery as necessary, and on startup.
   Its default calls `rebuildView({ storeDir, viewDir, templates })`, rereading the published
   store. It is safe to repeat and never feeds view data back into the private store.
-- `ingestPendingProposals(context)` runs under the queue for an authenticated state request and
-  returns pending full records in ingestion order. It is skipped while history is blocked.
-  The default hostile-inbox reader journals its own `inbox: N new versions` commit and resolves
-  it before returning. Both hooks remain overrideable for tests.
+- `scanInbox(context)` runs under the queue for an authenticated state request and every
+  3 seconds from `serve`. Both use the same context and in-memory observations. Polling skips a
+  tick if a state/timer scan is queued or running. The timer is unreferenced (it cannot keep a
+  test process alive); server close stops it, as does the returned `stopInboxTimer()` hook.
+  Timer scans resolve journals and retry history first, just like state requests. A blocked
+  history prevents ingestion and cleanup. Polling failures log a fixed event without content.
+  Tests inject the scheduler/listener or call the handler directly; no socket is needed.
 - Outcomes acknowledge `(proposal, hash)` pairs, including unknown versions. Known records get
   `status = outcome` and an `outcome` object containing `outcome`, `applied` and `at`. The first
   recorded outcome wins. New filenames use `<pid>-<first 16 hex of hash>.json`; records and the
@@ -54,8 +57,8 @@ Backups are derived from the published snapshot and immutable objects, never fro
 
 `NOTES_SYNC_SKIP_TAILSCALE=1` has effect only with `NOTES_SYNC_TEST=1`; it does not bypass
 configuration or git-remote checks. Funnel checks inspect the public listener's proxy mapping,
-not just the loopback port. An enabled listener with an unknown mapping is refused. The real
-forwarded Host and real Tailscale status shape still need run B's temporary-service checks.
+not just the loopback port. An enabled listener with an unknown mapping is refused. Prior
+live forwarding checks are recorded in `DECISIONS.md`; this run uses injected fixtures.
 
 ## Verification
 
@@ -79,24 +82,44 @@ directory fsync. The view removes only expected stale note/image filenames, neve
 
 `view-manifest.json` maps relative view filenames to hashes. Rebuilds hash previous files,
 log damage as path/time only in `view-log.jsonl`, then replace them from the store. Missing
-directories are created; symlinked or foreign-owned directories are refused. Inbox directories
-are never emptied. An unreadable inbox is skipped without inferring withdrawal.
+directories are created; symlinked or foreign-owned directories are refused. Rebuilds create
+only `inbox/`, leave its contents alone, and retire the old root helper file without following
+links. Legacy inbox subdirectories, if present, are unrelated entries and are left alone.
 
-The ingestion reader never writes into the inbox. Invalid entries get body-free refusal
-records: readable malformed JSON is hashed as raw bytes; an oversized or unreadable entry uses
-a fixed refusal-marker hash without reading its content or target. New versions supersede old
-pending versions, missing pending files become withdrawn,
-and handled content cannot be resurrected by putting old bytes back. A monotonically increasing
-`sequence` preserves ingestion order even when timestamps tie. Filename hash collisions are
-refused instead of overwriting a stored version. Outcomes update the same records and rebuild
-both proposal view files. The proposal index contains metadata/status/outcomes, not bodies;
-titles are drawn only from currently live notes.
+Claude Code writes `inbox/<pid>.html` first (complete raw UTF-8 HTML, at most 512 KiB), then
+`inbox/<pid>.json` (at most 16 KiB) with exactly `note`, `basedOnRev`, `generation`, `title`,
+`folderId`, `tags`, `why`. A pid matches `^p-[a-z0-9-]{3,80}$`. There is no shell in note
+sessions. The launcher names only Read, Edit, Write, Glob and Grep, passes CLAUDE.md explicitly
+with `--append-system-prompt-file`, and both policy templates deny Bash. The fail-closed sandbox
+block remains as defence in depth.
 
-`propose.mjs` reads only `notebook/` and `inbox/`, writes only `inbox/`, and shares the checked
-filesystem operations. `submit` checks generation as well as revision and also checks local
-pending files that the service has not ingested yet. `list` removes a handled pending file
-only if its current canonical hash matches that handled version. The helper checks shape,
-references and size; the phone still audits and normalizes HTML in 4c.
+The scanner remembers size, modification time and inode for both files, and ingests only after
+two unchanged observations. It rechecks stats during reads and before cleanup to avoid
+capturing or removing a changed pair. Observations are in memory; a restart needs two scans
+again and restarts half-pair timers. A lone file older than ten minutes is refused as
+`missing-body` or `missing-details`. Nonmatching names and nonregular entries (including
+symlinks) are ignored, never followed or deleted; a pid with either path nonregular is skipped
+as a whole. An unsafe inbox is logged and skipped without affecting pending proposals.
+
+All shape, revision, generation, Trash, folder, live-note link and existing-image checks use
+`store.published`, never view metadata. The body is valid UTF-8 but is not normalized: the
+phone still audits formatting in 4c. At most 50 versions are pending. A valid proposal for the
+same note supersedes its pending version, even at the limit; refused replacements leave it
+alone. Deleting inbox files does not withdraw proposals.
+
+Versions use SHA-256 of canonical fields plus body, without the filename pid. Malformed or
+unreadable input uses bounded byte hashes/refusal markers when a canonical value cannot be
+formed. Refusals retain validated details and a reason but no body. A monotonically increasing
+`sequence` preserves ingestion order even when timestamps tie. Truncated filename hash
+collisions are refused instead of overwriting a stored version. Repeating a pid/hash never
+resurrects it. `commitProposalUpdates` journals and commits captured versions and rebuilds
+both view status files before pinned unlink removes the pair. If a crash leaves those files,
+the next stable scan finds the stored hash, repairs the view and repeats cleanup without
+another version. History failure retains files until repaired. The proposal index contains
+metadata/status/reason/outcomes, not bodies; titles come only from currently live notes.
+
+`server/view/CLAUDE.md` documents the precise field limits and every refusal reason with its
+next step. Writing a fresh pair requires no helper or command-line tool.
 
 ## Deployment and remaining verification
 
@@ -116,14 +139,16 @@ the selected release on deploy and rollback as well as install.
 
 `npm run sync-check` is an explicit, socket-based script for Claude to run. It uses a new
 temporary store/view/config, the made-up sample notebook and loopback only; it checks pairing,
-image uploads, pushes, helper submission, ingestion/outcomes, import confirmation, backup
-counts/hashes and process exits after apply/publication followed by recovery. Its Markdown
+image uploads, pushes, file-pair ingestion by the timer, outcomes, stale refusals, superseding,
+import confirmation, backup counts/hashes and process exits after apply/publication followed
+by recovery. Its Markdown
 projection is fixture-only; the app's view export belongs to 4b. It does not verify Tailscale
 forwarding or browser behavior.
 
-Before real notes enter the view, Claude still needs to measure the forwarded Host, verify
-Tailscale/Funnel and systemd behavior, and test `claude-notes` in the still-empty view: expected
-setting sources, CLAUDE.md loaded, no plugins/connectors/MCP, sandbox available, web/shell network
-denied, protected writes and sentinel reads denied, helper allowed, and permissive local
-settings unable to loosen any rule. `--restricted` is the requested implementation, not yet a
-claim of verified live isolation. No live install/deploy or socket-based check ran in Codex.
+Run C does not repeat live installation, Tailscale or Claude Code sessions. The prior live
+checks and the AppArmor sandbox failure are recorded in `DECISIONS.md`. Before using this
+release, Claude must verify in the still-empty view: CLAUDE.md loaded, exactly the five file
+tools, no plugins/connectors/MCP, Bash unavailable, protected writes and sentinel reads denied,
+file-pair submission working, and permissive local settings unable to loosen any rule. The
+sandbox remains fail-closed; note sessions no longer depend on starting it. Codex's checks use
+only temporary fixtures, with no live install/deploy, socket-based check or phone changes.

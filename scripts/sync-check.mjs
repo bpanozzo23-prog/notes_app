@@ -15,7 +15,6 @@ import { openStore } from "../server/store.mjs";
 
 const run = promisify(execFile);
 const MAIN = fileURLToPath(new URL("../server/main.mjs", import.meta.url));
-const HELPER = fileURLToPath(new URL("../server/propose.mjs", import.meta.url));
 export function samplePush(sample, state, generation, rows = sample.notes) {
   // Fixture-only projection until 4b adds the app's deterministic view export.
   const live = sample.notes.filter((n) => n.deletedAt === null);
@@ -132,22 +131,45 @@ export async function syncCheck(args = process.argv.slice(2), print = (s) => pro
     await request("POST", "/v1/push", samplePush(sample, await request("GET", "/v1/state"), generation, [edited]));
     await verify();
     pass("incremental note edit");
-    const helper = (args) => run(process.execPath, [HELPER, ...args], { cwd: config.viewDir, env: { ...env, NOTES_VIEW: config.viewDir } });
-    await helper(["draft", edited.id]);
-    const bodyPath = path.join(config.viewDir, `inbox/drafts/${keyFor(edited.id)}/body.html`);
-    await fs.appendFile(bodyPath, "<p>Proposed fixture addition.</p>");
-    await helper(["check", edited.id]);
-    await helper(["submit", edited.id]);
-    const proposal = (await request("GET", "/v1/state")).proposals[0];
+    const submit = async (pid, extra = {}) => {
+      const { body, ...details } = { note: edited.id, basedOnRev: edited.rev, generation,
+        title: edited.title, folderId: edited.folderId, tags: edited.tags, why: "Fixture check",
+        body: `${edited.html}<p>Proposed fixture addition.</p>`, ...extra };
+      await fs.writeFile(path.join(config.viewDir, `inbox/${pid}.html`), body);
+      await fs.writeFile(path.join(config.viewDir, `inbox/${pid}.json`), JSON.stringify(details));
+      // Poll only the view: this also proves the timer works without a phone state request.
+      for (let i = 0; i < 80; i++) {
+        const recorded = (await readJson(path.join(config.viewDir, "notebook/proposals.json"))).find((p) => p.proposal === pid);
+        if (recorded) {
+          // Publication precedes cleanup, so wait for both files to disappear as well.
+          const names = await fs.readdir(path.join(config.viewDir, "inbox"));
+          if (!names.includes(`${pid}.html`) && !names.includes(`${pid}.json`)) return recorded;
+        }
+        await delay(100);
+      }
+      throw new Error("proposal-ingestion-timeout");
+    };
+    assert.equal((await submit("p-fixture-first")).status, "pending");
+    const proposal = (await request("GET", "/v1/state")).proposals.find((p) => p.proposal === "p-fixture-first");
     assert.equal(proposal.note, edited.id);
     assert.ok(proposal.body.includes("Proposed fixture addition."));
     await request("POST", "/v1/outcomes", [{ proposal: proposal.proposal, hash: proposal.hash,
       outcome: "applied", applied: ["body"], at: new Date().toISOString() }]);
     const handled = await readJson(path.join(config.viewDir, "notebook/proposals.json"));
     assert.equal(handled.find((p) => p.hash === proposal.hash).status, "applied");
-    await helper(["list"]);
-    assert.equal((await fs.readdir(path.join(config.viewDir, "inbox/pending"))).length, 0);
-    pass("helper submission, ingestion and reported outcome");
+    assert.equal((await fs.readdir(path.join(config.viewDir, "inbox"))).length, 0);
+    pass("file pair ingestion by timer and reported outcome");
+    const refused = await submit("p-fixture-stale", { basedOnRev: edited.rev + 1 });
+    assert.equal(refused.status, "refused");
+    assert.equal(refused.reason, "changed-since-read");
+    assert.ok(!Object.hasOwn(refused, "body"));
+    pass("changed-since-read refusal");
+    assert.equal((await submit("p-fixture-replaced")).status, "pending");
+    assert.equal((await submit("p-fixture-replacement", { title: "Replacement fixture" })).status, "pending");
+    const superseded = await readJson(path.join(config.viewDir, "notebook/proposals.json"));
+    assert.equal(superseded.find((p) => p.proposal === "p-fixture-replaced").status, "superseded");
+    assert.equal(superseded.filter((p) => p.status === "pending").length, 1);
+    pass("new valid proposal supersedes the pending proposal for its note");
     generation = "sample-generation-B";
     edited.title += " (imported)";
     await upload();

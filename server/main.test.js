@@ -4,9 +4,11 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { AT, fixture, push } from "./test-support.js";
 import { loadConfig, validateConfig } from "./config.mjs";
-import { main, serve, startupChecks, status, createTailscale } from "./main.mjs";
+import { main, serve, startupChecks, status, createTailscale, startInboxTimer } from "./main.mjs";
 import { createServer } from "./http.mjs";
 import { TEMP_PREFIX, writeJson } from "./fsutil.mjs";
+import { enqueueInboxScan } from "./inbox.mjs";
+import { readProposals } from "./proposals.mjs";
 
 let f;
 beforeEach(async () => { f = await fixture(); });
@@ -86,6 +88,7 @@ it("resolves a journal, removes temp files and rebuilds before listening (inject
   });
   const serverFactory = vi.fn(() => ({ start }));
   const result = await serve(f.config, { git: f.git, tailscale: tailscale(), env: {}, now: () => new Date(AT), serverFactory, rebuildView });
+  result.stopInboxTimer();
   expect(result.context.store.state().round).toBe(1);
   expect(start).toHaveBeenCalledOnce();
   expect(serverFactory.mock.calls[0][1].listen).toBe("127.0.0.1");
@@ -117,20 +120,104 @@ it("uses execFile arguments for Tailscale, and the HTTP adapter refuses non-loop
   expect(() => createServer(() => {}, { listen: "0.0.0.0" })).toThrow("invalid-listen");
 });
 
+it("polls every 3 seconds with an unreferenced timer, skips queued/running scans, and survives errors", async () => {
+  let tick;
+  const timer = { unref: vi.fn() };
+  const schedule = vi.fn((callback) => { tick = callback; return timer; });
+  const cancel = vi.fn();
+  const stop = startInboxTimer(f.context, { schedule, cancel });
+  expect(schedule).toHaveBeenCalledWith(expect.any(Function), 3000);
+  expect(timer.unref).toHaveBeenCalledOnce();
+  let releaseQueue, releaseScan;
+  const queued = f.context.enqueue(() => new Promise((resolve) => { releaseQueue = resolve; }));
+  await Promise.resolve();
+  const scanStarted = new Promise((resolve) => {
+    f.context.scanInbox = vi.fn(() => { resolve(); return new Promise((done) => { releaseScan = done; }); });
+  });
+  const scan = tick();
+  expect(f.context.inboxScans).toBe(1);
+  tick(); tick();
+  expect(f.context.scanInbox).not.toHaveBeenCalled();
+  releaseQueue(); await queued; await scanStarted;
+  tick(); tick();
+  expect(f.context.scanInbox).toHaveBeenCalledOnce();
+  releaseScan(); await scan;
+  expect(f.context.inboxScans).toBe(0);
+  f.context.scanInbox.mockRejectedValueOnce(new Error("PRIVATE SENTINEL"));
+  await tick();
+  expect(f.context.inboxScans).toBe(0);
+  expect(f.logger).toHaveBeenCalledWith('{"event":"inbox-scan-failed"}');
+  expect(JSON.stringify(f.logger.mock.calls)).not.toContain("PRIVATE SENTINEL");
+  f.context.scanInbox.mockResolvedValue([]);
+  await tick();
+  expect(f.context.scanInbox).toHaveBeenCalledTimes(3);
+  stop(); expect(cancel).toHaveBeenCalledWith(timer);
+});
+it("skips timer ticks while a state scan is queued or running, including a failed request", async () => {
+  let tick, release;
+  const stop = startInboxTimer(f.context, { schedule: (callback) => { tick = callback; return { unref() {} }; }, cancel() {} });
+  const queued = f.context.enqueue(() => new Promise((resolve) => { release = resolve; }));
+  await Promise.resolve();
+  // Same queue wrapper used by GET /v1/state; no HTTP socket is involved.
+  const scan = enqueueInboxScan(f.context, async () => { throw new Error("failed-state"); });
+  const rejected = expect(scan).rejects.toThrow("failed-state");
+  expect(tick()).toBeUndefined();
+  expect(f.context.inboxScans).toBe(1);
+  release(); await queued; await rejected;
+  expect(f.context.inboxScans).toBe(0);
+  stop();
+});
+it("timer ingestion uses journal recovery and history blocking before scanning", async () => {
+  await f.request("POST", "/v1/push", push());
+  f.context.afterStep = (name) => { if (name === "apply") throw new Error("crash"); };
+  await f.request("POST", "/v1/push", push([], { base: { round: 1, generation: "generation-A" },
+    tombstones: [{ id: "note-1", purgedAt: AT }] }));
+  delete f.context.afterStep;
+  let tick;
+  const stop = startInboxTimer(f.context, { schedule: (callback) => { tick = callback; return { unref() {} }; }, cancel() {} });
+  f.context.scanInbox = vi.fn(async () => {
+    expect(await f.context.store.readJournal()).toBeNull();
+    expect(f.context.store.state().round).toBe(2);
+  });
+  f.git.commit.mockRejectedValue(new Error("git-failed"));
+  await tick();
+  expect(f.context.scanInbox).not.toHaveBeenCalled();
+  expect(f.context.store.published.meta.historyError).toBe(true);
+  f.git.commit.mockResolvedValue();
+  await tick();
+  expect(f.context.scanInbox).toHaveBeenCalledOnce();
+  stop();
+});
+it("ingests and cleans up a stable pair by timer alone with no state request", async () => {
+  await f.request("POST", "/v1/push", push());
+  const inbox = path.join(f.config.viewDir, "inbox");
+  await fs.writeFile(path.join(inbox, "p-timer.html"), "<p>Timer fixture</p>");
+  await fs.writeFile(path.join(inbox, "p-timer.json"), JSON.stringify({ note: "note-1", basedOnRev: 1,
+    generation: "generation-A", title: "Timer", folderId: null, tags: [], why: "" }));
+  let tick;
+  const stop = startInboxTimer(f.context, { schedule: (callback) => { tick = callback; return { unref() {} }; }, cancel() {} });
+  await tick();
+  expect(await readProposals(f.config.storeDir)).toEqual([]);
+  await tick();
+  expect((await readProposals(f.config.storeDir))[0].record).toMatchObject({ status: "pending", proposal: "p-timer" });
+  expect(await fs.readdir(inbox)).toEqual([]);
+  stop();
+});
+
 it("runs as a program when reached through a symlink, as the deployed service is", async () => {
-  const { execFile } = await import("node:child_process");
-  const { promisify } = await import("node:util");
-  const fsp = await import("node:fs/promises");
-  const os = await import("node:os");
-  const pathModule = await import("node:path");
-  const root = await fsp.mkdtemp(pathModule.join(os.tmpdir(), "notes-sync-entry-"));
+  const { spawn } = await import("node:child_process");
+  const link = path.join(f.root, "current");
+  await fs.symlink(path.resolve("server"), link);
+  // This sandbox suppresses child-process pipe output. A temporary file still checks the
+  // actual CLI exit and JSON error, without falling back to an assertion on exit alone.
+  const stderrPath = path.join(f.root, "stderr.txt");
+  const stderr = await fs.open(stderrPath, "w", 0o600);
   try {
-    const link = pathModule.join(root, "current");
-    await fsp.symlink(pathModule.resolve("server"), link);
     // An unknown command proves main() ran: it refuses with a JSON error and exit code 1.
-    const result = await promisify(execFile)(process.execPath, [pathModule.join(link, "main.mjs"), "no-such-command"],
-      { env: { ...process.env, NOTES_SYNC_CONFIG: pathModule.join(root, "missing.json") } }).catch((error) => error);
-    expect(result.code).toBe(1);
-    expect(result.stderr).toContain('"error"');
-  } finally { await fsp.rm(root, { recursive: true, force: true }); }
+    const child = spawn(process.execPath, [path.join(link, "main.mjs"), "no-such-command"],
+      { env: { ...process.env, NOTES_SYNC_CONFIG: path.join(f.root, "missing.json") }, stdio: ["ignore", "ignore", stderr.fd] });
+    const code = await new Promise((resolve, reject) => { child.once("error", reject); child.once("exit", resolve); });
+    expect(code).toBe(1);
+  } finally { await stderr.close(); }
+  expect(JSON.parse(await fs.readFile(stderrPath, "utf8"))).toEqual({ error: "startup-failed" });
 });

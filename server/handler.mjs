@@ -7,7 +7,7 @@ import { buildBackup } from "./backup.mjs";
 import { pushRound, recordOutcomes, resolveJournal, retryHistory } from "./round.mjs";
 import { HttpError, detectImage, fail } from "./validate.mjs";
 import { rebuildView } from "./view.mjs";
-import { ingest } from "./inbox.mjs";
+import { scanInbox, enqueueInboxScan } from "./inbox.mjs";
 import { loadViewTemplates } from "./templates.mjs";
 
 const METHODS = ["GET", "POST", "PUT", "DELETE"];
@@ -18,7 +18,7 @@ export async function createContext(config, overrides = {}) {
     config, now, store: overrides.store ?? await openStore(config.storeDir, { git: overrides.git }),
     pairing: createPairing(config.configDir, now), enqueue: createQueue(), confirmations: createConfirmations(now),
     rebuildView: async () => rebuildView({ ...config, templates: await loadViewTemplates(config), now: now() }),
-    ingestPendingProposals: (context) => ingest({ ...config, context }),
+    scanInbox,
     logger: () => {}, ...overrides,
   };
 }
@@ -93,7 +93,8 @@ export function createHandler(context) {
             catch { fail(400, "invalid-json"); }
           }
         }
-        response = await context.enqueue(async () => {
+        const enqueue = route === "state" ? (task) => enqueueInboxScan(context, task) : context.enqueue;
+        response = await enqueue(async () => {
           // Pairing may have changed while the body arrived; the queue is where it's decided.
           if (route !== "pair" && !await context.pairing.checkToken(h.authorization)) fail(401, "unauthorized");
           try { await resolveJournal(context); }
@@ -108,7 +109,7 @@ export function createHandler(context) {
             case "pair": return reply(await context.pairing.pair(body));
             case "unpair": await context.pairing.unpair(); return reply({ disconnected: true });
             case "state": {
-              const proposals = context.store.published.meta.historyError ? [] : await context.ingestPendingProposals(context);
+              const proposals = context.store.published.meta.historyError ? [] : await context.scanInbox(context);
               return reply(await stateBody(proposals));
             }
             case "backup": return reply(await backupBody(), 200, backupHeaders);

@@ -7,6 +7,7 @@ import { createPairing } from "./pairing.mjs";
 import { createServer } from "./http.mjs";
 import { isEntryPoint, mkdir, removeTemps } from "./fsutil.mjs";
 import { resolveJournal, retryHistory } from "./round.mjs";
+import { enqueueInboxScan } from "./inbox.mjs";
 import path from "node:path";
 
 const execute = promisify(execFile);
@@ -75,7 +76,24 @@ export async function serve(config, overrides = {}) {
   });
   const server = (overrides.serverFactory ?? createServer)(createHandler(context), config);
   await server.start();
-  return { context, server };
+  const stopInboxTimer = startInboxTimer(context);
+  server.once?.("close", stopInboxTimer);
+  return { context, server, stopInboxTimer };
+}
+export function startInboxTimer(context, { schedule = setInterval, cancel = clearInterval } = {}) {
+  const timer = schedule(() => {
+    if (context.inboxScans) return;
+    return enqueueInboxScan(context, async () => {
+      await resolveJournal(context);
+      await retryHistory(context);
+      if (!context.store.published.meta.historyError) await context.scanInbox(context);
+    }).catch(() => {
+      // Never log paths, proposal contents, or arbitrary exception messages.
+      try { context.logger(JSON.stringify({ event: "inbox-scan-failed" })); } catch { /* Best effort. */ }
+    });
+  }, 3000);
+  timer.unref();
+  return () => cancel(timer);
 }
 export async function status(config, overrides = {}) {
   const context = await createContext(config, overrides);

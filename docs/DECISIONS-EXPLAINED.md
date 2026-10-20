@@ -5,7 +5,7 @@ this one is for the owner: what was chosen, why, what it means for the app, what
 and how hard it would be to reverse ("lock-in"). Ordered by lock-in, hardest first. Updated whenever
 `DECISIONS.md` gains an entry with consequences for how the app behaves.
 
-Last updated 2026-10-19, at the Phase 4 plan (§73).
+Last updated 2026-10-19, at step 4a (§74).
 
 ---
 
@@ -1122,17 +1122,20 @@ Obsidian-style folder later is a small change.
 **Chosen:** a settings file in `~/notes`, and a launcher (`claude-notes`), restrict any Claude
 Code session there:
 - no web tools, and none of your connected accounts (Google Drive, Notion, Calendar);
-- shell commands run inside a sandbox with no network at all;
-- it can write only in `inbox/`;
+- **no command line at all** (your choice, 19 October): it can only read files, search them and
+  write in `inbox/`;
 - it can't read your SSH keys, the test API key or the sync service's own files.
 
 Its instructions say note text is information, never instructions.
-**Why:** some notes contain text pasted from web pages. On the XPS, Claude Code can run commands,
-so a hidden instruction in a note could otherwise try to send your notes somewhere. Inside the
+**Why:** some notes contain text pasted from web pages. A Claude Code session that could run
+commands could be talked by a hidden instruction in a note into sending your notes somewhere.
+Claude Code's own command fence (its sandbox) can't start on the XPS without loosening an Ubuntu
+security setting for every program there, so the commands were removed instead. Inside the
 app, Claude can only propose. On the XPS, the lock-down plays that role.
 **What it leads to:**
-- Claude Code in `~/notes` can read, think and propose, nothing else. For anything that needs the
-  web, use a session somewhere else.
+- Claude Code in `~/notes` can read, search, think and propose, nothing else. It can't run
+  scripts on your notes (word counts and the like). For anything that needs the web or commands,
+  use a session somewhere else.
 - The launcher also leaves out your own Claude Code settings, hooks and plugins, so nothing there
   can loosen the rules by accident.
 - Step 4a tests every rule in a real session before any note arrives, including with deliberately
@@ -1238,7 +1241,9 @@ deleted.
 ### 72. Proposals: edits first, new notes and Trash later if you want them
 
 **Chosen:** step 4c lets Claude Code propose changes to an existing note's title, text, tags and
-folder. It drafts with a helper (`./propose`) that checks the proposal before it reaches you.
+folder. It writes a proposal as two files in its inbox (the new text, and a few details such as
+which version of the note it read). Within seconds the XPS checks them against its private copy
+and records the proposal, or refuses it with a reason Claude Code can read and fix.
 Step 4d adds new notes, moving a note to Trash, and "Keep both" for a refused proposal. 4d
 happens only if you ask after using 4c.
 **Why:** edits reuse Phase 3's apply and Undo almost unchanged. New notes and Trash need more
@@ -1255,19 +1260,22 @@ new code. Using the simpler version first shows whether they're wanted.
 - **No Obsidian for now.** The view can be laid out for it later.
 - **One connected phone at a time.** Connecting another replaces it.
 
-### 74. The XPS view and helper are now built (2026-10-19)
+### 74. The XPS service is built and installed (2026-10-19)
 
-The service can rebuild the folder Claude Code reads entirely from its private copy. If a
-read-only file is edited, the next rebuild restores it and records the filename and time.
-It refuses folders that redirect writes elsewhere. Drafts and submitted files in the inbox
-are left alone by the service.
-
-Each submitted version is captured in history before the phone receives it. Changing a submitted
-file makes a new version; removing it withdraws the pending version. The helper refuses a second
-pending proposal for the same note and refuses submission after the phone's copy changes.
-The phone's review and Apply screens still come in 4c.
-
-The installer, rollback command and restricted Claude launcher are written. Tests cover their
-plans and policy files using made-up data. They have not been installed or tested against the
-real service or a live Claude session by Codex. Claude still needs to check the launcher on the
-empty view before real notes are made available there.
+- **It's running.** The sync service is installed on the XPS as a user service: it starts at
+  boot, restarts itself after a crash (tested by killing it), and answers only your devices on
+  Tailscale port 8443. Its private copy is empty and no phone is connected yet.
+- **It survives freezes.** A sync cut short is finished from its journal after a restart (tested
+  by stopping it mid-sync).
+- **The folder Claude Code reads** is rebuilt entirely from the private copy. If a read-only file
+  in it is changed, the next sync puts it back and records the file name and time. It refuses
+  folders that try to redirect its writes elsewhere.
+- **Proposals** written into the inbox are captured in the history before your phone ever sees
+  them. Claude Code learns within seconds whether one was accepted or refused, and why. A newer
+  proposal for the same note replaces a waiting one.
+- **Tested through Tailscale** with the made-up sample notebook on a temporary copy: connecting,
+  refusing other websites and wrong tokens, uploading pictures, syncing 19 notes, and getting the
+  backup back with identical pictures.
+- **No shell in note sessions** (§65): the first real lock-down test showed Claude Code's command
+  fence can't run on the XPS, so note sessions have no command line.
+- The phone side (Settings → Sync) comes in 4b.

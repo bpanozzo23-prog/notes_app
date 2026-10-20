@@ -49,13 +49,17 @@ export async function withDirectory(root, relative, operation, { create = false,
       sync: () => handles.at(-1).sync() });
   } finally { for (const handle of handles.reverse()) await handle.close(); }
 }
-export async function readRegular(filename, limit) {
+export const sameFileStat = (a, b) => Boolean(a && b && a.size === b.size && a.mtimeMs === b.mtimeMs && a.ino === b.ino);
+
+export async function readRegular(filename, limit, expected) {
   const stat = await fs.lstat(filename);
   if (!stat.isFile()) refuse("not-regular");
+  if (expected && !sameFileStat(stat, expected)) refuse("file-changed");
   const handle = await fs.open(filename, C.O_RDONLY | C.O_NOFOLLOW | C.O_NONBLOCK);
   try {
     const opened = await handle.stat();
     if (!opened.isFile() || opened.dev !== stat.dev || opened.ino !== stat.ino) refuse("not-regular");
+    if (expected && !sameFileStat(opened, expected)) refuse("file-changed");
     if (opened.size > limit) refuse("too-large");
     // readFile alone could grow without bound if a writer extends the file after fstat.
     const chunks = [];
@@ -68,6 +72,7 @@ export async function readRegular(filename, limit) {
       if (size > limit) refuse("too-large");
       chunks.push(chunk.subarray(0, bytesRead));
     }
+    if (expected && !sameFileStat(await handle.stat(), expected)) refuse("file-changed");
     return Buffer.concat(chunks, size);
   } finally { await handle.close(); }
 }
@@ -93,13 +98,14 @@ export async function writeInDirectory(dir, name, data, mode = 0o600) {
 export const writeViewFile = (root, relative, data, mode = 0o600) =>
   withDirectory(root, path.dirname(relative), (dir) => writeInDirectory(dir, path.basename(relative), data, mode));
 
-export async function unlinkInDirectory(dir, name) {
+export async function unlinkInDirectory(dir, name, expected) {
   if (parts(name).length !== 1 || path.basename(name) !== name) refuse("unsafe-path");
   await dir.verify();
   const filename = path.join(dir.directory, name);
   let stat;
   try { stat = await fs.lstat(filename); }
   catch (error) { if (error.code === "ENOENT") return; throw error; }
+  if (expected && (!stat.isFile() || !sameFileStat(stat, expected))) refuse("file-changed");
   if (!stat.isFile() && !stat.isSymbolicLink()) refuse("not-regular");
   await fs.unlink(filename);
   await dir.sync();

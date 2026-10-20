@@ -1,77 +1,135 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { MAX_PENDING_PROPOSALS, MAX_PROPOSAL_BYTES } from "./constants.mjs";
+import { MAX_PENDING_PROPOSALS, MAX_PROPOSAL_DETAILS_BYTES } from "./constants.mjs";
 import { sha256 } from "./fsutil.mjs";
-import { PENDING_NAME, proposalFilename, proposalHash, proposalProblem, readProposals } from "./proposals.mjs";
-import { readRegular, withDirectory } from "./view-fs.mjs";
-import { openStore } from "./store.mjs";
+import { INBOX_NAME, MAX_BODY_BYTES, proposalFilename, proposalHash,
+  proposalProblem, referenceProblem, readProposals } from "./proposals.mjs";
+import { readRegular, sameFileStat, withDirectory, unlinkInDirectory } from "./view-fs.mjs";
 import { commitProposalUpdates } from "./round.mjs";
-import { rebuildView, viewLog } from "./view.mjs";
+import { viewLog } from "./view.mjs";
+import { isObject } from "./validate.mjs";
 
-export async function ingest({ storeDir, viewDir, context, now = () => new Date() }) {
-  context ??= { store: await openStore(storeDir), now, rebuildView: () => rebuildView({ storeDir, viewDir }) };
-  const records = await readProposals(storeDir);
+export const HALF_PAIR_TIMEOUT_MS = 10 * 60 * 1000;
+const decode = (bytes) => new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+const stamp = ({ size, mtimeMs, ino }) => ({ size, mtimeMs, ino });
+const samePair = (a, b) => ["json", "html"].every((ext) =>
+  !a[ext] && !b[ext] || sameFileStat(a[ext], b[ext]));
+
+async function inspectPair(dir, pid) {
+  const pair = {};
+  for (const ext of ["json", "html"]) {
+    try {
+      const stat = await fs.lstat(path.join(dir.directory, `${pid}.${ext}`));
+      // A matching symlink/special file is never read, removed, or treated as half a pair.
+      if (!stat.isFile()) return null;
+      pair[ext] = stamp(stat);
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+    }
+  }
+  return pair;
+}
+
+async function capture(dir, proposal, pair, missing) {
+  let details, body, reason = missing;
+  const read = async (ext, limit) => {
+    if (!pair[ext]) return;
+    try { return await readRegular(path.join(dir.directory, `${proposal}.${ext}`), limit, pair[ext]); }
+    catch (error) {
+      // A raced replacement is not a proposal. Observe it afresh on a later scan.
+      if (["file-changed", "not-regular"].includes(error.reason) || ["ENOENT", "ELOOP"].includes(error.code)) throw error;
+      reason ??= error.reason === "too-large" ? "too-large" : "unreadable";
+    }
+  };
+  const jsonBytes = await read("json", MAX_PROPOSAL_DETAILS_BYTES);
+  const htmlBytes = await read("html", MAX_BODY_BYTES);
+  if (jsonBytes) {
+    try { details = JSON.parse(decode(jsonBytes)); }
+    catch { reason ??= "invalid-json"; }
+  }
+  const shape = details === undefined ? "invalid-shape" : proposalProblem(details);
+  reason ??= shape;
+  if (htmlBytes) {
+    try { body = decode(htmlBytes); }
+    catch { reason ??= "invalid-body"; }
+  }
+  const value = !shape && body !== undefined ? { ...details, body } : null;
+  // Use the canonical fields/body even for invalid fields. Excessively deep JSON, broken
+  // UTF-8 or unreadable files need a bounded byte/marker hash instead.
+  let hash;
+  if (isObject(details) && body !== undefined) {
+    try { hash = proposalHash({ ...details, body }); }
+    catch { reason ??= "invalid-shape"; }
+  }
+  hash ??= proposalHash({
+    json: jsonBytes ? sha256(jsonBytes) : `refused:${reason}`,
+    html: htmlBytes ? sha256(htmlBytes) : `refused:${reason}`,
+  });
+  return { proposal, hash, value, details: !shape ? details : null, reason, pair };
+}
+
+// Must run inside the mutation queue, after journal recovery and history retry.
+export async function scanInbox(context) {
+  const { store, config, now } = context;
+  const records = await readProposals(config.storeDir);
   const pending = () => records.filter(({ record }) => record.status === "pending").map(({ record }) => record);
-  if (context.store.published.meta.historyError) return pending();
-  // The handler resolves recovery first. A standalone invocation must not replace a journal.
-  if (await context.store.readJournal()) throw new Error("journal-pending");
-  const entries = [];
+  if (store.published.meta.historyError) return [];
+  if (await store.readJournal()) throw new Error("journal-pending");
+  const observations = context.inboxObservations ??= new Map();
+  const entries = [], seen = new Set();
   try {
-    await withDirectory(viewDir, "inbox/pending", async ({ directory, verify }) => {
-      for (const name of (await fs.readdir(directory)).sort()) {
-        if (!PENDING_NAME.test(name)) continue;
-        const proposal = name.slice(0, -5);
-        let bytes, value, hash, reason;
+    await withDirectory(config.viewDir, "inbox", async (dir) => {
+      const ids = new Set((await fs.readdir(dir.directory)).sort().map((name) => INBOX_NAME.exec(name)?.[1]).filter(Boolean));
+      for (const pid of ids) {
+        await dir.verify();
+        const pair = await inspectPair(dir, pid);
+        if (!pair || !pair.json && !pair.html) continue;
+        seen.add(pid);
+        const previous = observations.get(pid);
+        const firstSeen = previous && Boolean(previous.json) === Boolean(pair.json) &&
+          Boolean(previous.html) === Boolean(pair.html) ? previous.firstSeen : new Date(now()).getTime();
+        observations.set(pid, { ...pair, firstSeen });
+        const complete = pair.json && pair.html;
+        if (complete ? !previous || !samePair(previous, pair) :
+          new Date(now()).getTime() - firstSeen <= HALF_PAIR_TIMEOUT_MS) continue;
         try {
-          await verify();
-          bytes = await readRegular(path.join(directory, name), MAX_PROPOSAL_BYTES);
-          try { value = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)); }
-          catch { reason = "invalid-json"; }
-          // Excessively deep JSON can exceed the canonical serializer's stack. Refuse it.
-          if (!reason) {
-            try { hash = proposalHash(value); reason = proposalProblem(value, proposal); }
-            catch { reason = "invalid-shape"; }
-          }
+          const entry = await capture(dir, pid, pair, complete ? null : pair.json ? "missing-body" : "missing-details");
+          const current = await inspectPair(dir, pid);
+          if (current && samePair(pair, current)) entries.push(entry);
+          else observations.delete(pid);
         } catch (error) {
-          reason = error.reason ?? (error.code === "ENOENT" ? "disappeared" : "unreadable");
+          if (!["file-changed", "not-regular"].includes(error.reason) && !["ENOENT", "ELOOP"].includes(error.code)) throw error;
+          observations.delete(pid);
         }
-        if (reason === "disappeared") continue;
-        // Unreadable entries have no content hash. Hash a fixed refusal marker, never their target.
-        hash ??= sha256(bytes ?? `refused:${reason}`);
-        entries.push({ proposal, hash, value, reason });
       }
-      await verify();
+      await dir.verify();
     });
-  } catch (error) {
-    // Do not infer withdrawal from an unreadable directory, or read/write any linked target.
-    await viewLog(storeDir, "inbox-skipped", "inbox/pending", context.now());
+  } catch {
+    observations.clear();
+    await viewLog(config.storeDir, "inbox-skipped", "inbox", now());
     return pending();
   }
+  for (const pid of observations.keys()) if (!seen.has(pid)) observations.delete(pid);
   const updates = new Map();
-  const update = (entry, status) => {
-    entry.record = { ...entry.record, status, handledAt: new Date(context.now()).toISOString() };
-    updates.set(entry.filename, entry);
-  };
-  const present = new Set(entries.map((e) => e.proposal));
-  for (const entry of records) {
-    if (entry.record.status === "pending" && !entry.record.outcome && !present.has(entry.record.proposal)) update(entry, "withdrawn");
-  }
-  let sequence = Math.max(0, ...records.map(({ record }) => record.sequence ?? 0));
+  let sequence = records.reduce((max, { record }) => Math.max(max, record.sequence ?? 0), 0);
   let added = 0;
   for (const entry of entries) {
-    const oldPending = records.find(({ record }) => record.proposal === entry.proposal && record.status === "pending");
-    if (oldPending && oldPending.record.hash !== entry.hash) update(oldPending, "superseded");
-    // Returning to an already handled byte-for-byte version never resurrects it.
-    if (records.some(({ record }) => record.proposal === entry.proposal && record.hash === entry.hash)) continue;
-    let reason = entry.reason;
-    if (!reason && pending().some((r) => r.note === entry.value.note)) reason = "note-busy";
-    if (!reason && pending().length >= MAX_PENDING_PROPOSALS) reason = "too-many";
-    const ingestedAt = new Date(context.now()).toISOString();
-    const record = reason
-      ? { proposal: entry.proposal, hash: entry.hash, status: "refused", reason, ingestedAt, sequence: ++sequence }
-      : { ...entry.value, proposal: entry.proposal, hash: entry.hash, status: "pending", ingestedAt, sequence: ++sequence };
-    const filename = proposalFilename(entry.proposal, entry.hash);
-    // A truncated-hash collision must never replace a previously captured version.
+    const { proposal, hash, value, details } = entry;
+    // Replaying even a handled or superseded version only removes the inbox files.
+    if (records.some(({ record }) => record.proposal === proposal && record.hash === hash)) continue;
+    let reason = entry.reason ?? referenceProblem(value, store.published);
+    const replaced = !reason ? records.filter(({ record }) => record.status === "pending" && record.note === value.note) : [];
+    if (!reason && pending().length - replaced.length >= MAX_PENDING_PROPOSALS) reason = "too-many";
+    const ingestedAt = new Date(now()).toISOString();
+    if (!reason) {
+      for (const old of replaced) {
+        old.record = { ...old.record, status: "superseded", handledAt: ingestedAt };
+        updates.set(old.filename, old);
+      }
+    }
+    const record = { ...(reason ? details : value), proposal, hash, status: reason ? "refused" : "pending",
+      ...(reason ? { reason } : {}), ingestedAt, sequence: ++sequence };
+    const filename = proposalFilename(proposal, hash);
     if (records.some((r) => r.filename === filename)) throw new Error("proposal-hash-collision");
     const stored = { filename, record };
     records.push(stored);
@@ -79,5 +137,28 @@ export async function ingest({ storeDir, viewDir, context, now = () => new Date(
     added++;
   }
   if (updates.size) await commitProposalUpdates(context, [...updates.values()], `inbox: ${added} new versions`, "inbox");
+  // A failed history commit leaves files available until history has been repaired.
+  if (store.published.meta.historyError) return [];
+  if (entries.length) {
+    // Commit's journal has rebuilt the view; repeats also repair it before cleanup.
+    if (!updates.size) await context.rebuildView();
+    await withDirectory(config.viewDir, "inbox", async (dir) => {
+      for (const { proposal, pair } of entries) {
+        const current = await inspectPair(dir, proposal);
+        // Preserve edits/replacements made while the commit or view rebuild was running.
+        if (!current || !samePair(pair, current)) { observations.delete(proposal); continue; }
+        try {
+          for (const ext of ["json", "html"]) if (pair[ext]) await unlinkInDirectory(dir, `${proposal}.${ext}`, pair[ext]);
+        } catch (error) { if (error.reason !== "file-changed") throw error; }
+        observations.delete(proposal);
+      }
+    });
+  }
   return pending();
+}
+
+// Count queued state scans too, so polling cannot pile up behind a slow round/request.
+export function enqueueInboxScan(context, task) {
+  context.inboxScans = (context.inboxScans ?? 0) + 1;
+  return context.enqueue(task).finally(() => { context.inboxScans--; });
 }

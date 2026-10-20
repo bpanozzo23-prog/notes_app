@@ -18,17 +18,17 @@ export function renderTemplate(source, values, kind = "text") {
   });
 }
 export async function loadTemplate(name, values) {
-  if (!["CLAUDE.md", "AGENTS.md", "settings.json", "claude-strict.json", "propose", "claude-notes", "notes-sync.service"].includes(name)) {
+  if (!["CLAUDE.md", "AGENTS.md", "settings.json", "claude-strict.json", "claude-notes", "notes-sync", "notes-sync.service"].includes(name)) {
     throw new Error("unknown-template");
   }
   const source = await fs.readFile(path.join(import.meta.dirname, "view", name), "utf8");
   return renderTemplate(source, values, name.endsWith(".json") ? "json" :
-    ["propose", "claude-notes"].includes(name) ? "shell" : name.endsWith(".service") ? "unit" : "text");
+    ["claude-notes", "notes-sync"].includes(name) ? "shell" : name.endsWith(".service") ? "unit" : "text");
 }
 export async function loadViewTemplates(config) {
   const values = templatePaths(config);
   return Object.fromEntries(await Promise.all([
     ["CLAUDE.md", "CLAUDE.md"], ["AGENTS.md", "AGENTS.md"],
-    [".claude/settings.json", "settings.json"], ["propose", "propose"],
+    [".claude/settings.json", "settings.json"],
   ].map(async ([target, name]) => [target, await loadTemplate(name, values)])));
 }

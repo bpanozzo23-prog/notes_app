@@ -36,12 +36,14 @@ it("rebuilds exact live HTML, projection, image copies and metadata with explici
   const manifest = await readJson(path.join(f.config.storeDir, "view-manifest.json"));
   for (const [name, hash] of Object.entries(manifest)) {
     expect(sha256(await fs.readFile(view(name)))).toBe(hash);
-    expect((await fs.stat(view(name))).mode & 0o777).toBe(name === "propose" ? 0o555 : 0o444);
+    expect((await fs.stat(view(name))).mode & 0o777).toBe(0o444);
   }
-  for (const name of ["", "notebook", "notebook/notes", "notebook/images", ".claude", "inbox", "inbox/pending", "inbox/drafts"]) {
+  for (const name of ["", "notebook", "notebook/notes", "notebook/images", ".claude", "inbox"]) {
     expect((await fs.stat(view(name))).mode & 0o777).toBe(0o755);
   }
   expect(await fs.readdir(view("notebook/notes"))).toEqual([`${keyFor("note-1")}.html`]);
+  expect(await fs.readdir(view("inbox"))).toEqual([]);
+  expect(await fs.readdir(view(""))).not.toContain("propose");
 });
 it("rebuilds a deleted view from the store alone on serve start, before listening", async () => {
   await seed();
@@ -50,8 +52,9 @@ it("rebuilds a deleted view from the store alone on serve start, before listenin
     expect((await readJson(view("notebook/index.json"))).notes).toHaveLength(1);
     expect(await fs.readFile(view("notebook/notebook.md"), "utf8")).toBe("# Fixture\n");
   });
-  await serve(f.config, { git: f.git, env: { NOTES_SYNC_TEST: "1", NOTES_SYNC_SKIP_TAILSCALE: "1" },
+  const { stopInboxTimer } = await serve(f.config, { git: f.git, env: { NOTES_SYNC_TEST: "1", NOTES_SYNC_SKIP_TAILSCALE: "1" },
     serverFactory: () => ({ start }) });
+  stopInboxTimer();
   expect(start).toHaveBeenCalledOnce();
 });
 it("removes only stale expected files or symlinks and preserves all inbox work", async () => {
@@ -60,16 +63,16 @@ it("removes only stale expected files or symlinks and preserves all inbox work",
   await fs.symlink(f.context.store.file("meta.json"), extra);
   await fs.writeFile(view("notebook/notes/keep-me.txt"), "Unrelated");
   await fs.mkdir(view(`notebook/notes/${"e".repeat(64)}.html`));
-  await fs.writeFile(view("inbox/drafts/unfinished.txt"), "Draft");
-  await fs.writeFile(view("inbox/pending/p-fixture-kept.json"), "{}");
+  await fs.writeFile(view("inbox/unfinished.txt"), "Draft");
+  await fs.writeFile(view("inbox/p-fixture-kept.json"), "{}");
   const next = await f.next([note({ rev: 2, deletedAt: AT, html: '<img data-file="image-1">' })],
     { files: [file()], tombstones: [{ id: "trashed", purgedAt: AT }] });
   expect((await f.request("POST", "/v1/push", next)).status).toBe(200);
   expect(await fs.readdir(view("notebook/images"))).toEqual([]);
   expect(await f.context.store.readObject(f.context.store.published.files["image-1"].sha256)).toEqual(PNG);
   expect((await fs.readdir(view("notebook/notes"))).sort()).toEqual([`${"e".repeat(64)}.html`, "keep-me.txt"].sort());
-  expect(await fs.readFile(view("inbox/drafts/unfinished.txt"), "utf8")).toBe("Draft");
-  expect(await fs.readFile(view("inbox/pending/p-fixture-kept.json"), "utf8")).toBe("{}");
+  expect(await fs.readFile(view("inbox/unfinished.txt"), "utf8")).toBe("Draft");
+  expect(await fs.readFile(view("inbox/p-fixture-kept.json"), "utf8")).toBe("{}");
   expect((await readJson(view("notebook/index.json"))).notes).toEqual([]);
 });
 it("restores edited and symlinked files, logs paths/time without content, leaves backups unchanged", async () => {
@@ -80,7 +83,7 @@ it("restores edited and symlinked files, logs paths/time without content, leaves
   await fs.writeFile(target, "SENTINEL private edit");
   await fs.unlink(view("notebook/index.json"));
   await fs.symlink(f.context.store.file("meta.json"), view("notebook/index.json"));
-  await fs.writeFile(view("inbox/pending/p-fixture-junk.json"), "SENTINEL inbox edit");
+  await fs.writeFile(view("inbox/p-fixture-junk.json"), "SENTINEL inbox edit");
   await rebuild();
   expect(await fs.readFile(target, "utf8")).toBe("# Fixture\n");
   expect((await fs.lstat(view("notebook/index.json"))).isSymbolicLink()).toBe(false);
@@ -93,7 +96,7 @@ it("restores edited and symlinked files, logs paths/time without content, leaves
   await rebuild();
   expect(await fs.readFile(target)).toEqual(markdown);
 });
-it.each(["", "notebook", "notebook/notes", "notebook/images", ".claude", "inbox", "inbox/pending", "inbox/drafts"])(
+it.each(["", "notebook", "notebook/notes", "notebook/images", ".claude", "inbox"])(
   "refuses symlinked view directory %s without following it", async (relative) => {
     await seed();
     const sentinel = f.context.store.file("sentinel.txt");
@@ -128,4 +131,16 @@ it("rechecks ancestors before mutation, including a replacement during an operat
 it("can rebuild directly with only store and view paths", async () => {
   await seed();
   await expect(rebuildView({ storeDir: f.config.storeDir, viewDir: f.config.viewDir })).resolves.toBeUndefined();
+});
+
+it("removes the retired helper without following a link and recreates a missing inbox", async () => {
+  await seed();
+  const sentinel = f.context.store.file("sentinel.txt");
+  await fs.writeFile(sentinel, "KEEP");
+  await fs.symlink(sentinel, view("propose"));
+  await fs.rm(view("inbox"), { recursive: true });
+  await rebuild();
+  expect(await fs.readFile(sentinel, "utf8")).toBe("KEEP");
+  expect(await fs.readdir(view(""))).not.toContain("propose");
+  expect(await fs.readdir(view("inbox"))).toEqual([]);
 });

@@ -46,12 +46,14 @@ export function planDeployment({ mode, paths: p, sha, dirty = "", current = null
     for (const [name, destination, mode, kind] of [
       ["claude-strict.json", path.join(p.configDir, "claude-strict.json"), 0o600, "json"],
       ["claude-notes", launcher, 0o755, "shell"],
+      ["notes-sync", path.join(p.binDir, "notes-sync"), 0o755, "shell"],
       ["notes-sync.service", unit, 0o644, "unit"],
     ]) actions.push({ type: "render", source: path.join(release, "server/view", name), destination, values, mode, kind });
   };
   if (mode === "uninstall") {
     if (hasUnit) command("systemctl", ["--user", "disable", "--now", "notes-sync"]);
-    actions.push({ type: "remove-file", path: unit }, { type: "remove-file", path: launcher });
+    actions.push({ type: "remove-file", path: unit }, { type: "remove-file", path: launcher },
+      { type: "remove-file", path: path.join(p.binDir, "notes-sync") });
     command("systemctl", ["--user", "daemon-reload"]);
     command("tailscale", ["serve", "--https=8443", "off"]);
     return actions;

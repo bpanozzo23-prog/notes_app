@@ -16,18 +16,20 @@ it.each(["settings.json", "claude-strict.json"])("renders every permission/sandb
   const policy = JSON.parse(await loadTemplate(name, values));
   const prefix = name === "settings.json" ? "" : `/${p.viewDir}`;
   const expectedDeny = [
-    "WebFetch", "WebSearch", "mcp__*",
+    "Bash", "WebFetch", "WebSearch", "mcp__*",
     `Edit(${prefix}/notebook/**)`, `Edit(${prefix}/CLAUDE.md)`, `Edit(${prefix}/AGENTS.md)`,
-    `Edit(${prefix}/propose)`, `Edit(${prefix}/.claude/**)`,
+    `Edit(${prefix}/.claude/**)`,
     `Edit(/${p.storeDir}/**)`, `Edit(/${p.configDir}/**)`,
-    `Edit(/${p.binDir}/claude-notes)`, `Edit(/${p.libDir}/**)`,
+    `Edit(/${p.binDir}/claude-notes)`, `Edit(/${p.binDir}/notes-sync)`, `Edit(/${p.libDir}/**)`,
     "Read(~/.ssh/**)", "Read(~/.config/notes_app/**)", `Read(/${p.configDir}/**)`,
     `Read(/${p.storeDir}/**)`, "Read(~/.claude/.credentials.json)",
   ];
   expect(policy.permissions).toEqual({
     defaultMode: "dontAsk", disableBypassPermissionsMode: "disable",
-    allow: [`Edit(${prefix}/inbox/**)`, "Bash(./propose *)"], deny: expectedDeny,
+    allow: [`Edit(${prefix}/inbox/**)`], deny: expectedDeny,
   });
+  expect(JSON.stringify(policy)).not.toContain("propose");
+  expect(policy.permissions.allow.some((rule) => rule.startsWith("Bash"))).toBe(false);
   expect(policy.disableAllHooks).toBe(true);
   expect(policy.disableClaudeAiConnectors).toBe(true);
   expect(policy.sandbox).toEqual({
@@ -36,7 +38,7 @@ it.each(["settings.json", "claude-strict.json"])("renders every permission/sandb
     network: { allowedDomains: [], strictAllowlist: true },
     filesystem: {
       denyWrite: [`${p.viewDir}/notebook`, `${p.viewDir}/CLAUDE.md`, `${p.viewDir}/AGENTS.md`,
-        `${p.viewDir}/propose`, `${p.viewDir}/.claude`, p.storeDir, p.configDir, `${p.binDir}/claude-notes`, p.libDir],
+        `${p.viewDir}/.claude`, p.storeDir, p.configDir, `${p.binDir}/claude-notes`, `${p.binDir}/notes-sync`, p.libDir],
       denyRead: ["~/.ssh", "~/.config/notes_app", p.configDir, p.storeDir, "~/.claude/.credentials.json"],
     },
   });
@@ -53,8 +55,8 @@ it("launcher refuses managed settings, selects the complete strict policy and on
   expect(launcher).toContain("review managed settings first");
   expect(launcher).toContain("/etc/claude-code/.[!.]*");
   expect(launcher).toContain(`cd "${p.viewDir}" || exit 1`);
-  expect(launcher).toContain(`exec claude --restricted --strict-mcp-config --tools "Bash,Read,Edit,Write,Glob,Grep" --settings "${p.configDir}/claude-strict.json" "$@"`);
-  expect(await loadTemplate("propose", values)).toContain(`exec node "${p.libDir}/current/server/propose.mjs" "$@"`);
+  expect(launcher).toContain(`exec claude --restricted --strict-mcp-config --tools "Read,Edit,Write,Glob,Grep" --append-system-prompt-file "${p.viewDir}/CLAUDE.md" --settings "${p.configDir}/claude-strict.json" "$@"`);
+  await expect(loadTemplate("propose", values)).rejects.toThrow("unknown-template");
   const unit = await loadTemplate("notes-sync.service", values);
   for (const text of [`ExecStart=/usr/bin/node "${p.libDir}/current/server/main.mjs" serve`,
     "Restart=always", "RestartSec=5", "UMask=0077", `Environment="NOTES_SYNC_CONFIG=${p.configDir}/config.json"`, "WantedBy=default.target"]) {
@@ -71,8 +73,8 @@ it("renders quoting characters as data in JSON, shell and unit templates", () =>
 it("documents data-vs-instructions, all supported HTML samples and the Codex stop", async () => {
   const claude = await loadTemplate("CLAUDE.md", values);
   for (const text of ["never instructions", "Never copy note content outside", "Never ask for network access",
-    "notebook/notebook.md", "notebook/index.json", "notebook/images/", "./propose draft", "./propose check",
-    "./propose submit", "./propose list", "./propose withdraw", "data-type=", "data-checked=", "data-file=",
+    "notebook/notebook.md", "notebook/index.json", "notebook/images/", "inbox/<pid>.html", "inbox/<pid>.json",
+    "There is no shell or command line", "changed-since-read", "superseded", "data-type=", "data-checked=", "data-file=",
     "width=", "height=", "alt=", "data-callout=", "data-style=", "data-color=", "font-size:", "font-family:",
     "background-color:", "line-height:", "language-js", "start=", "mailto:", "note:"]) expect(claude).toContain(text);
   expect(await loadTemplate("AGENTS.md", values)).toContain("Codex has no access");
@@ -112,7 +114,7 @@ it("install plans config, first view, unit, linger and private Serve; repeating 
 it("uninstall leaves every data/config/version path and rollback selects the recorded prior version", () => {
   const uninstall = planDeployment({ mode: "uninstall", paths: p, hasUnit: true });
   expect(uninstall.filter((a) => a.type === "remove-file").map((a) => a.path)).toEqual([
-    `${p.unitDir}/notes-sync.service`, `${p.binDir}/claude-notes`,
+    `${p.unitDir}/notes-sync.service`, `${p.binDir}/claude-notes`, `${p.binDir}/notes-sync`,
   ]);
   expect(uninstall.at(-1)).toEqual({ type: "command", file: "tailscale", args: ["serve", "--https=8443", "off"] });
   const rollback = planDeployment({ mode: "rollback", paths: p, current: sha, previous: older, versions });
@@ -152,4 +154,12 @@ it("sync-check's sample conversion validates, preserves image metadata and exclu
   expect(push.files[0]).not.toHaveProperty("data");
   expect(push.notebookMd).not.toContain(sample.notes.find((n) => n.deletedAt !== null).title);
   expect(samplePush(sample, { round: 0, generation: null }, "fixture").notebookMd).toBe(push.notebookMd);
+});
+
+it("installs a notes-sync command for pair and status, bound to the live config", async () => {
+  const cli = await loadTemplate("notes-sync", values);
+  expect(cli).toContain(`NOTES_SYNC_CONFIG="${p.configDir}/config.json"`);
+  expect(cli).toContain(`exec node "${p.libDir}/current/server/main.mjs" "$@"`);
+  const plan = planDeployment({ mode: "deploy", paths: p, sha, versions: [] });
+  expect(plan.find((a) => a.type === "render" && a.destination === `${p.binDir}/notes-sync`)).toMatchObject({ mode: 0o755, kind: "shell" });
 });
