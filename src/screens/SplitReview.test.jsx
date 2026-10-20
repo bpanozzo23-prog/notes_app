@@ -32,7 +32,7 @@ it('a later edit of a created note offers keeping it and copying the original', 
 });
 it('recaptures a stale split with the same instruction', async () => {
   await ready(); render(<ClaudeReview {...reviewProps(sample.notes)} />); await updateNote(payload.note.id, { title: 'Later' });
-  await screen.findByText('This note changed since Claude read it. Ask again.'); expect(button('Apply split').disabled).toBe(true);
+  await screen.findByText('This note changed since Claude read it.'); expect(button('Apply split').disabled).toBe(true);
   fireEvent.click(button('Ask again')); const dialog = await screen.findByRole('dialog', { name: 'Send to Anthropic?' }); expect(dialog.textContent).toContain('By topic'); expect(dialog.textContent).toContain('Images: not sent (Claude sees only where they are)');
 });
 it.each(['tidy', 'split'])('Note sheet keeps its chosen action through discard confirmation (%s)', async (kind) => {

@@ -1,21 +1,22 @@
 import { notePreview } from "../claude/preview.js";
 import { reorganiseRowIds } from "../claude/reorganise.js";
+import NoteReviewCard from "./review/NoteReviewCard.jsx";
+import TitleRow from "./review/TitleRow.jsx";
+import TagsRow from "./review/TagsRow.jsx";
+import FolderRow from "./review/FolderRow.jsx";
 
-export default function ReorganiseCard({ change, note, folders, selected, title, titleError, toggle, editTitle, untick, disabled }) {
-  const preview = notePreview(note.text);
-  const row = (field, text) => <label className="flex min-h-11 items-center gap-3"><input type="checkbox" checked={selected.has(`${change.note}:${field}`)} disabled={disabled} onChange={() => toggle(`${change.note}:${field}`)} />{text}</label>;
-  return <article aria-label={note.displayTitle} className="space-y-2 rounded-lg border border-[var(--color-line)] p-3">
-    <h2 className="text-lg font-semibold">{note.displayTitle}</h2>
+export default function ReorganiseCard({ change, note, folders, selected, title, titleError, toggle, editTitle, selectRows, disabled }) {
+  const preview = notePreview(note.text), ids = reorganiseRowIds(change);
+  const anyTicked = ids.some((id) => selected.has(id)), selectionLabel = anyTicked ? "Untick all" : "Tick all";
+  const row = (field) => ({ checked: selected.has(`${change.note}:${field}`), onToggle: () => toggle(`${change.note}:${field}`), disabled });
+  return <NoteReviewCard title={note.displayTitle} reason={change.reason}
+    action={{ label: selectionLabel, ariaLabel: `${selectionLabel} in ${note.displayTitle}`, tone: "accent", disabled, onClick: () => selectRows(ids, !anyTicked) }}>
     {/* An untitled note is already headed by its first line; don't repeat it. */}
-    {preview !== note.displayTitle && <p className="text-sm text-[var(--color-muted)]">{preview}</p>}
-    <p className="text-sm">{change.reason}</p>
-    {change.title !== null && <div>
-      {row("title", `Title: ${note.title || "(untitled)"} → ${title || "(untitled)"}`)}
-      <input aria-label={`Proposed title for ${note.displayTitle}`} className="min-h-11 w-full rounded border p-2" value={title} disabled={disabled} onChange={(event) => editTitle(event.target.value)} />
-      {titleError && <p role="alert">{titleError}</p>}
-    </div>}
-    {change.folder.action !== "keep" && row("folder", `Folder: ${folders.find((folder) => folder.id === note.folderId)?.name ?? "No folder"} → ${change.folder.name ?? "No folder"}${change.folder.action === "create" ? " (new folder)" : ""}`)}
-    {!!(change.addTags.length || change.removeTags.length) && row("tags", `Tags: ${[...change.addTags.map((tag) => `+ ${tag}`), ...change.removeTags.map((tag) => `− ${tag}`)].join(" ")}`)}
-    <button className="app-button text-sm" disabled={disabled} onClick={() => untick(reorganiseRowIds(change))}>Untick this note</button>
-  </article>;
+    {preview !== note.displayTitle && <p className="my-1 text-sm text-[var(--color-muted)]">{preview}</p>}
+    <div>
+      {change.title !== null && <TitleRow {...row("title")} before={note.title} title={title} onEdit={editTitle} error={titleError} inputLabel={`Proposed title for ${note.displayTitle}`} />}
+      {change.folder.action !== "keep" && <FolderRow {...row("folder")} before={folders.find((folder) => folder.id === note.folderId)?.name ?? "No folder"} after={change.folder.name ?? "No folder"} isNew={change.folder.action === "create"} />}
+      {!!(change.addTags.length || change.removeTags.length) && <TagsRow {...row("tags")} added={change.addTags} removed={change.removeTags} />}
+    </div>
+  </NoteReviewCard>;
 }

@@ -545,12 +545,25 @@ await button("Notas de clase").click();
 await beginTidy("Fix accents and make the supplies a list. [shot:tidy-class]", true);
 await shot("89-tidy-disclosure"); await sendDisclosed(); await release(2);
 await page.getByText(/^Claude is working on a proposal/).waitFor(); await shot("90-tidy-working");
-await release(); await button("Apply 3 changes").waitFor(); await shot("91-tidy-review-top");
+await release(); await button("Apply 3 changes").waitFor();
+await page.evaluate(() => window.scrollTo(0, 0)); await shot("91-tidy-review-top");
+// Centre review content in the space above the fixed action bar, including at reduced height.
+const showReviewContent = async (locator) => locator.evaluate((element) => {
+  const bar = document.querySelector('[aria-label="Review actions"]');
+  const available = bar?.getBoundingClientRect().top ?? window.innerHeight;
+  window.scrollBy(0, element.getBoundingClientRect().top - Math.max(12, (available - element.getBoundingClientRect().height) / 2));
+});
+const textChange = page.getByRole("article", { name: "Change 1 of 2", exact: true });
+await textChange.getByRole("button", { name: "Show before and after", exact: true }).click();
+await showReviewContent(textChange.getByText("− Before").locator(".."));
+await shot("91a-tidy-before-after");
+await textChange.getByRole("button", { name: "Hide before and after", exact: true }).click();
 // Each paragraph edited in place is its own change; the second turns into the list.
-await page.locator('article[aria-label="Change 2 of 2"] .bg-blue-50 ul').scrollIntoViewIfNeeded();
+await showReviewContent(page.locator('article[aria-label="Change 2 of 2"] .claude-preview ul'));
 await shot("92-tidy-list-change");
 await page.getByRole("checkbox", { name: /^Tags:/ }).uncheck();
-await button("Apply 2 changes").scrollIntoViewIfNeeded(); await shot("93-tidy-partial");
+await button("Apply 2 changes").waitFor();
+await page.evaluate(() => window.scrollTo(0, 0)); await shot("93-tidy-partial");
 await applyTidy(); await shot("94-tidy-applied"); await back();
 await page.getByLabel("Note body").waitFor(); await shot("95-note-after-tidy");
 await page.goForward(); await button("Undo").click(); await page.getByText("Earlier version restored.", { exact: true }).waitFor();
@@ -558,7 +571,7 @@ await back(); await page.getByLabel("Note body").waitFor(); await shot("96-note-
 await beginTidy("[shot:tidy-class]"); await finishTidy(); await back();
 await page.getByLabel("Title", { exact: true }).fill("Notas de clase editada");
 await button("Claude's proposal is ready · Review").click();
-await page.getByText("This note changed since Claude read it. Ask again.", { exact: true }).waitFor();
+await page.getByText("This note changed since Claude read it.", { exact: true }).waitFor();
 await shot("97-tidy-stale"); await button("Discard").click();
 await page.getByLabel("Title", { exact: true }).fill("Notas de clase");
 await beginTidy("[shot:tidy-class]"); await finishTidy(); await applyTidy(); await back();
@@ -624,7 +637,7 @@ await back(); await back(); await button("Mi recordatorio después de Claude").w
 await button("Ask Claude").click(); await beginReorganise(); await finishTidy(); await back(); await back();
 await button("Mi recordatorio después de Claude").click(); await page.getByLabel("Title", { exact: true }).fill("Otra edición");
 await button("Claude's proposal is ready · Review").click();
-await page.getByText("Some notes changed since Claude read them. Ask again.", { exact: true }).waitFor(); await shot("121-reorganise-stale");
+await page.getByText("Some notes changed since Claude read them.", { exact: true }).waitFor(); await shot("121-reorganise-stale");
 await button("Discard").click(); await back();
 // Phase 3e: reimport for stable handles; all requests still use the fail-closed fixture guard.
 await button("Settings").click(); await page.getByLabel("Import backup").setInputFiles(sample);
@@ -667,7 +680,7 @@ await button("Undo the 4 unchanged notes").click(); await page.getByText(/^Resto
 await back(); await back(); await button("Ask Claude").click(); await beginLinks(); await finishTidy(); await back(); await back();
 await button("Lista de lecturas").click(); await page.getByLabel("Title", { exact: true }).fill("Lista de lecturas editada");
 await button("Claude's proposal is ready · Review").click();
-await page.getByText("Some notes changed since Claude read them. Ask again.", { exact: true }).waitFor(); await shot("134-links-stale");
+await page.getByText("Some notes changed since Claude read them.", { exact: true }).waitFor(); await shot("134-links-stale");
 await button("Discard").click(); await back();
 // Phase 3f: a fresh public sample makes group handles, backlinks and Undo reproducible.
 await button("Settings").click(); await page.getByLabel("Import backup").setInputFiles(sample);
@@ -709,7 +722,7 @@ await button("Other suggested merges (2)").click(); await page.getByRole("articl
 await back(); await back(); await button("Libros por leer (before Claude)").waitFor(); await button("Lista de lecturas").waitFor(); await shot("151-merge-copies-and-restored-source");
 await button("Claude's suggestions are ready · Review").click(); await selectReadingMerge(); await finishTidy("Apply merge"); await back();
 await button("Lista de lecturas").click(); await page.getByLabel("Title", { exact: true }).fill("Lista de lecturas editada"); await button("Claude's proposal is ready · Review").click();
-await page.getByText("Some notes changed since Claude read them. Ask again.", { exact: true }).waitFor(); await shot("152-merge-stale");
+await page.getByText("Some notes changed since Claude read them.", { exact: true }).waitFor(); await shot("152-merge-stale");
 await button("Discard").click(); await back(); await back();
 await button("Vocabulario — comida").click(); await button("Claude").click(); await button("Split…").scrollIntoViewIfNeeded(); await shot("153-note-split-sheet");
 await button("Split…").click();

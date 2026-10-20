@@ -46,7 +46,7 @@ it.each([false, true])('stale note at review or Apply flush refuses and Ask agai
   const props = reviewProps(sample.notes); render(<ClaudeReview {...props} />); await waitFor(() => expect(button('Apply merge').disabled).toBe(false));
   if (duringFlush) { props.queue.flush.mockImplementation(() => updateNote(payload.notes[1].id, { title: 'Later' })); fireEvent.click(button('Apply merge')); }
   else await updateNote(payload.notes[1].id, { title: 'Later' });
-  await screen.findByText('Some notes changed since Claude read them. Ask again.'); expect(button('Apply merge').disabled).toBe(true);
+  await screen.findByText('Some notes changed since Claude read them.'); expect(button('Apply merge').disabled).toBe(true);
   fireEvent.click(button('Ask again')); await screen.findByRole('dialog', { name: 'Send to Anthropic?' }); expect(session.getSnapshot().suggestions.kind).toBe('duplicates');
   expect(session.getSnapshot().proposal.payload.notes.map((n) => n.id)).toEqual(payload.notes.map((n) => n.id));
 });

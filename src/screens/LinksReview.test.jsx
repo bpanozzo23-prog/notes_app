@@ -35,7 +35,9 @@ it('groups by source with both placements, defaults all ticked, supports row/not
   expect(card('N17').getAllByText(/Links the words/)).toHaveLength(2); expect(card('N17').getByText('Adds it to "See also:" at the end of the note')).toBeTruthy();
   expect(screen.queryByRole('link')).toBeNull(); expect(screen.queryByRole('textbox')).toBeNull();
   fireEvent.click(card('N17').getByRole('checkbox', { name: `→ ${note('N2').displayTitle}` })); expect(button('Apply 6 changes')).toBeTruthy();
-  fireEvent.click(card('N9').getByRole('button', { name: 'Untick this note' })); expect(button('Apply 5 changes')).toBeTruthy();
+  fireEvent.click(card('N9').getByRole('button', { name: `Untick all in ${note('N9').displayTitle}` })); expect(button('Apply 5 changes')).toBeTruthy();
+  fireEvent.click(card('N9').getByRole('button', { name: `Tick all in ${note('N9').displayTitle}` })); expect(button('Apply 6 changes')).toBeTruthy();
+  fireEvent.click(card('N9').getByRole('button', { name: `Untick all in ${note('N9').displayTitle}` }));
   fireEvent.click(button('Apply 5 changes')); await screen.findByText('Applied 5 changes.'); expect(shared.queue.flush).toHaveBeenCalled();
   expect((await db.notes.get(note('N17').id)).linkedIds).toEqual([note('N3').id, note('N14').id]);
   expect((await db.notes.get(note('N9').id)).html).toBe(note('N9').html);
@@ -60,7 +62,8 @@ it.each([false, true])('refuses a stale target at review or during Apply flush (
   fireEvent.click(card('N17').getByRole('checkbox', { name: `→ ${note('N2').displayTitle}` }));
   if (duringFlush) { shared.queue.flush.mockImplementation(() => updateNote(note('N2').id, { title: 'Changed target' })); fireEvent.click(button('Apply 6 changes')); }
   else await updateNote(note('N2').id, { title: 'Changed target' });
-  await screen.findByText(STALE_REORGANISE); expect(button('Apply 6 changes').disabled).toBe(true); expect(await db.prefs.get('claudeLastChange')).toBeUndefined();
+  await screen.findByText(STALE_REORGANISE.replace(/ Ask again\.$/, "")); expect(button('Apply 6 changes').disabled).toBe(true); expect(await db.prefs.get('claudeLastChange')).toBeUndefined();
+  expect(screen.getAllByRole('checkbox').every((box) => box.disabled)).toBe(true);
   fireEvent.click(button('Ask again')); const disclosure = await screen.findByRole('dialog', { name: 'Send to Anthropic?' });
   expect(disclosure.textContent).toContain('Links between notes'); expect(session.getSnapshot().proposal.payload.kind).toBe('links');
 });

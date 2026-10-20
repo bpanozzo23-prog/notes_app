@@ -32,8 +32,11 @@ it('defaults every metadata row ticked, supports per-note and per-row untick, ti
   await ready(); const shared = props(); render(<ClaudeReview {...shared} />);
   await waitFor(() => expect(button('Apply 7 changes').disabled).toBe(false));
   expect(screen.getAllByRole('checkbox').every((box) => box.checked)).toBe(true); expect(card('N18').getByText('Llevar el cuaderno azul a la biblioteca el jueves y devolver los libros de la lista de lecturas.')).toBeTruthy();
-  fireEvent.click(card('N18').getByRole('button', { name: 'Untick this note' })); expect(button('Apply 4 changes')).toBeTruthy();
+  fireEvent.click(card('N18').getByRole('button', { name: `Untick all in ${note('N18').displayTitle}` })); expect(button('Apply 4 changes')).toBeTruthy();
+  fireEvent.click(card('N18').getByRole('button', { name: `Tick all in ${note('N18').displayTitle}` })); expect(button('Apply 7 changes')).toBeTruthy();
+  fireEvent.click(card('N18').getByRole('button', { name: `Untick all in ${note('N18').displayTitle}` }));
   fireEvent.click(card('N10').getByRole('checkbox')); expect(button('Apply 3 changes')).toBeTruthy();
+  fireEvent.click(card('N7').getByRole('button', { name: 'Edit' }));
   fireEvent.change(card('N7').getByRole('textbox'), { target: { value: 'x'.repeat(201) } }); expect(button('Apply 3 changes').disabled).toBe(true);
   fireEvent.change(card('N7').getByRole('textbox'), { target: { value: '  My reading title  ' } });
   fireEvent.click(button('Apply 3 changes')); await screen.findByText('Applied 3 changes.'); expect(shared.queue.flush).toHaveBeenCalled();
@@ -67,10 +70,11 @@ it('Untick all disables Apply; an empty proposal has no Apply or stale message',
 });
 it.each([false, true])('refuses one stale unticked note at render or after flushing Apply (%s)', async (duringFlush) => {
   await ready(); const shared = props(); render(<ClaudeReview {...shared} />); await waitFor(() => expect(button('Apply 7 changes').disabled).toBe(false));
-  fireEvent.click(card('N18').getByRole('button', { name: 'Untick this note' }));
+  fireEvent.click(card('N18').getByRole('button', { name: `Untick all in ${note('N18').displayTitle}` }));
   if (duringFlush) { shared.queue.flush.mockImplementation(() => updateNote(note('N18').id, { title: 'Changed during flush' })); fireEvent.click(button('Apply 4 changes')); }
   else await updateNote(note('N18').id, { title: 'Changed' });
-  await screen.findByText(STALE_REORGANISE); expect(button('Apply 4 changes').disabled).toBe(true); expect((await db.notes.get(note('N7').id)).title).toBe('');
+  await screen.findByText(STALE_REORGANISE.replace(/ Ask again\.$/, "")); expect(button('Apply 4 changes').disabled).toBe(true); expect((await db.notes.get(note('N7').id)).title).toBe('');
+  expect(screen.getAllByRole('checkbox').every((box) => box.disabled)).toBe(true);
   expect(await db.prefs.get('claudeLastChange')).toBeUndefined(); fireEvent.click(button('Ask again')); await screen.findByRole('dialog', { name: 'Send to Anthropic?' });
 });
 it.each([{ readOnly: true }, { replaced: true }, { versionChange: 'pending' }])('disables Apply, Undo and partial Undo with guard message %j', async (access) => {

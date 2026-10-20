@@ -13,7 +13,7 @@ export default function DuplicatesCard({ group, index, notes, selected, toggle, 
       if (!claudeSession.prepareProposal(payload, { keepSuggestions: true })) throw new Error("Wait for Claude's current request to finish.");
     });
   }
-  return <article aria-label={`Suggested merge ${index}`} className="space-y-3 rounded-lg border border-[var(--color-line)] p-3">
+  return <article aria-label={`Suggested merge ${index}`} className="space-y-3 rounded-[14px] border border-[var(--color-line)] bg-white px-3.5 py-3">
     {notes.map((note) => <div key={note.handle}><label className="flex min-h-11 items-center gap-3"><input type="checkbox" checked={selected.has(`g${index}:${note.handle}`)} onChange={() => toggle(`g${index}:${note.handle}`)} disabled={disabled} /><span>{noteTitle(note)}</span></label>
       {notePreview(note.text) !== noteTitle(note) && <p className="text-sm text-[var(--color-muted)]">{notePreview(note.text)}</p>}</div>)}
     <p>{group.reason}</p>

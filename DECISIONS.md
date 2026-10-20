@@ -1444,3 +1444,36 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   Apply (and Discard); per-note cards with Dismiss for the XPS; a clear amber banner and greyed,
   disabled rows for a changed-since-read note. — The owner asked for a better review screen; the
   current one repeats each paragraph twice and puts the actual changes in small print.
+
+- 2026-10-20 — Phase 4c, run G implements the approved review look in shared React components
+  under `src/components/review/`, using the mockup colours as `src/index.css` tokens.
+  `ChangeCard` keeps its existing export and accessible article name, wrapping `ChangeRow`;
+  `ReadOnlyBody` moves unchanged and is re-exported for its existing callers. Inline text uses
+  the existing word parts, with literal whitespace and spoken added/removed prefixes. The word
+  label counts each replacement once (the larger of the removed/added word counts for that
+  edit), summing separate edits. Shape changes show the formatted result and a plain Before
+  line; other replacements offer formatted Before/After on demand. — Presentation must not
+  alter the diff, tick ids, proposal plans, Apply, Undo or freshness checks.
+- 2026-10-20 — Review title editing is revealed by Edit; per-note selection moves into the card
+  header. Untick all keeps clearing any partial selection; when nothing is ticked it becomes
+  Tick all, using the same existing ids and proposal update path. The existing stale result
+  disables and fades metadata/text rows as well as disabling Apply. The fixed action bar has
+  safe-area padding and the review page reserves 120 px plus the safe area below its content.
+  Duplicates keeps its per-group Merge actions and has only Discard in that bar. — The approved
+  controls change where the owner reviews and selects, not what can be applied.
+- 2026-10-20 — Run G retains every screenshot name and adds `91a-tidy-before-after`; tidy shots
+  explicitly position their content above the fixed bar. Existing review test interactions
+  now open Edit/the formatted toggle and use the per-note header's new selection label; the
+  saved-After assertion still compares the displayed result to the exact normalised saved body.
+  New fixture tests cover shared rows, diff kinds, whitespace, keyboard ticks, metadata,
+  action buttons and disabled stale rows. Browser screenshots and the phone/keyboard check
+  remain for Claude and the owner; Codex has not run or seen them.
+- 2026-10-20 — Run G verification passed: `npm test` (86 files, 1,967 tests), `npm run build`,
+  `node --check scripts/screenshot.mjs` and `git diff --check`. The build retains the existing
+  large-chunk warning. No dependencies, proposal/diff/session logic, storage code, `server/` or
+  `src/sync/` changed; no paid requests, live-service changes, commit or deployment.
+- 2026-10-20 — Claude Code reviewed run G against the approved mockups with fresh shots (191
+  PNGs: tidy review, its stale state, titles/tags/folders): the build matches. Fixed: the stale
+  banner no longer repeats "Ask again." before its Ask again button (tests and shot waits follow
+  the shortened text). Test edits in run G only add checks (Tick all, disabled rows when stale).
+  Verification: `npm test` (86 files, 1,968 tests), `npm run build`.

@@ -39,7 +39,7 @@ export function SplitReview({ payload, proposal, titles }) {
     {proposal.title !== null && <p>Title: {payload.note.title || "Untitled"} → {proposal.title || "Untitled"}</p>}
     <ReadOnlyBody html={proposal.remaining} />
     <p>Then adds: Split into: {proposal.notes.map(display).join(" · ")}</p>
-    {proposal.notes.map((note, index) => <article key={index} aria-label={display(note)} className="space-y-2 rounded-lg border border-[var(--color-line)] p-3">
+    {proposal.notes.map((note, index) => <article key={index} aria-label={display(note)} className="space-y-2 rounded-[14px] border border-[var(--color-line)] bg-white px-3.5 py-3">
       <h3 className="text-lg font-semibold">{display(note)}</h3><p>Folder: {folderLabel(note.folder, payload.note, payload.folders)}</p>
       <p>Tags: {note.tags.join(", ") || "none"}</p><p>{note.reason}</p><ReadOnlyBody html={note.html} />
     </article>)}

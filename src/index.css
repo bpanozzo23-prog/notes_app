@@ -6,6 +6,17 @@
   --color-muted: #6b7280;
   --color-line: #e5e2db;
   --color-accent: #2563eb;
+  --color-del-bg: #fde2e2;
+  --color-del-ink: #9b1c1c;
+  --color-ins-bg: #dcfce7;
+  --color-ins-ink: #14532d;
+  --color-warn-bg: #fef3c7;
+  --color-warn-ink: #78350f;
+  --color-kind-bg: #e0e7ff;
+  --color-kind-ink: #3730a3;
+  --color-danger: #b91c1c;
+  --color-tick-border: #9ca3af;
+  --color-tick-disabled: #d1d5db;
 }
 
 html,
@@ -204,3 +215,15 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--color-accen
 .claude-preview .ProseMirror { min-height: 0; overflow-wrap: anywhere; }
 .claude-preview .ProseMirror a { cursor: default; }
 .claude-preview .ProseMirror input { pointer-events: none; }
+
+/* Review text uses the approved phone mockup's sizes, independently of the editor. */
+.review-screen > header { min-height: 64px; gap: 12px; padding-left: 16px; padding-right: 16px; }
+.review-screen > header h1 { font-size: 20px; }
+.review-row .claude-preview .ProseMirror > :first-child { margin-top: 0; }
+.review-row .claude-preview .ProseMirror > :last-child { margin-bottom: 0; }
+.review-row .claude-preview .ProseMirror li p { margin-bottom: 0; }
+.review-row .claude-preview .ProseMirror ul,
+.review-row .claude-preview .ProseMirror ol { margin: 4px 0; padding-left: 22px; }
+.review-added, .review-removed { border-radius: 3px; padding: 0 2px; }
+.review-added { background: var(--color-ins-bg); color: var(--color-ins-ink); text-decoration: none; font-weight: 600; }
+.review-removed { background: var(--color-del-bg); color: var(--color-del-ink); text-decoration: line-through; }

@@ -15,7 +15,8 @@ import { captureTidyPayload, runTidy } from "../claude/proposals.js";
 import { claudeSession as session } from "../claude/session.js";
 import { chunkedFetch } from "../test/anthropic.js";
 import { tidyEvents, classProposal, classBefore, tidyClass } from "../claude/fixtures/tidy.js";
-import { STALE_PROPOSAL } from "../db/claudeChanges.js";
+import { STALE_PROPOSAL as STALE_FULL } from "../db/claudeChanges.js";
+const STALE_PROPOSAL = STALE_FULL.replace(/ Ask again\.$/, "");
 const key = 'sk-ant-SENTINEL-PRIVATE-KEY';
 let note, payload;
 const props = () => ({ queue: { flush: vi.fn(async () => {}) }, run: async (task) => { await task(); return true; }, refresh: vi.fn(async () => {}), onBack: vi.fn(), busy: false, claudeReady: true });
@@ -57,11 +58,16 @@ it("validates edited title and saves exactly the body shown in After", async () 
   await ready({ ...classProposal, title: 'New title', titleReason: 'Clearer' });
   render(<ClaudeReview {...props()} />);
   await waitFor(() => expect(button('Apply 4 changes').disabled).toBe(false));
+  fireEvent.click(button('Edit'));
   fireEvent.change(screen.getByLabelText('Proposed title'), { target: { value: 'x'.repeat(201) } });
   expect(button('Apply 4 changes').disabled).toBe(true); expect(screen.getByRole('alert').textContent).toContain('200');
   fireEvent.change(screen.getByLabelText('Proposed title'), { target: { value: '  My title  ' } });
-  // Every block of this sample note changed, so the saved body is the After previews in order.
-  const after = screen.getAllByText('+ After').map((heading) => heading.parentElement.querySelector('.ProseMirror').innerHTML).join('')
+  // Text previews are folded; the shape change already shows its formatted After.
+  fireEvent.click(button('Show before and after'));
+  const after = screen.getAllByRole('article').map((card) => {
+    const afterHeading = within(card).queryByText('+ After');
+    return (afterHeading?.parentElement ?? card).querySelector('.ProseMirror').innerHTML;
+  }).join('')
     .replaceAll('<br class="ProseMirror-trailingBreak">', ''); // the on-screen placeholder in an empty line
   fireEvent.click(button('Apply 4 changes')); await screen.findByText('Applied 4 changes.');
   // The preview leaves out the editor's end-of-note empty line, which the saved body keeps.
@@ -80,6 +86,8 @@ it("Undo after later edits offers copies, leaving the later version intact", asy
 it("Untick all disables Apply, and a no-change proposal says so", async () => {
   await ready(); const view = render(<ClaudeReview {...props()} />);
   fireEvent.click(button('Untick all')); expect(button('Apply 0 changes').disabled).toBe(true);
+  fireEvent.click(button('Tick all')); expect(button('Apply 3 changes')).toBeTruthy();
+  expect(screen.getAllByRole('checkbox').every((box) => box.checked)).toBe(true);
   view.unmount(); await ready({ ...classProposal, tags: null, html: null }); render(<ClaudeReview {...props()} />);
   expect(screen.getByText('Claude suggests no changes.')).toBeTruthy(); expect(screen.queryByRole('button', { name: /^Apply/ })).toBeNull();
 });
@@ -88,8 +96,23 @@ it("checks stale on render and again after flush inside Apply", async () => {
   render(<ClaudeReview {...shared} />); await waitFor(() => expect(button('Apply 3 changes').disabled).toBe(false));
   fireEvent.click(button('Apply 3 changes')); await screen.findByText(STALE_PROPOSAL);
   expect(button('Apply 3 changes').disabled).toBe(true); expect((await db.notes.get(note.id)).html).toBe(note.html);
+  expect(screen.getAllByRole('checkbox').every((box) => box.disabled)).toBe(true);
+  expect(within(screen.getByRole('alert')).getByRole('button', { name: 'Ask again' }).disabled).toBe(false);
   expect(await db.prefs.get('claudeLastChange')).toBeUndefined();
   fireEvent.click(button('Ask again')); await screen.findByRole('dialog', { name: 'Send to Anthropic?' });
+});
+it("a stale tidy greys and disables metadata, title editing and text rows without losing the ticks", async () => {
+  await ready({ ...classProposal, title: 'Class notes', titleReason: 'Clearer', folder: { action: 'create', name: 'Classes' }, folderReason: 'Keep classes together' });
+  render(<ClaudeReview {...props()} />);
+  await waitFor(() => expect(button('Apply 5 changes').disabled).toBe(false));
+  fireEvent.click(button('Edit'));
+  const ticked = session.getSnapshot().proposal.ticked;
+  await updateNote(note.id, { title: 'Changed locally' }); await screen.findByText(STALE_PROPOSAL);
+  expect(screen.getAllByRole('checkbox')).toHaveLength(5);
+  expect(screen.getAllByRole('checkbox').every((box) => box.disabled && box.checked)).toBe(true);
+  expect(screen.getByRole('textbox', { name: 'Proposed title' }).disabled).toBe(true);
+  expect(button('Edit').disabled).toBe(true); expect(button('Untick all').disabled).toBe(true);
+  expect(session.getSnapshot().proposal.ticked).toEqual(ticked);
 });
 it.each([{ readOnly: true }, { replaced: true }, { versionChange: 'pending' }])("disables Apply and Undo in guard state %j", async (access) => {
   await ready(); const shared = props(), view = render(<ClaudeReview {...shared} />);
