@@ -118,7 +118,7 @@ it("limits changed restarts to three and recaptures each time", async () => {
   server.before(async (request) => request.path === "/v1/push" ? { status: 409, body: { error: "changed" } } : undefined);
   expect(await round()).toEqual({ status: "error", kind: "changed" });
   expect(pushes()).toHaveLength(4);
-  expect(server.requests.filter((request) => request.path === "/v1/state")).toHaveLength(4);
+  expect(server.requests.filter((request) => request.path === "/v1/state?proposals=2")).toHaveLength(4);
 });
 
 it("recovers from a reply lost after the server accepted a push", async () => {
@@ -174,7 +174,7 @@ it("posts outcomes after push and acknowledges only sent, recorded versions whil
     }
   });
   expect(await round()).toMatchObject({ status: "ok" });
-  expect(server.requests.map(({ path }) => path)).toEqual(["/v1/state", "/v1/push", "/v1/outcomes"]);
+  expect(server.requests.map(({ path }) => path)).toEqual(["/v1/state?proposals=2", "/v1/push", "/v1/outcomes"]);
   expect(await readOutbox()).toEqual([outcome("p-new")]);
 });
 
@@ -185,7 +185,7 @@ it("leaves failed outcomes queued and retains the successful push in the result"
   expect(await readOutbox()).toEqual([outcome()]);
 });
 
-it.each(["/v1/state", "/v1/files/image-1", "/v1/push", "/v1/outcomes"])("local import invalidates an outstanding %s, with no late acknowledgement", async (path) => {
+it.each(["/v1/state?proposals=2", "/v1/files/image-1", "/v1/push", "/v1/outcomes"])("local import invalidates an outstanding %s, with no late acknowledgement", async (path) => {
   await imageNote(); await appendOutbox(outcome());
   server.after(async (request) => {
     if (request.path === path) await importBackup(backupFixture({ notes: [note({ id: "imported" })] }));
@@ -201,7 +201,7 @@ it.each(["/v1/state", "/v1/files/image-1", "/v1/push", "/v1/outcomes"])("local i
 it.each(["disconnect", "broadcast", "replacement", "update"])("invalidates a round on %s", async (event) => {
   await imageNote(); await appendOutbox(outcome());
   server.after(async (request) => {
-    if (request.path !== "/v1/state") return;
+    if (request.path !== "/v1/state?proposals=2") return;
     if (event === "disconnect") await forgetToken();
     if (event === "replacement") {
       await db.prefs.put({ key: "notebookGeneration", value: "elsewhere" });

@@ -203,3 +203,37 @@ describe("review fixes (Claude Code, 4a)", () => {
     expect((await f.request("GET", "/v1/state")).body.fullPush).toBe(false);
   });
 });
+
+it("filters only state replies for old apps after a 0.4.2 push, while ingesting every kind", async () => {
+  const { note } = await import("./test-support.js");
+  const { readProposals } = await import("./proposals.mjs");
+  expect((await f.request("POST", "/v1/push", push([
+    note(), note({ id: "folder-note" }), note({ id: "trash-note" }),
+  ], { appVersion: "0.4.2" }))).status).toBe(200);
+  const common = { generation: "generation-A", title: "Proposal", folderId: null, tags: [], why: "Fixture" };
+  const proposals = {
+    "p-edit-old": { ...common, note: "note-1", basedOnRev: 1 },
+    "p-edit-folder": { ...common, note: "folder-note", basedOnRev: 1, newFolder: "Recipes" },
+    "p-new-note": { ...common, newFolder: "Recipes" },
+    "p-trash-note": { note: "trash-note", basedOnRev: 1, generation: "generation-A", trash: true, why: "Fixture" },
+  };
+  for (const [pid, details] of Object.entries(proposals)) {
+    if (!details.trash) await fs.writeFile(path.join(f.config.viewDir, `inbox/${pid}.html`), "<p>Fixture</p>");
+    await fs.writeFile(path.join(f.config.viewDir, `inbox/${pid}.json`), JSON.stringify(details));
+  }
+  await f.request("GET", "/v1/state");
+  expect((await f.request("GET", "/v1/state")).body.proposals.map((p) => p.proposal)).toEqual(["p-edit-old"]);
+  expect((await readProposals(f.config.storeDir)).map((p) => p.record.status)).toEqual(Array(4).fill("pending"));
+  expect(await fs.readdir(path.join(f.config.viewDir, "inbox"))).toEqual([]);
+  for (const query of ["", "?proposals=1", "?proposals=", "?proposals=02", "?proposals=2%ZZ", "?other=proposals%3D2",
+    "?proposals=1&proposals=2", "?bad=%ZZ&unknown=true"]) {
+    const response = await f.request("GET", `/v1/state${query}`);
+    expect(response.status).toBe(200);
+    expect(response.body.proposals.map((p) => p.proposal), query).toEqual(["p-edit-old"]);
+  }
+  for (const query of ["?proposals=2", "?other=1&proposals=2&unknown=3", "?proposals=%32&bad=%ZZ", "?proposals=2&proposals=1"]) {
+    const response = await f.request("GET", `/v1/state${query}`);
+    expect(response.status).toBe(200);
+    expect(response.body.proposals.map((p) => p.proposal).sort(), query).toEqual(Object.keys(proposals).sort());
+  }
+});

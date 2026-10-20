@@ -10,7 +10,7 @@ import { clearFileUrls } from "../editor/fileUrls.js";
 
 import { claudeApiKey, claudeEnabled, claudeSpend, claudeLastChange } from "../claude/prefs.js";
 import { claudeSession } from "../claude/session.js";
-import { syncAddress, syncToken, syncOutbox } from "../sync/prefs.js";
+import { syncAddress, syncToken, syncOutbox, syncHandled } from "../sync/prefs.js";
 import { syncLifecycle } from "../sync/lifecycle.js";
 
 // Measured on the owner's phone (2026-10-18): 40 MB and 118 MB backups each took about 1–2 s to
@@ -19,7 +19,7 @@ export const COMFORTABLE_BACKUP_BYTES = 150 * 1024 * 1024;
 const V1_EXPORTED_PREFS = Object.freeze(["lastBackupAt", "toolbar"]);
 export const EXPORTED_PREFS = Object.freeze(["lastBackupAt", ...FORMATTING_KEYS]);
 // Device-local preferences that older backups contained: accepted with a warning, never restored.
-export const IGNORED_PREFS = Object.freeze(["storagePersisted", claudeEnabled, claudeSpend, claudeLastChange, syncAddress, syncOutbox]);
+export const IGNORED_PREFS = Object.freeze(["storagePersisted", claudeEnabled, claudeSpend, claudeLastChange, syncAddress, syncOutbox, syncHandled]);
 export const BACKUP_FORMAT = "notes_app-backup";
 
 export async function buildBackup() {

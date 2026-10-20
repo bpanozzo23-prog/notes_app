@@ -4,8 +4,9 @@ import { clearReferencedFileMarks } from "./files.js";
 import { newId, isSafeId } from "../lib/ids.js";
 import { nowIso } from "../lib/dates.js";
 import { noteTitle } from "../lib/notebookView.js";
-import { extractNoteLinks, neutralizeNoteLinks } from "../lib/text.js";
-import { appendOutboxInTransaction } from "../sync/prefs.js";
+import { extractNoteLinks, extractFileIds, neutralizeNoteLinks } from "../lib/text.js";
+import { addedNoteLinks } from "../claude/diff.js";
+import { appendOutboxInTransaction, appendHandledInTransaction, readHandled, outboxId } from "../sync/prefs.js";
 
 export const STALE_PROPOSAL = "This note changed since Claude read it. Ask again.";
 const stale = () => { throw new Error(STALE_PROPOSAL); };
@@ -16,18 +17,42 @@ async function generationCheck(expected) {
 }
 async function checkPlan(plan) {
   await generationCheck(plan.generation);
-  if (!plan.notes.length || new Set(plan.notes.map((item) => item.id)).size !== plan.notes.length) stale();
+  if (!plan.notes.length && !(plan.kind === "xps" && plan.createNotes?.length) || new Set(plan.notes.map((item) => item.id)).size !== plan.notes.length) stale();
   const notes = await db.notes.bulkGet(plan.notes.map((item) => item.id));
   if (notes.some((note, index) => !note || note.deletedAt !== null || note.rev !== plan.notes[index].expectedRev)) stale();
   const createdIds = new Set((plan.createNotes ?? []).map((note) => note.id)), targets = new Set();
   for (const [index, item] of plan.notes.entries()) {
-    if (Object.hasOwn(item.patch, "html")) for (const id of extractNoteLinks(item.patch.html)) {
-      if (!notes[index].linkedIds.includes(id)) targets.add(id);
+    if (Object.hasOwn(item.patch, "html")) for (const id of plan.kind === "xps" ? addedNoteLinks(notes[index].html, item.patch.html) : extractNoteLinks(item.patch.html)) {
+      if (plan.kind === "xps" || !notes[index].linkedIds.includes(id)) targets.add(id);
     }
   }
   for (const note of plan.createNotes ?? []) for (const id of extractNoteLinks(note.html)) targets.add(id);
   const linked = await db.notes.bulkGet([...targets].filter((id) => !createdIds.has(id)));
   if (linked.some((note) => !note || plan.kind === "xps" && note.deletedAt !== null)) stale();
+  if (plan.kind === "xps") {
+    const handled = await readHandled(), identities = new Set(handled.map(outboxId));
+    if ((plan.outbox ?? []).some((entry) => identities.has(outboxId(entry))) || (plan.handled ?? []).some((entry) =>
+      identities.has(outboxId(entry)) || entry.pid && handled.some((old) => old.pid === entry.pid && old.generation === plan.generation))) stale();
+    if (plan.notes.some((item) => item.role === "trashed" && targets.has(item.id))) stale();
+    const pictures = [...new Set((plan.createNotes ?? []).flatMap((note) => extractFileIds(note.html)))];
+    if ((await db.files.bulkGet(pictures)).some((file) => !file)) stale();
+    for (const expected of plan.nameReuseChecks ?? []) {
+      const matches = (await db.folders.toArray()).filter((folder) => folder.name.toLowerCase() === expected.name.toLowerCase());
+      if (matches.length !== 1 || matches[0].id !== expected.id) stale();
+    }
+    if (plan.sourceCheck) {
+      const source = await db.notes.get(plan.sourceCheck.id);
+      if ((source?.rev ?? null) !== plan.sourceCheck.rev) stale();
+    }
+    for (const expected of plan.linkChecks ?? []) {
+      const note = await db.notes.get(expected.id);
+      if (!note || note.deletedAt !== null || note.rev !== expected.rev) stale();
+    }
+    for (const expected of plan.fileChecks ?? []) {
+      const file = await db.files.get(expected.id);
+      if (!file || Object.keys({ ...file, ...expected }).filter((key) => key !== "unusedSince").some((key) => file[key] !== expected[key])) stale();
+    }
+  }
   for (const expected of plan.folderChecks ?? []) {
     const folder = await db.folders.get(expected.id);
     if (!folder || folder.name !== expected.name) stale();
@@ -44,7 +69,7 @@ async function checkPlan(plan) {
   return notes;
 }
 export async function claudePlanIsCurrent(plan) {
-  try { return await db.transaction("r", db.notes, db.folders, db.prefs, async () => { await checkPlan(plan); return true; }); }
+  try { return await db.transaction("r", db.notes, db.folders, db.files, db.prefs, async () => { await checkPlan(plan); return true; }); }
   catch { return false; }
 }
 export function applyClaudeChanges(plan) {
@@ -57,7 +82,7 @@ export function applyClaudeChanges(plan) {
       const id = newId(); created.set(name, id);
       await db.folders.add({ id, name, position: position++ });
     }
-    const undo = { ...(plan.kind ? { kind: plan.kind } : {}), changeId: newId(), generation: plan.generation, at: nowIso(), notes: [], createdFolders: [...created.values()], createdNotes: [], trashedNotes: [] };
+    const undo = { ...(plan.kind ? { kind: plan.kind } : {}), changeId: newId(), generation: plan.generation, at: nowIso(), notes: [], createdFolders: [...created.values()], createdFolderNames: [...created.keys()], createdNotes: [], trashedNotes: [] };
     for (const [index, item] of plan.notes.entries()) {
       const before = notes[index], patch = { ...item.patch };
       if (patch.folderId && typeof patch.folderId === "object") {
@@ -74,7 +99,7 @@ export function applyClaudeChanges(plan) {
       // The old body is now protected by Undo; clear any pre-existing unused clock immediately.
       await clearReferencedFileMarks(before.html);
     }
-    if (!undo.notes.length) throw new Error("Claude suggests no changes.");
+    if (!undo.notes.length && !(plan.kind === "xps" && plan.createNotes?.length)) throw new Error("Claude suggests no changes.");
     for (const item of plan.createNotes ?? []) {
       const folderId = item.folderId && typeof item.folderId === "object" ? created.get(item.folderId.create) : item.folderId;
       if (folderId === undefined) stale();
@@ -84,6 +109,7 @@ export function applyClaudeChanges(plan) {
     if (!isClaudeChange(undo)) throw new Error("Invalid Claude change.");
     await db.prefs.put({ key: "claudeLastChange", value: undo });
     if (plan.outbox) await appendOutboxInTransaction(plan.outbox);
+    if (plan.handled) await appendHandledInTransaction(plan.handled);
     return { changeId: undo.changeId, applied: undo.notes.length, created: undo.createdNotes.map((note) => note.id) };
   });
 }
@@ -93,8 +119,9 @@ export function isClaudeChange(record) {
   const date = (value) => typeof value === "string" && Number.isFinite(Date.parse(value));
   const valid = !!record && isSafeId(record.changeId) && (record.generation === null || isSafeId(record.generation)) && date(record.at) &&
     Array.isArray(record.createdFolders) && record.createdFolders.every(isSafeId) &&
+    (!Object.hasOwn(record, "createdFolderNames") || Array.isArray(record.createdFolderNames) && record.createdFolderNames.length === record.createdFolders.length && record.createdFolderNames.every((name) => typeof name === "string")) &&
     Array.isArray(record.createdNotes) && Array.isArray(record.trashedNotes) &&
-    Array.isArray(record.notes) && record.notes.length > 0 && new Set(record.notes.map((entry) => entry?.id)).size === record.notes.length &&
+    Array.isArray(record.notes) && (record.notes.length > 0 || record.kind === "xps" && record.createdNotes.length > 0) && new Set(record.notes.map((entry) => entry?.id)).size === record.notes.length &&
     record.notes.every((entry) => {
       const before = entry?.before;
       return isSafeId(entry?.id) && before?.id === entry.id && typeof before.title === "string" && typeof before.html === "string" &&
@@ -104,14 +131,16 @@ export function isClaudeChange(record) {
         Array.isArray(entry.fields) && entry.fields.length > 0 && new Set(entry.fields).size === entry.fields.length && entry.fields.every((field) => fields.includes(field));
     });
   if (!valid || ![undefined, "xps", "links", "merge", "split"].includes(record.kind)) return false;
-  if (!["merge", "split"].includes(record.kind)) return !record.createdNotes.length && !record.trashedNotes.length && record.notes.every((entry) => !Object.hasOwn(entry, "role"));
+  if (!["merge", "split", "xps"].includes(record.kind)) return !record.createdNotes.length && !record.trashedNotes.length && record.notes.every((entry) => !Object.hasOwn(entry, "role"));
   const content = record.notes.filter((entry) => entry.role === "content"), trashed = record.notes.filter((entry) => entry.role === "trashed");
-  if (content.length > 1 || (record.kind === "split" && content.length !== 1) || record.notes.some((entry) => !["content", "trashed", "relinked"].includes(entry.role))) return false;
+  if (record.kind === "xps") {
+    if (record.notes.some((entry) => Object.hasOwn(entry, "role") ? entry.role !== "trashed" : entry.fields.some((field) => !["title", "html", "folderId", "tags"].includes(field)))) return false;
+  } else if (content.length > 1 || (record.kind === "split" && content.length !== 1) || record.notes.some((entry) => !["content", "trashed", "relinked"].includes(entry.role))) return false;
   if (trashed.some((entry) => entry.fields.length !== 1 || entry.fields[0] !== "deletedAt" || entry.before.deletedAt !== null)) return false;
   if (record.notes.some((entry) => entry.role === "relinked" && (entry.fields.length !== 1 || entry.fields[0] !== "html"))) return false;
   if (record.trashedNotes.length !== trashed.length || new Set(record.trashedNotes).size !== trashed.length || record.trashedNotes.some((id) => !trashed.some((entry) => entry.id === id))) return false;
   if (new Set(record.createdNotes.map((entry) => entry?.id)).size !== record.createdNotes.length || record.createdNotes.some((entry) => !entry || Object.keys(entry).length !== 2 || !isSafeId(entry.id) || !Number.isSafeInteger(entry.writtenRev) || entry.writtenRev < 1 || record.notes.some((note) => note.id === entry.id))) return false;
-  return record.kind === "merge" ? trashed.length > 0 && record.createdNotes.length === 0 : record.notes.length === 1 && record.createdNotes.length > 0;
+  return record.kind === "xps" || (record.kind === "merge" ? trashed.length > 0 && record.createdNotes.length === 0 : record.notes.length === 1 && record.createdNotes.length > 0);
 }
 async function readUndo(changeId) {
   const record = (await db.prefs.get("claudeLastChange"))?.value;
@@ -129,10 +158,17 @@ export const isMetadataOnlyChange = (record) => record.createdNotes.length === 0
 export const allowsPartialUndo = (record) => isMetadataOnlyChange(record) ||
   (record.kind === "links" && !record.createdNotes.length && !record.trashedNotes.length &&
   !record.createdFolders.length && record.notes.every((entry) => entry.fields.length === 1 && entry.fields[0] === "html"));
+export const isMovedChange = (record) => ["merge", "split"].includes(record.kind) || record.kind === "xps" && (record.createdNotes.length > 0 || record.trashedNotes.length > 0);
+async function removeCreatedFolders(record) {
+  for (const [index, id] of record.createdFolders.entries()) {
+    const name = record.createdFolderNames?.[index];
+    if (name !== undefined && (await db.folders.get(id))?.name === name && !(await db.notes.filter((note) => note.folderId === id).count())) await db.folders.delete(id);
+  }
+}
 export function undoClaudeChange(changeId, { unchangedOnly = false, keepEdits = false, expected } = {}) {
   return writeTransaction(tables(), async () => {
     const record = await readUndo(changeId);
-    if (["merge", "split"].includes(record.kind)) return undoMovedNotes(record, { keepEdits, expected });
+    if (isMovedChange(record)) return undoMovedNotes(record, { keepEdits, expected });
     const notes = await db.notes.bulkGet(record.notes.map((entry) => entry.id));
     const unchanged = notes.map((note, index) => !!note && note.deletedAt === null && note.rev === record.notes[index].writtenRev);
     const partial = allowsPartialUndo(record);
@@ -148,7 +184,7 @@ export function undoClaudeChange(changeId, { unchangedOnly = false, keepEdits = 
       await db.notes.put({ ...next, updatedAt: entry.before.updatedAt });
       await clearReferencedFileMarks(next.html);
     }
-    for (const id of record.createdFolders) if (!(await db.notes.filter((note) => note.folderId === id).count())) await db.folders.delete(id);
+    await removeCreatedFolders(record);
     await db.prefs.delete("claudeLastChange");
     return { restored: unchanged.filter(Boolean).length, ...(unchangedOnly ? { skipped } : {}) };
   });
@@ -156,7 +192,7 @@ export function undoClaudeChange(changeId, { unchangedOnly = false, keepEdits = 
 export function restoreClaudeCopies(changeId) {
   return writeTransaction(tables(), async () => {
     const record = await readUndo(changeId);
-    if (["merge", "split"].includes(record.kind)) throw new Error("Use Undo for this change instead.");
+    if (isMovedChange(record)) throw new Error("Use Undo for this change instead.");
     if (allowsPartialUndo(record)) throw new Error("Use Undo for the unchanged notes instead.");
     const tombstones = new Set(await db.tombstones.toCollection().primaryKeys()), ids = [];
     for (const { before } of record.notes) {
@@ -187,7 +223,7 @@ async function undoMovedNotes(record, { keepEdits, expected }) {
     const note = notes[index];
     return note && note.rev === entry.writtenRev && (entry.role === "trashed" ? note.deletedAt !== null : note.deletedAt === null);
   });
-  const decisions = entries.map((entry, index) => ({ id: entry.id, title: noteTitle(notes[index] ?? entry.before ?? { title: "Untitled", text: "" }), action: conflictAction[entry.role](notes[index]) }));
+  const decisions = entries.map((entry, index) => ({ id: entry.id, title: noteTitle(notes[index] ?? entry.before ?? { title: "Untitled", text: "" }), action: conflictAction[entry.role ?? "content"](notes[index]) }));
   if (!asLeft && (!keepEdits || JSON.stringify(decisions) !== JSON.stringify(expected))) return { conflict: true, keepEdits: true, decisions };
   const tombstones = new Set(await db.tombstones.toCollection().primaryKeys()), copies = [];
   for (const [index, entry] of entries.entries()) {
@@ -212,7 +248,7 @@ async function undoMovedNotes(record, { keepEdits, expected }) {
       await db.notes.put({ ...next, updatedAt: entry.before.updatedAt });
     }
   }
-  if (asLeft) for (const id of record.createdFolders) if (!(await db.notes.filter((note) => note.folderId === id).count())) await db.folders.delete(id);
+  if (asLeft) await removeCreatedFolders(record);
   await db.prefs.delete("claudeLastChange");
   return asLeft ? { restored: true, kind: record.kind } : { restored: true, keepEdits: true, decisions, copies };
 }

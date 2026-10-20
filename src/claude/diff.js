@@ -37,6 +37,12 @@ export function effects(before, after) {
   for (const next of remaining.added) result.push({ type: next.href.startsWith("note:") ? "note-link-added" : "web-link-added", href: next.href });
   return result;
 }
+export function addedNoteLinks(before, after) {
+  return [...new Set(effects([before], [after]).flatMap((effect) => {
+    const href = effect.type === "link-retargeted" ? effect.after : effect.type === "note-link-added" ? effect.href : "";
+    return href.startsWith("note:") ? [href.slice(5)] : [];
+  }))];
+}
 function formatLabels(before, after) {
   const a = parseBody(before.join("") || "<p></p>"), b = parseBody(after.join("") || "<p></p>");
   const shape = (n) => [n.type, n.attrs, n.marks, n.content?.filter((c) => c.type !== "text").map(shape)];

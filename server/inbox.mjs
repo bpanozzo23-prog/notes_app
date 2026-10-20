@@ -3,7 +3,7 @@ import path from "node:path";
 import { MAX_PENDING_PROPOSALS, MAX_PROPOSAL_DETAILS_BYTES } from "./constants.mjs";
 import { sha256 } from "./fsutil.mjs";
 import { INBOX_NAME, MAX_BODY_BYTES, proposalFilename, proposalHash,
-  proposalProblem, referenceProblem, readProposals } from "./proposals.mjs";
+  proposalKind, recordKind, proposalProblem, referenceProblem, readProposals } from "./proposals.mjs";
 import { readRegular, sameFileStat, withDirectory, unlinkInDirectory } from "./view-fs.mjs";
 import { commitProposalUpdates } from "./round.mjs";
 import { viewLog } from "./view.mjs";
@@ -30,7 +30,7 @@ async function inspectPair(dir, pid) {
   return pair;
 }
 
-async function capture(dir, proposal, pair, missing) {
+async function capture(dir, proposal, pair, missing, stable) {
   let details, body, reason = missing;
   const read = async (ext, limit) => {
     if (!pair[ext]) return;
@@ -47,18 +47,22 @@ async function capture(dir, proposal, pair, missing) {
     try { details = JSON.parse(decode(jsonBytes)); }
     catch { reason ??= "invalid-json"; }
   }
+  const trash = isObject(details) && proposalKind(details) === "trash";
+  // A stable lone JSON is only a complete submission when it declares Trash.
+  if (!pair.html && (trash ? !stable : !missing)) return null;
+  if (trash) reason = pair.html ? "trash-with-body" : null;
   const shape = details === undefined ? "invalid-shape" : proposalProblem(details);
-  reason ??= shape;
+  reason ??= trash && shape ? "invalid-shape" : shape;
   if (htmlBytes) {
     try { body = decode(htmlBytes); }
     catch { reason ??= "invalid-body"; }
   }
-  const value = !shape && body !== undefined ? { ...details, body } : null;
+  const value = !shape ? trash && !pair.html ? details : body !== undefined ? { ...details, body } : null : null;
   // Use the canonical fields/body even for invalid fields. Excessively deep JSON, broken
   // UTF-8 or unreadable files need a bounded byte/marker hash instead.
   let hash;
-  if (isObject(details) && body !== undefined) {
-    try { hash = proposalHash({ ...details, body }); }
+  if (trash && !shape && !pair.html || isObject(details) && body !== undefined) {
+    try { hash = proposalHash(trash && !shape && !pair.html ? details : { ...details, body }); }
     catch { reason ??= "invalid-shape"; }
   }
   hash ??= proposalHash({
@@ -90,12 +94,14 @@ export async function scanInbox(context) {
           Boolean(previous.html) === Boolean(pair.html) ? previous.firstSeen : new Date(now()).getTime();
         observations.set(pid, { ...pair, firstSeen });
         const complete = pair.json && pair.html;
-        if (complete ? !previous || !samePair(previous, pair) :
-          new Date(now()).getTime() - firstSeen <= HALF_PAIR_TIMEOUT_MS) continue;
+        const stable = previous && samePair(previous, pair);
+        const expired = new Date(now()).getTime() - firstSeen > HALF_PAIR_TIMEOUT_MS;
+        if (complete ? !stable : !expired && !(pair.json && stable)) continue;
         try {
-          const entry = await capture(dir, pid, pair, complete ? null : pair.json ? "missing-body" : "missing-details");
+          const entry = await capture(dir, pid, pair,
+            !complete && expired ? pair.json ? "missing-body" : "missing-details" : null, stable);
           const current = await inspectPair(dir, pid);
-          if (current && samePair(pair, current)) entries.push(entry);
+          if (current && samePair(pair, current)) { if (entry) entries.push(entry); }
           else observations.delete(pid);
         } catch (error) {
           if (!["file-changed", "not-regular"].includes(error.reason) && !["ENOENT", "ELOOP"].includes(error.code)) throw error;
@@ -117,8 +123,10 @@ export async function scanInbox(context) {
     const { proposal, hash, value, details } = entry;
     // Replaying even a handled or superseded version only removes the inbox files.
     if (records.some(({ record }) => record.proposal === proposal && record.hash === hash)) continue;
-    let reason = entry.reason ?? referenceProblem(value, store.published);
-    const replaced = !reason ? records.filter(({ record }) => record.status === "pending" && record.note === value.note) : [];
+    let reason = entry.reason ?? referenceProblem({ ...value, proposal }, store.published, records);
+    const replaced = !reason ? records.filter(({ record }) => record.status === "pending" &&
+      (proposalKind(value) === "new" ? recordKind(record) === "new" && record.proposal === proposal :
+        recordKind(record) !== "new" && record.note === value.note)) : [];
     if (!reason && pending().length - replaced.length >= MAX_PENDING_PROPOSALS) reason = "too-many";
     const ingestedAt = new Date(now()).toISOString();
     if (!reason) {

@@ -6,7 +6,7 @@ import { AT, fixture, note, push } from "./test-support.js";
 import { readJson, sha256, stableStringify } from "./fsutil.mjs";
 import { buildBackup } from "./backup.mjs";
 import { HALF_PAIR_TIMEOUT_MS, scanInbox } from "./inbox.mjs";
-import { readProposals, proposalFilename } from "./proposals.mjs";
+import { readProposals, proposalFilename, proposalHash } from "./proposals.mjs";
 import { OUTCOME_STEPS } from "./round.mjs";
 
 let f;
@@ -28,7 +28,7 @@ async function put(extra = {}, pid = PID) {
   await fs.writeFile(filename("html", pid), body);
   await fs.writeFile(filename("json", pid), JSON.stringify(details));
 }
-const state = () => f.request("GET", "/v1/state");
+const state = () => f.request("GET", "/v1/state?proposals=2");
 async function ingest() {
   expect((await state()).status).toBe(200);
   const response = await state();
@@ -367,4 +367,223 @@ it("never follows an inbox replaced during scanning", async () => {
   expect(f.git.commit).not.toHaveBeenCalled();
   expect((await fs.lstat(inbox())).isSymbolicLink()).toBe(true);
   expect(await fs.readdir(f.context.store.repo)).not.toContain(`${PID}.html`);
+});
+
+const newDetails = (extra = {}) => ({ generation: "generation-A", title: "New suggestion", folderId: null,
+  tags: [], why: "New fixture", ...extra });
+const trashDetails = (extra = {}) => ({ note: "note-1", basedOnRev: 1, generation: "generation-A", trash: true, why: "Trash fixture", ...extra });
+async function submit(details, body, pid = PID) {
+  if (body !== undefined) await fs.writeFile(filename("html", pid), body);
+  await fs.writeFile(filename("json", pid), JSON.stringify(details));
+}
+
+it("takes a lone Trash JSON only after two stable scans and stores no body", async () => {
+  const details = trashDetails();
+  await submit(details);
+  expect((await state()).body.proposals).toEqual([]);
+  expect(await fs.readdir(inbox())).toEqual([`${PID}.json`]);
+  await fs.appendFile(filename(), " ");
+  expect((await state()).body.proposals).toEqual([]);
+  expect(await records()).toEqual([]);
+  const [record] = (await state()).body.proposals;
+  expect(record).toEqual({ ...details, proposal: PID, hash: proposalHash(details), status: "pending", ingestedAt: AT, sequence: 1 });
+  expect(record.hash).not.toBe(proposalHash({ ...details, body: "" }));
+  expect(await records()).toEqual([record]);
+  expect(await fs.readdir(inbox())).toEqual([]);
+  expect((await summary())[0]).toMatchObject({ kind: "trash", title: "Fixture title" });
+});
+it("accepts an edit with a new folder, and a new note with live links and pictures in a new folder", async () => {
+  await put({ newFolder: "Recipes" });
+  expect((await ingest())[0].newFolder).toBe("Recipes");
+  const details = newDetails({ newFolder: "Recipes" });
+  const body = '<p>New</p><img data-file="image-1"><a href="note:other">Other</a>';
+  await submit(details, body, "p-new-note");
+  expect((await ingest()).at(-1)).toEqual({ ...details, body, proposal: "p-new-note", hash: proposalHash({ ...details, body }),
+    status: "pending", ingestedAt: AT, sequence: 2 });
+  expect((await summary()).map((p) => p.kind)).toEqual(["edit", "new"]);
+});
+it.each([
+  [trashDetails({ title: "Not allowed" }), undefined, "invalid-shape"],
+  [trashDetails({ trash: false }), undefined, "invalid-shape"],
+  [trashDetails({ basedOnRev: 0 }), undefined, "invalid-shape"],
+  [trashDetails({ newFolder: "Recipes" }), undefined, "invalid-shape"],
+  [trashDetails({ folderId: null }), undefined, "invalid-shape"],
+  [trashDetails(), "", "trash-with-body"],
+  [trashDetails({ extra: true }), "Unexpected body", "trash-with-body"],
+  [trashDetails({ note: "missing" }), undefined, "unknown-note"],
+  [trashDetails({ note: "trash" }), undefined, "note-in-trash"],
+  [trashDetails({ basedOnRev: 2 }), undefined, "changed-since-read"],
+  [trashDetails({ generation: "old" }), undefined, "changed-since-read"],
+  [newDetails({ basedOnRev: 1 }), "New body", "invalid-shape"],
+  [newDetails({ newFolder: " Recipes" }), "New body", "invalid-folder"],
+  [newDetails({ folderId: "folder", newFolder: "Recipes" }), "New body", "invalid-folder"],
+  [newDetails({ newFolder: "fOlDeR" }), "New body", "folder-exists"],
+  [newDetails({ generation: "old" }), "New body", "changed-since-read"],
+  [newDetails({ folderId: "missing" }), "New body", "unknown-folder"],
+  [newDetails(), '<a href="note:trash">Trash</a>', "unknown-note-link"],
+  [newDetails(), '<img data-file="new-image">', "new-image"],
+])("refuses new/Trash submission %j (%s, %s) without a body", async (details, body, reason) => {
+  await submit(details, body);
+  expect(await ingest()).toEqual([]);
+  expect(await records()).toEqual([expect.objectContaining({ proposal: PID, status: "refused", reason })]);
+  expect((await records())[0]).not.toHaveProperty("body");
+  expect(await fs.readdir(inbox())).toEqual([]);
+});
+it("refuses an edit's existing new-folder name without superseding its pending version", async () => {
+  await put(); await ingest();
+  await put({ newFolder: "fOlDeR" }); await ingest();
+  expect((await records()).map((r) => [r.status, r.reason])).toEqual([["pending", undefined], ["refused", "folder-exists"]]);
+});
+it("reformatted identical Trash replay only cleans up, including after the owner handled it", async () => {
+  const details = trashDetails();
+  await submit(details); const [record] = await ingest();
+  await f.request("POST", "/v1/outcomes", [{ proposal: PID, hash: record.hash, outcome: "dismissed", at: AT }]);
+  const commits = f.git.commit.mock.calls.length;
+  await fs.writeFile(filename(), JSON.stringify(Object.fromEntries(Object.entries(details).reverse()), null, 2));
+  expect(await ingest()).toEqual([]);
+  expect(await records()).toHaveLength(1);
+  expect((await records())[0]).toMatchObject({ hash: record.hash, status: "dismissed" });
+  expect(f.git.commit).toHaveBeenCalledTimes(commits);
+  expect(await fs.readdir(inbox())).toEqual([]);
+});
+it.each(OUTCOME_STEPS)("recovers lone Trash interrupted after %s without a second version", async (step) => {
+  await submit(trashDetails()); await state();
+  f.context.afterStep = (name) => { if (name === step) throw new Error("crash"); };
+  expect((await state()).status).toBe(503);
+  expect(await fs.readdir(inbox())).toEqual([`${PID}.json`]);
+  const fresh = await f.restart();
+  expect(await ingest()).toHaveLength(1);
+  expect(await records()).toHaveLength(1);
+  expect((await records())[0]).not.toHaveProperty("body");
+  expect(f.git.commit).toHaveBeenCalledTimes(1);
+  expect(await fresh.store.readJournal()).toBeNull();
+  expect(await fs.readdir(inbox())).toEqual([]);
+});
+it("leaves a Trash JSON edited during view rebuild for later ingestion", async () => {
+  await submit(trashDetails()); await state();
+  const original = f.context.rebuildView;
+  f.context.rebuildView = async () => { await original(); await submit(trashDetails({ why: "Reconsidered reason" })); };
+  expect((await state()).body.proposals).toHaveLength(1);
+  expect(JSON.parse(await fs.readFile(filename(), "utf8")).why).toBe("Reconsidered reason");
+  f.context.rebuildView = original;
+  expect((await ingest())[0].why).toBe("Reconsidered reason");
+  expect((await records()).map((r) => r.status)).toEqual(["superseded", "pending"]);
+});
+it("leaves a Trash JSON changed at the final unlink check", async () => {
+  await submit(trashDetails()); await state();
+  const original = fs.lstat;
+  let cleanup = false, checks = 0;
+  f.context.afterStep = (step) => { if (step === "response") cleanup = true; };
+  vi.spyOn(fs, "lstat").mockImplementation(async (name, ...args) => {
+    if (cleanup && String(name).endsWith(`${PID}.json`) && ++checks === 2) {
+      await fs.appendFile(filename(), "  ");
+    }
+    return original(name, ...args);
+  });
+  expect((await state()).status).toBe(200);
+  expect(await fs.readdir(inbox())).toEqual([`${PID}.json`]);
+  expect(await records()).toHaveLength(1);
+});
+it.each(["between scans", "during read"])("waits again when a Trash HTML companion appears %s", async (when) => {
+  await submit(trashDetails()); await state();
+  if (when === "between scans") await fs.writeFile(filename("html"), "Unexpected");
+  else {
+    const original = fs.open;
+    let changed = false;
+    vi.spyOn(fs, "open").mockImplementation(async (name, ...args) => {
+      const handle = await original(name, ...args);
+      if (!changed && String(name).endsWith(`${PID}.json`)) {
+        changed = true; await fs.writeFile(filename("html"), "Unexpected");
+      }
+      return handle;
+    });
+  }
+  await state();
+  expect(await records()).toEqual([]);
+  await ingest();
+  expect(await records()).toEqual([expect.objectContaining({ status: "refused", reason: "trash-with-body" })]);
+});
+it.each(["edit", "new", "invalid-json", "unreadable", "too-large"])("keeps lone %s JSON waiting through stable reads until missing-body timeout", async (kind) => {
+  if (kind === "edit") { await put(); await fs.unlink(filename("html")); }
+  else await submit(newDetails());
+  if (kind === "invalid-json") await fs.writeFile(filename(), "{broken");
+  if (kind === "too-large") await fs.writeFile(filename(), " ".repeat(16 * 1024 + 1));
+  if (kind === "unreadable") {
+    const original = fs.open;
+    vi.spyOn(fs, "open").mockImplementation(async (name, ...args) => {
+      if (String(name).endsWith(`${PID}.json`)) throw Object.assign(new Error("Fixture"), { code: "EACCES" });
+      return original(name, ...args);
+    });
+  }
+  await ingest();
+  expect(await records()).toEqual([]);
+  expect(await fs.readdir(inbox())).toEqual([`${PID}.json`]);
+  expect(f.context.inboxObservations.get(PID).firstSeen).toBe(Date.parse(AT));
+  f.setTime(Date.parse(AT) + HALF_PAIR_TIMEOUT_MS); await state();
+  expect(await records()).toEqual([]);
+  f.setTime(Date.parse(AT) + HALF_PAIR_TIMEOUT_MS + 1); await state();
+  expect((await records())[0]).toMatchObject({ status: "refused", reason: "missing-body" });
+  expect(await fs.readdir(inbox())).toEqual([]);
+});
+it("a lone new JSON probe does not consume it before its body arrives", async () => {
+  await submit(newDetails()); await ingest();
+  await fs.writeFile(filename("html"), "New body");
+  expect((await state()).body.proposals).toEqual([]);
+  expect((await state()).body.proposals).toHaveLength(1);
+  expect((await records())[0].body).toBe("New body");
+});
+it("supersedes edit to Trash to edit by note across different pids", async () => {
+  await put(); await ingest();
+  await submit(trashDetails(), undefined, "p-trash-note");
+  expect((await ingest())[0].trash).toBe(true);
+  await put({ title: "Edited instead" }, "p-edit-again");
+  expect((await ingest())[0].title).toBe("Edited instead");
+  expect((await records()).map((r) => [r.status, r.handledAt])).toEqual([
+    ["superseded", AT], ["superseded", AT], ["pending", undefined],
+  ]);
+});
+it("supersedes new notes only by pid, with no collision against an edit whose note id is that pid", async () => {
+  expect((await f.request("POST", "/v1/push", await f.next([...f.context.store.published.notes, note({ id: PID })]))).status).toBe(200);
+  await put({ note: PID }, "p-edit-collision"); await ingest();
+  await submit(newDetails(), "First"); await ingest();
+  await submit(newDetails({ title: "Revision" }), "Second");
+  expect(await ingest()).toHaveLength(2);
+  await put({ note: PID, title: "Edited" }, "p-edit-next");
+  expect(await ingest()).toHaveLength(2);
+  await submit(newDetails(), "Separate", "p-other-new");
+  expect(await ingest()).toHaveLength(3);
+  expect((await records()).map((r) => r.status)).toEqual(["superseded", "superseded", "pending", "pending", "pending"]);
+});
+it.each(["applied", "kept", "dismissed", "stale"])("refuses pid-used after a new note's %s outcome", async (outcome) => {
+  await submit(newDetails(), "First"); const [record] = await ingest();
+  expect((await f.request("POST", "/v1/outcomes", [{ proposal: PID, hash: record.hash, outcome, applied: [], at: AT }])).status).toBe(200);
+  await submit(newDetails({ title: "Another version" }), "Second");
+  expect(await ingest()).toEqual([]);
+  expect((await records()).map((r) => [r.status, r.reason])).toEqual([[outcome, undefined], ["refused", "pid-used"]]);
+});
+it.each(["refused", "superseded", "handled-edit", "handled-trash"])("allows a new-note pid after %s", async (status) => {
+  if (status === "handled-edit" || status === "handled-trash") {
+    if (status === "handled-edit") await put();
+    else await submit(trashDetails());
+    const [record] = await ingest();
+    await f.request("POST", "/v1/outcomes", [{ proposal: PID, hash: record.hash, outcome: "applied", at: AT }]);
+  } else {
+    await submit(newDetails(status === "refused" ? { generation: "old" } : {}), "First"); await ingest();
+    if (status === "superseded") { await submit(newDetails({ title: "Second" }), "Second"); await ingest(); }
+  }
+  await submit(newDetails({ title: "Final revision" }), "Final");
+  expect((await ingest())[0].title).toBe("Final revision");
+  expect((await records()).at(-1).status).toBe("pending");
+});
+it("counts all three kinds at the pending limit and subtracts replacements of either identity", async () => {
+  await put(); await ingest();
+  await submit(trashDetails({ note: "other" }), undefined, "p-trash-other"); await ingest();
+  for (let i = 0; i < 49; i++) await submit(newDetails(), "Fixture", `p-new-${String(i).padStart(3, "0")}`);
+  expect(await ingest()).toHaveLength(50);
+  expect((await records()).at(-1)).toMatchObject({ status: "refused", reason: "too-many" });
+  await submit(newDetails({ title: "Replacement" }), "Replacement", "p-new-000");
+  expect(await ingest()).toHaveLength(50);
+  await submit(trashDetails(), undefined, "p-trash-replacement");
+  expect(await ingest()).toHaveLength(50);
+  expect((await records()).at(-1).status).toBe("pending");
 });

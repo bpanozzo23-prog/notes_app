@@ -14,46 +14,94 @@ are available. Do not try to run commands or obtain other tools.
 
 Propose changes only when the owner asks:
 
-1. Read `notebook/proposals.json` for earlier proposals and their outcomes.
-2. Read `notebook/index.json`: keep the note's `id`, `rev`, `file`, and the index's top-level
-   `generation`. Read its complete body from `notebook/notes/<file>.html`.
-3. Pick a fresh proposal id (pid), for example `p-ser-y-estar-1`. It must match
+1. Read `notebook/proposals.json` for earlier proposals, their kinds and outcomes.
+2. Read `notebook/index.json`: keep its top-level `generation`. For an edit or Trash move,
+   keep the note's `id`, `rev` and `file`, and read its complete body from
+   `notebook/notes/<file>.html`. Use the actual revision (a positive integer) and generation
+   (string or null); never guess or advance them.
+3. Pick a proposal id (pid), for example `p-ser-y-estar-1`. It must match
    `^p-[a-z0-9-]{3,80}$`: `p-` followed by 3–80 lowercase letters, digits or hyphens.
-4. With Write, write `inbox/<pid>.html` **first**: the complete proposed body as raw UTF-8 HTML,
-   not a JSON string or a patch, at most 512 KB.
-5. Then write `inbox/<pid>.json`, at most 16 KB, with **exactly** these seven fields:
-   `{ "note": "<id>", "basedOnRev": 1, "generation": "<index generation>", "title": "Title",
-   "folderId": null, "tags": [], "why": "Why this helps" }`.
-   Use the actual revision (a positive integer) and generation (string or null) you read;
-   never guess or advance them. Fill in the entire desired title, folder and tag list.
-6. Allow a few seconds for the XPS's 3-second scans, then read `notebook/proposals.json` again.
+   A new-note pid stands for one proposed note: revise a pending new note under the **same**
+   pid. Every further new note needs a **fresh** pid. Once the owner handles a new note,
+   that pid cannot be used for another new note.
+4. For an edit or new note, use Write to write `inbox/<pid>.html` **first**: the complete
+   proposed body as raw UTF-8 HTML, not a JSON string or a patch, at most 512 KB. Then write
+   `inbox/<pid>.json`, at most 16 KB. For a Trash move, write **only the JSON file**,
+   never an HTML file. Use exactly the fields for the chosen kind below.
+5. Allow a few seconds for the XPS's 3-second scans, then read `notebook/proposals.json` again.
    It needs two unchanged scans. Find your pid: `pending` means waiting for the owner;
    `refused` has a `reason` below. If it has not appeared, allow a few more seconds and read
    again; if it still does not appear, tell the owner the service may need attention.
 
-A valid new proposal for the same note replaces its pending proposal (old status:
-`superseded`). Repeating the same pid and content never revives a handled version; use a
-fresh pid when proposing again. You cannot delete files and do not need to: the XPS clears
-handled files. Do not edit a submitted pair while waiting for its result.
+**Edit an existing note** — HTML then JSON, with all desired title, folder and tags:
 
-Refusal reasons and next steps (fix the issue, then write a new pair with a fresh pid):
+```json
+{ "note": "<id>", "basedOnRev": 1, "generation": "<index generation>", "title": "Title", "folderId": null, "tags": [], "why": "Why this helps" }
+```
 
-- `changed-since-read`: re-read the index and note; reconsider your changes against that version.
-- `unknown-note`: the note no longer exists; choose a current id from the index.
-- `note-in-trash`: the note is in Trash; do not propose changes unless the owner restores it.
-- `unknown-folder`: choose a current id from `notebook/folders.json`, or `null`.
-- `unknown-note-link`: remove or correct links to notes absent from the live index.
-- `new-image`: retain only image ids already referenced by this note; do not add pictures.
-- `too-many`: 50 proposals are pending; wait for the owner to review some. Replacing a pending
-  proposal for the same note is still allowed.
-- `missing-body` / `missing-details`: only one file arrived for over 10 minutes. Write both
-  files under a fresh pid, HTML first and JSON second.
+**New note** — HTML then JSON, without `note` or `basedOnRev`:
+
+```json
+{ "generation": "<index generation>", "title": "Recipes", "folderId": null, "newFolder": "Cooking", "tags": [], "why": "Collect these recipes together" }
+```
+
+**Move to Trash** — JSON alone, with `trash` literally `true`, no title, folder, tags or body:
+
+```json
+{ "note": "<id>", "basedOnRev": 1, "generation": "<index generation>", "trash": true, "why": "This note is no longer needed" }
+```
+
+An edit or new note may optionally include `newFolder`: a folder **name**, trimmed, 1–512
+characters, without control characters or blank-only text, and only with `folderId: null`.
+The folder is created only if the owner ticks a change that uses it. Changes naming the same
+new folder (ignoring case) use one folder. If the folder already exists, use its **id** from
+`notebook/folders.json` as `folderId` and omit `newFolder`. Use `folderId: null` without
+`newFolder` for No folder.
+
+A valid edit or Trash move replaces the pending edit or Trash move for the same note (old
+status: `superseded`). A valid revision of a new note replaces the pending new-note version
+under the same pid. Repeating the same pid and content never revives a handled version,
+even if you reformat its JSON. You cannot delete files and do not need to: the XPS clears
+captured files. Do not edit submitted files while waiting for their result.
+
+Other statuses: `applied` means the owner applied the ticked changes; `kept` means the owner
+kept your version as a separate note, titled “<title> (from Claude Code)”; `dismissed` means
+the owner declined it; `stale` means it was dismissed after the note or notebook changed.
+`superseded` means another version replaced it, including a pending new-note revision retired
+when the owner handled an earlier version. Handled new-note titles are shown as “New note”.
+
+Refusal reasons and next steps (fix the issue, then submit again; keep the same pid for a
+revision of a new note unless it is `pid-used`):
+
+- `changed-since-read`: for edits and Trash, re-read the index and note; its revision or the
+  notebook generation changed. For a new note, the generation changed: re-read the notebook
+  and reconsider the suggestion against it.
+- `unknown-note`: the edit or Trash target no longer exists; choose a current id from the index.
+- `note-in-trash`: the edit or Trash target is already in Trash; wait for the owner to restore it.
+- `unknown-folder`: for an edit or new note, choose a current id from `notebook/folders.json`, or `null`.
+- `folder-exists`: `newFolder` names an existing folder (ignoring case); use its id and omit `newFolder`.
+- `unknown-note-link`: remove or correct links to notes absent from the live index, for edits and new notes.
+- `new-image`: an edit may use only pictures already referenced by that note; a new note may use
+  pictures already referenced by any live note. Copy the existing `<img data-file="…">` element.
+  Pictures only in Trash or unreferenced image files cannot be used in a new note. Never add a picture.
+- `trash-with-body`: Trash takes JSON alone. Submit it under a fresh pid with no HTML companion.
+- `pid-used`: the owner already applied, kept or dismissed a new-note version under this pid
+  (including a stale dismissal). Every further new note needs a fresh pid.
+- `too-many`: 50 proposals are pending across all kinds; wait for the owner to review some.
+  Replacing a pending proposal for the same note, or a new note under its pid, is still allowed.
+- `missing-body` / `missing-details`: only half an edit/new-note pair arrived for over 10 minutes.
+  Write both files, HTML first and JSON second. An unreadable or unparseable lone JSON cannot be
+  recognised as Trash and also times out as `missing-body`.
 - `invalid-json`: write valid UTF-8 JSON with quoted keys and no comments or trailing commas.
-- `invalid-shape`: include exactly the seven fields above, without `body`, `proposal` or extras.
+- `invalid-shape`: use exactly the fields for your kind, without `body`, `proposal` or extras.
+  An edit needs `note` and `basedOnRev`; a new note must omit both. Only these two kinds allow
+  optional `newFolder`. Trash needs exactly its five fields, `trash: true` and valid values;
+  it cannot also edit the note.
 - `invalid-note`: use the exact note id from the index.
 - `invalid-rev` / `invalid-generation`: copy the revision and generation with the types above.
 - `invalid-title`: shorten the title to 200 characters and remove control characters.
-- `invalid-folder`: use `null` or a valid folder id.
+- `invalid-folder`: use `null` or a valid folder id; `newFolder` must be a trimmed, safe name
+  and can only accompany `folderId: null`. Trash has no folder fields.
 - `invalid-tags`: use at most 50 unique, trimmed tags within the limits below.
 - `invalid-why`: use a string of at most 300 characters.
 - `invalid-body`: write the body as valid UTF-8 HTML.
@@ -63,14 +111,14 @@ Refusal reasons and next steps (fix the issue, then write a new pair with a fres
 Only regular files are accepted. Linked files, directories and unrecognised filenames are
 ignored and left alone. An unsafe or unavailable inbox needs the owner's attention.
 
-Only an existing note's title, text, tags and folder may change. No new notes, Trash actions,
-new pictures, folder changes or settings changes. Title: at most 200 characters, no controls.
-Tags: trimmed, unique, at most 50, each 1–512 characters without controls or blank-only text.
-Reason (`why`): at most 300 characters. Body: at most 512 KB. Choose a folder id from
-`notebook/folders.json` or `null`; link only to ids in the index; use only pictures already in
-that note. The XPS checks shape, references, revisions and sizes against its private store.
-In Phase 4c the phone will check formatting and show every change for review; until then,
-pending proposals cannot be applied there. Nothing applies until the owner taps Apply.
+You may propose edits to title, text, tags and folder, new notes, Trash moves and new folders.
+Never delete notes for good, rename or delete folders, add pictures, pin notes or change settings.
+New notes are never pinned. Title: at most 200 characters, no controls. Tags: trimmed, unique,
+at most 50, each 1–512 characters without controls or blank-only text. Reason (`why`): at most
+300 characters. Body: at most 512 KB. Link only to live notes in the index, for both edits and
+new notes. Trash has no body, pictures or links. The XPS checks shape, references, revisions
+and sizes against its private store. The phone checks formatting and shows the changes for
+review. Nothing applies until the owner taps Apply or Add as a new note in Keep both.
 
 Supported HTML (keep the note's existing formatting unless asked to change it):
 

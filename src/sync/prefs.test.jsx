@@ -107,3 +107,21 @@ it("cancellation rolls pairing credentials back before commit", async () => {
   await expect(saveConnection({ address, token }, { signal: operation.controller.signal })).rejects.toThrow();
   expect((await readSyncConfig()).token).toBe("");
 });
+it("keeps handled-version history out of the notebook hook's React state and rendered preferences", async () => {
+  const handled = [{ proposal: "HANDLED-STATE-SENTINEL", hash: "a".repeat(64), generation: null, outcome: "applied" }];
+  await db.prefs.put({ key: "syncHandled", value: handled });
+  const { result } = renderHook(useNotebook);
+  let refreshed;
+  await act(async () => { refreshed = await result.current.refresh(); });
+  expect(refreshed.prefs).not.toHaveProperty("syncHandled");
+  expect(result.current.prefs).not.toHaveProperty("syncHandled");
+  render(<output>{JSON.stringify(result.current)}</output>);
+  expect(screen.getByRole("status").textContent).not.toContain("HANDLED-STATE-SENTINEL");
+  expect(await getPref("syncHandled")).toEqual(handled);
+});
+it.each([1, 2, 3, 4])("ignores handled-version history in a schema %s backup", (schemaVersion) => {
+  const result = validateBackup(backupFixture({ schemaVersion, files: [], preferences: { syncHandled: [{ proposal: "p-old" }] } }));
+  expect(result.ok).toBe(true);
+  expect(result.warnings).toEqual(["Preference syncHandled is specific to the device it was exported from and will be ignored."]);
+  expect(result.envelope.preferences).toEqual({});
+});

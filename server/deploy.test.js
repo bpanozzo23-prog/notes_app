@@ -76,7 +76,10 @@ it("documents data-vs-instructions, all supported HTML samples and the Codex sto
     "notebook/notebook.md", "notebook/index.json", "notebook/images/", "inbox/<pid>.html", "inbox/<pid>.json",
     "There is no shell or command line", "changed-since-read", "superseded", "data-type=", "data-checked=", "data-file=",
     "width=", "height=", "alt=", "data-callout=", "data-style=", "data-color=", "font-size:", "font-family:",
-    "background-color:", "line-height:", "language-js", "start=", "mailto:", "note:"]) expect(claude).toContain(text);
+    "background-color:", "line-height:", "language-js", "start=", "mailto:", "note:", "newFolder", "kept",
+    "folder-exists", "trash-with-body", "pid-used", "same", "fresh", "never an HTML file", "any live note",
+    "Never delete notes for good", "rename or delete folders", "pin notes"]) expect(claude).toContain(text);
+  expect(claude).not.toContain("In Phase 4c the phone will check");
   expect(await loadTemplate("AGENTS.md", values)).toContain("Codex has no access");
 });
 it("default config and path derivation are explicit and valid", () => {

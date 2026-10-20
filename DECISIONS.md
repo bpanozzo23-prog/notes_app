@@ -1577,3 +1577,95 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   duplicate, a silent difference between review and write, or a leak of a trashed note's title.
 - 2026-10-20 — The owner approved the 4d contract (`docs/PHASE-4-DIRECTION.md` "4d"). BRIEF
   Tier 4 now mentions Keep both and the new proposal kinds. — Next: run I (server), run J (app).
+- 2026-10-20 — Phase 4d, run I keeps edit checks in their 4c order and inserts the new-folder
+  collision check after folder-id lookup. New notes check generation, folder id, folder name,
+  live links, live-note pictures, then prior owner outcomes for the pid; Trash checks existence,
+  Trash state, then revision/generation. — Establish the current notebook and valid references
+  before reporting pid reuse; an edit's existing first refusal stays the same.
+- 2026-10-20 — Phase 4d, run I probes stable lone JSON through the existing bounded read and
+  reinspection, keeping the observation and original half-pair timer when it is not Trash.
+  Malformed Trash objects are refused immediately as `invalid-shape`; a companion body takes
+  `trash-with-body` precedence. Valid lone Trash hashes only canonical details. — Two unchanged
+  observations still protect a Trash file, and reading an unfinished edit/new pair must neither
+  consume it nor reset its timeout. Cleanup retains the captured stamps and file set.
+- 2026-10-20 — Phase 4d, run I uses separate replacement identities for existing notes and
+  new-note pids. Outcome updates accumulate by filename, including pending new-note siblings,
+  before one journal batch; sibling `handledAt` uses the service clock, as ingestion does.
+  — A delayed outcome for an earlier revision retires its replacement without losing another
+  explicit outcome in the same request, and a note id equal to a pid cannot collide.
+- 2026-10-20 — Phase 4d, run I parses the state query with `URLSearchParams` after the first
+  question mark; its first `proposals` value must be exactly `2`. Other parameters are ignored,
+  malformed escapes do not throw, and the route and logs keep the query-free path. — The
+  compatibility filter belongs only to the reply, independent of ingestion and app versions.
+- 2026-10-20 — Phase 4d, run I verification passed: `npx vitest run server/ --reporter=dot`
+  (10 files, 606 tests), then one full `npm test -- --pool=threads` (90 files, 2,190 tests;
+  138 added over the 2,052-test baseline). `node --check` passed on all seven changed `.mjs`
+  files, and `git diff --check` passed. Tests use temporary stores and generated rows without
+  sockets, including recovery at every ingestion/outcome checkpoint, canonical Trash replay,
+  raced reads/cleanup, new-note sibling retirement, title privacy and old-app reply filtering.
+  The server half of `sync-check` gains five checks; its browser half and the supported-HTML
+  list are unchanged. `sync-check`, shots, browser checks and deployment were not run; no phone,
+  browser layout, real service or live Claude Code session was seen. No network, protected owner
+  data, keys, app source changes, new dependencies or repository commit were used. — Claude
+  Code runs the socket/browser checks and reviews this server step before run J.
+- 2026-10-20 — Claude Code reviewed run I (the shapes per kind, the lone Trash JSON read only
+  after two stable observations, the body-less Trash hash, superseding by note or by pid,
+  `pid-used` from owner outcomes, sibling retirement in the outcome batch, `kept`, the
+  pending-and-current-generation title rule, the `?proposals=2` filter, the rewritten
+  `CLAUDE.md`). Fixed: a version refused for its shape is stored without details, so it was
+  classed as a new note and shown as "New note" in `proposals.json`; `recordKind` now gives it no
+  kind (with a test). Verification: server tests (607), `npm run sync-check` 24/24 (15 server,
+  9 browser) with the unchanged 0.4.1 app against the new service, which is the order the
+  release uses.
+- 2026-10-20 — Phase 4d, run J keeps the exact reviewed edit diff and ticks while a card is
+  open; handled-version and handled-pid checks remain live and disable old cards immediately.
+  The durable handled list is read inside database callbacks, with only filtered proposals or
+  plain display messages entering React state. Dismiss reads freshness again inside the same
+  transaction as its outbox and handled entries. — A late reply, sleeping window or delayed
+  acknowledgement cannot repeat an approval or turn a stale dismissal into a current one.
+- 2026-10-20 — Phase 4d, run J uses the shared body-cleaning path for new notes and Keep both.
+  Keep both captures source and link revisions plus picture metadata when its sheet opens;
+  picture cleanup's unused clock is excluded from that comparison because it changes no picture.
+  The saved copy is never cleaned again after confirmation. New titles use the same validation
+  and edit control as edit titles. — Refusal requires another look at the exact copy, without
+  making routine picture housekeeping invalidate an otherwise unchanged sheet.
+- 2026-10-20 — Phase 4d, run J checks new note-link occurrences through the shared effects
+  comparison, including a retargeted link or a second link to an already-linked note. The review
+  and xps Apply use the same comparison; links already present may stay when their target moves
+  to Trash. Other Claude plan kinds retain their previous target checks. — Matching plain words
+  or a set of target ids alone would miss a newly added link into a ticked Trash move.
+- 2026-10-20 — Phase 4d, run J gives moved-note xps Undo a confirmation even directly after
+  Apply, using the same description and decision list as Settings. Folder names are captured
+  for every new Undo record; legacy records keep their created folders. The shared three 4c
+  browser fixtures remain, with new-note and Trash fixtures added; the screenshot script alone
+  revises the metadata fixture to demonstrate a new folder on an edit. — The owner can inspect
+  the moves before Undo, and older records cannot accidentally remove a renamed folder.
+- 2026-10-20 — Phase 4d, run J verification passed: one full `npm test -- --pool=threads`
+  (92 files, 2,272 tests; 81 added over the reviewed run I's 2,191), after targeted fixture
+  checks (206 tests across six files, then 46 review/preference tests covering the final
+  compatibility check). `npm run build`, `node --check` on all nine changed `.mjs` files and
+  `git diff --check` passed; the build retains its existing large-chunk warning. Tests cover
+  concurrent approvals, handled identities and pids, backup/React-state exclusions, folder
+  races, atomic mixed Apply, record validation, Undo, pictures, fresh Keep both confirmation,
+  the real handler's `kept` acknowledgement, links into Trash, row controls and Android Back.
+  Existing expectations changed for the agreed bar/intro/stale wording, `?proposals=2`, valid
+  created-note xps records and positive server sequence fixtures. The pending bar also keeps
+  hiding a legacy outbox-only version after acknowledgement. The browser scripts were extended
+  but not run: shots, `sync-check`, browser checks and the owner's phone remain for Claude Code
+  and the owner; no browser layout or phone keyboard was seen. Run J changed no `server/` files
+  and used no network, sockets, protected owner data, keys, paid requests, new dependencies,
+  deployment or repository commit. — Version 0.4.2 is ready for Claude Code's review and the
+  socket/browser/phone checks.
+- 2026-10-20 — Claude Code reviewed run J (the suggestion models per kind, `syncHandled`, folder
+  resolution, the mixed plan, `checkPlan`'s new rules, created-only xps records, Undo through
+  `undoMovedNotes` with folder names, Keep both's fresh sheet and its dependency checks, the
+  new rows and sheet) and ran what Codex couldn't. Fixed: `sync-check`'s mixed Apply/Undo step
+  read `~/notes`'s index as soon as the store had published, but the XPS rebuilds the view a
+  moment after publishing; the check now waits for the view as it does for the store (an
+  opt-in `SYNC_CHECK_DEBUG` prints assertion messages only, never Playwright errors). From the
+  shots: the new-note and Keep both previews label their folder ("Folder: …"). Kept as built:
+  Undo of a change with new or trashed notes asks for confirmation even right after Apply,
+  showing what it will do. Verification: `npm test` (92 files, 2,273 tests), `npm run build`,
+  `npm run sync-check` 26/26 (15 server, 11 browser, including a mixed Apply, its Undo and Keep
+  both through real files), `npm run shots` (207; shots 185–193 read), `npm run browser-checks`
+  15/15. `server/README.md` describes the three kinds.

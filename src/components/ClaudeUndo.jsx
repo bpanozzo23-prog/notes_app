@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { liveQuery } from "dexie";
 import { db } from "../db/db.js";
-import { undoClaudeChange, restoreClaudeCopies, isClaudeChange, allowsPartialUndo } from "../db/claudeChanges.js";
+import { undoClaudeChange, restoreClaudeCopies, isClaudeChange, allowsPartialUndo, isMovedChange } from "../db/claudeChanges.js";
 import Confirm from "./Confirm.jsx";
 import { noteTitle } from "../lib/notebookView.js";
 
@@ -20,6 +20,13 @@ function description(record, confirm = false) {
   // An exact-duplicate merge left the kept note untouched, so the record holds only the sources.
   if (record.kind === "merge") return confirm ? `Separate the merged notes again: ${title ? `${title} gets its earlier content back and ` : ""}${sources} comes out of Trash. If notes changed since, nothing is overwritten: you'll see what Undo can do first.` : title ? `Merge into “${title}”: ${title}, ${sources}` : `Merge: ${sources} moved to Trash`;
   if (record.kind === "split") return confirm ? `Put “${title}” back together; ${record.createdNotes.length === 1 ? "the new note moves" : `the ${record.createdNotes.length} new notes move`} to Trash. If notes changed since, nothing is overwritten: you'll see what Undo can do first.` : `Split “${title}” into ${record.createdNotes.length} new ${record.createdNotes.length === 1 ? "note" : "notes"}`;
+  if (record.kind === "xps" && isMovedChange(record)) {
+    const created = record.createdNotes.length, edited = record.notes.filter((entry) => !entry.role).length;
+    const parts = [created && `${created} new ${created === 1 ? "note moves" : "notes move"} to Trash`,
+      ...record.notes.filter((entry) => entry.role === "trashed").map((entry) => `“${noteTitle(entry.before)}” comes back from Trash`),
+      edited && `${edited} ${edited === 1 ? "note gets its" : "notes get their"} earlier version back`].filter(Boolean);
+    return parts.join(", ") + (confirm ? ". If notes changed since, nothing is overwritten: you'll see what Undo can do first." : ".");
+  }
   const titles = record.notes.map((entry) => noteTitle(entry.before)).join(", ");
   return confirm ? `Restore the earlier version of ${titles}. ${allowsPartialUndo(record) ? "If notes changed since, you can undo only the unchanged notes." : "If it changed since, you can restore a new copy instead."}` : titles;
 }
@@ -38,7 +45,7 @@ export default function ClaudeUndo({ changeId, settings = false, run, queue, ref
     if (result.conflict) setConflict({ id, ...result, changedAgain: keepEdits });
     else {
       setConflict(false);
-      setMessage(result.keepEdits ? "Undone, keeping later changes. Earlier content restored as copies where needed." : result.kind === "merge" ? "Merge undone." : result.kind === "split" ? "Split undone." : unchangedOnly ? `Restored ${result.restored} unchanged ${result.restored === 1 ? "note" : "notes"}.${result.skipped.length ? ` Left as they are${record.kind === "links" ? " (their links stay)" : ""}: ${result.skipped.map((note) => note.title).join(", ")}.` : ""}` : "Earlier version restored.");
+      setMessage(record.kind === "xps" && isMovedChange(record) ? "Claude Code's change undone." : result.keepEdits ? "Undone, keeping later changes. Earlier content restored as copies where needed." : result.kind === "merge" ? "Merge undone." : result.kind === "split" ? "Split undone." : unchangedOnly ? `Restored ${result.restored} unchanged ${result.restored === 1 ? "note" : "notes"}.${result.skipped.length ? ` Left as they are${record.kind === "links" ? " (their links stay)" : ""}: ${result.skipped.map((note) => note.title).join(", ")}.` : ""}` : "Earlier version restored.");
       await refresh(); onRestored?.();
     }
   });
@@ -50,9 +57,9 @@ export default function ClaudeUndo({ changeId, settings = false, run, queue, ref
   return <div className="space-y-2 text-sm">
     {current && <>
       {settings && <p>{new Date(record.at).toLocaleString("en-GB")} · {description(record)}</p>}
-      <button className="app-button" disabled={disabled} onClick={() => settings ? setConfirm(record.changeId) : undo()}>{settings || record.kind === "xps" ? label : "Undo"}</button>
+      <button className="app-button" disabled={disabled} onClick={() => settings || record.kind === "xps" && isMovedChange(record) ? setConfirm(record.changeId) : undo()}>{settings || record.kind === "xps" ? label : "Undo"}</button>
       {conflict?.id === record.changeId && <div role="status" className="space-y-2">{conflict.keepEdits ? <>
-        <p>Some notes changed after Claude's {record.kind}. Undo won't overwrite anything:</p>
+        <p>{record.kind === "xps" ? "Some notes changed after Claude Code's change." : `Some notes changed after Claude's ${record.kind}. Undo won't overwrite anything:`}</p>
         {conflict.changedAgain && <p>Something changed again; check the list.</p>}
         <ul className="list-disc space-y-2 pl-5">{conflict.decisions.map((decision) => <li key={decision.id}>{decisionLabel(decision, record)}</li>)}</ul>
         <button className="app-button" disabled={disabled} onClick={() => undo(conflict.id, false, true)}>Undo, keeping later changes</button>

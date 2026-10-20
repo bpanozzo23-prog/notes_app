@@ -146,7 +146,7 @@ it.each([...EXPORTED_PREFS, "syncOutbox"])("schedules formatting/outbox preferen
   expect(round).toHaveBeenCalledTimes(2);
 });
 
-it.each(["syncToken", "syncAddress", "claudeSpend", "claudeApiKey", "storagePersisted", "notebookGeneration", "anything"])("ignores preference %s", async (key) => {
+it.each(["syncToken", "syncAddress", "syncHandled", "claudeSpend", "claudeApiKey", "storagePersisted", "notebookGeneration", "anything"])("ignores preference %s", async (key) => {
   const round = await start();
   fire("prefs", [key]);
   fire("prefs", [key], "notes_app", ":dels");
@@ -295,7 +295,7 @@ it("Disconnect aborts an active request, forgets locally even if unpair fails, a
   await saveConnection({ address: server.address, token: server.token });
   const gate = deferred(), started = deferred();
   server.before(async (request) => {
-    if (request.path === "/v1/state") { started.resolve(); await gate.promise; }
+    if (request.path === "/v1/state?proposals=2") { started.resolve(); await gate.promise; }
     if (request.method === "DELETE") throw new Error("fixture offline");
   });
   stop = startSync({ queue, session, visibility, timers, clientFactory: server.clientFactory });
@@ -422,7 +422,7 @@ it("retries the restore check after a failed initial state request without pushi
   expect(await connectToPopulatedXps()).toMatchObject({ status: "restore-offer" });
   await disconnect();
   const pairing = await server.context.pairing.openWindow();
-  server.before(async (request) => { if (request.path === "/v1/state") throw new Error("offline fixture"); });
+  server.before(async (request) => { if (request.path === "/v1/state?proposals=2") throw new Error("offline fixture"); });
   expect(await connect({ address: server.address, code: pairing.code })).toMatchObject({ kind: "unreachable" });
   server.before(async () => {});
   expect(await syncNow()).toMatchObject({ status: "restore-offer" });
@@ -475,4 +475,10 @@ it("reopening after intentionally purging the last note syncs its tombstone with
   stop = startSync({ queue, session, visibility, timers, clientFactory: server.clientFactory });
   expect(await stop.ready).toMatchObject({ status: "ok", counts: { notes: 0 } });
   expect(session.getSnapshot().restoreOffer).toBeNull();
+});
+it("a real handled-preference write does not start a sync", async () => {
+  const round = await start();
+  await db.prefs.put({ key: "syncHandled", value: [{ proposal: "p-handled", hash: "a".repeat(64), generation: null, outcome: "dismissed" }] });
+  await settle(); await timers.advance(600_000);
+  expect(round).toHaveBeenCalledTimes(1);
 });

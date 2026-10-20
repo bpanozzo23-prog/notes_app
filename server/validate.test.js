@@ -94,7 +94,7 @@ it.each([
 ])("rejects outcome words and tick lists outside the contract %j", (extra) => {
   expect(() => validateOutcomes([{ proposal: "p", hash: "a".repeat(64), outcome: "applied", at: AT, ...extra }])).toThrow();
 });
-it.each(["applied", "dismissed", "stale"])("accepts the outcome %s with or without ticks", (outcome) => {
+it.each(["applied", "kept", "dismissed", "stale"])("accepts the outcome %s with or without ticks", (outcome) => {
   for (const applied of [undefined, null, [], ["title", "body-1"]]) {
     expect(() => validateOutcomes([{ proposal: "p", hash: "a".repeat(64), outcome, at: AT, applied }])).not.toThrow();
   }

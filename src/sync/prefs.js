@@ -6,7 +6,8 @@ import { syncLifecycle } from "./lifecycle.js";
 export const syncAddress = "syncAddress";
 export const syncToken = "syncToken";
 export const syncOutbox = "syncOutbox";
-export const SYNC_PREFS = Object.freeze([syncAddress, syncToken, syncOutbox]);
+export const syncHandled = "syncHandled";
+export const SYNC_PREFS = Object.freeze([syncAddress, syncToken, syncOutbox, syncHandled]);
 
 // Call only at the point of use. Neither value belongs in a UI snapshot.
 export function readSyncConfig() {
@@ -50,6 +51,18 @@ export const outboxId = ({ proposal, hash }) => JSON.stringify([proposal, hash])
 export async function readOutbox() {
   const saved = (await db.prefs.get(syncOutbox))?.value;
   return Array.isArray(saved) ? saved : [];
+}
+export async function readHandled() {
+  const saved = (await db.prefs.get(syncHandled))?.value;
+  return Array.isArray(saved) ? saved : [];
+}
+export async function appendHandledInTransaction(entries) {
+  const generation = (await db.prefs.get("notebookGeneration"))?.value ?? null;
+  const saved = (await readHandled()).filter((entry) => entry.generation === generation), ids = new Set(saved.map(outboxId));
+  for (const entry of entries) if (entry.generation === generation && !ids.has(outboxId(entry))) {
+    saved.push(entry); ids.add(outboxId(entry));
+  }
+  await db.prefs.put({ key: syncHandled, value: saved });
 }
 export function appendOutbox(entries) {
   return writeTransaction([db.prefs], () => appendOutboxInTransaction(entries));

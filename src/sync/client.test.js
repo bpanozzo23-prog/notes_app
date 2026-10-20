@@ -50,6 +50,7 @@ it("uses the round signal and each endpoint's timeout, sends secrets only in the
   await client.backup(controller.signal);
   await client.unpair(controller.signal);
   expect(timeout.mock.calls.map(([ms]) => ms)).toEqual([TIMEOUTS.pair, TIMEOUTS.state, TIMEOUTS.upload, TIMEOUTS.upload, TIMEOUTS.push, TIMEOUTS.outcomes, TIMEOUTS.backup, TIMEOUTS.unpair]);
+  expect(fetch.mock.calls[1][0]).toBe(`${address}/v1/state?proposals=2`);
   expect(fetch.mock.calls[2][0]).toBe(`${address}/v1/files/image%20%2F%20%C3%B1%3F?generation=gen%20%2F%3F`);
   expect(fetch.mock.calls[3][0]).toBe(`${address}/v1/files/image`);
   for (const [i, [, options]] of fetch.mock.calls.entries()) {

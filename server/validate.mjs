@@ -70,7 +70,7 @@ export function validatePush(body) {
 
 export const PROPOSAL_ID = /^[A-Za-z0-9_-]{1,128}$/;
 export const HASH = /^[a-f0-9]{64}$/;
-export const OUTCOMES = Object.freeze(["applied", "dismissed", "stale"]);
+export const OUTCOMES = Object.freeze(["applied", "kept", "dismissed", "stale"]);
 export function validateOutcomes(body) {
   check(Array.isArray(body), "invalid-outcomes");
   for (const item of body) {

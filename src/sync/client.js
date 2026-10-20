@@ -51,7 +51,7 @@ export function createSyncClient({ address, token, fetch = (...args) => globalTh
   }
   return {
     pair: ({ code, label = "Notes phone" }, signal) => request("pair", "POST", "/v1/pair", { code, label }, signal),
-    state: (signal) => request("state", "GET", "/v1/state", undefined, signal),
+    state: (signal) => request("state", "GET", "/v1/state?proposals=2", undefined, signal),
     upload: (id, bytes, generation, signal) => request("upload", "PUT", `/v1/files/${encodeURIComponent(id)}${generation == null ? "" : `?generation=${encodeURIComponent(generation)}`}`, bytes, signal),
     push: (body, signal) => request("push", "POST", "/v1/push", body, signal),
     outcomes: (body, signal) => request("outcomes", "POST", "/v1/outcomes", body, signal),

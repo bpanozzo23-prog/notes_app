@@ -7,7 +7,7 @@ import path from "node:path";
 export const button = (page, name) => page.getByRole("button", { name, exact: true });
 export const confirmation = (page) => page.getByRole("heading", { name: "The XPS copy has notes this phone doesn't", exact: true });
 export const unreachable = "Couldn't reach the XPS. Check that Tailscale is on. Trying again shortly.";
-export const staleSuggestion = "You edited this note after Claude Code read it, so this suggestion can't be applied. Claude Code's version is kept on the XPS.";
+export const staleSuggestion = "You edited this note after Claude Code read it, so this suggestion can't be applied. Keep both adds Claude Code's version as a separate note.";
 
 // Callers pass only their temporary fixture view. Write exactly the files Claude Code writes;
 // ingestion and hashes always belong to the real service, never fabricated browser state.
@@ -18,6 +18,17 @@ export async function writeProposalPair(viewDir, pid, note, generation, changes 
     folderId: note.folderId, tags: [...note.tags], why: "Make this fixture clearer.", ...metadata };
   await fs.writeFile(path.join(viewDir, `inbox/${pid}.html`), body);
   await fs.writeFile(path.join(viewDir, `inbox/${pid}.json`), JSON.stringify(details));
+}
+export async function writeNewNoteProposal(viewDir, pid, generation, fields) {
+  assert.match(pid, /^p-[a-z0-9-]{3,80}$/);
+  const { body, ...metadata } = fields;
+  assert.equal(typeof body, "string");
+  await fs.writeFile(path.join(viewDir, `inbox/${pid}.html`), body);
+  await fs.writeFile(path.join(viewDir, `inbox/${pid}.json`), JSON.stringify({ generation, title: "", folderId: null, tags: [], why: "New fixture note.", ...metadata }));
+}
+export async function writeTrashProposal(viewDir, pid, note, generation, why) {
+  assert.match(pid, /^p-[a-z0-9-]{3,80}$/);
+  await fs.writeFile(path.join(viewDir, `inbox/${pid}.json`), JSON.stringify({ note: note.id, basedOnRev: note.rev, generation, trash: true, why }));
 }
 
 export async function writeReviewFixtures(viewDir, snapshot) {
@@ -37,7 +48,14 @@ export async function writeReviewFixtures(viewDir, snapshot) {
   await writeProposalPair(viewDir, "p-phone-003-stale", stale, generation, {
     body: stale.html.replace("Ficciones.", "Ficciones de Borges."), why: "Added the author's name.",
   });
-  return { text, metadata, stale };
+  const picture = find("Captura de ejemplo"), trash = find("Recordatorio suelto");
+  const image = picture.html.match(/<img\b[^>]*\bdata-file=[^>]*>/i)?.[0];
+  assert.ok(image, "sample needs a referenced picture");
+  const newNote = { title: "Recetas de la semana", newFolder: "Recetas", tags: ["cocina"],
+    body: `<h2>Recetas de la semana</h2><p>Preparar verduras y arroz.</p>${image}`, why: "Collect the week's recipes with the existing example picture." };
+  await writeNewNoteProposal(viewDir, "p-phone-004-new", generation, newNote);
+  await writeTrashProposal(viewDir, "p-phone-005-trash", trash, generation, "This loose reminder is finished.");
+  return { text, metadata, stale, newNote, trash };
 }
 
 // Only for screen navigation with no open overlay (Back closes overlays first).

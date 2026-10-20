@@ -4,13 +4,13 @@ import App from "../App.jsx";
 import SyncReview from "./SyncReview.jsx";
 import SyncSettings from "./settings/SyncSettings.jsx";
 import SyncBar from "../components/SyncBar.jsx";
-import { db, notebookAccess } from "../db/db.js";
+import { db, notebookAccess, writeTransaction } from "../db/db.js";
 import { createNote, updateNote } from "../db/notes.js";
 import { resetDatabase } from "../test/fixtures.js";
-import { proposalFixture } from "../sync/inbox-fixtures.js";
+import { proposalFixture, newProposalFixture, trashProposalFixture } from "../sync/inbox-fixtures.js";
 import { syncSession } from "../sync/session.js";
-import { appendOutbox, readOutbox } from "../sync/prefs.js";
-import { STALE_XPS } from "../sync/inbox.js";
+import { appendOutbox, readOutbox, readHandled, appendHandledInTransaction } from "../sync/prefs.js";
+import { STALE_KEEP_BOTH, STALE_TRASH, STALE_GENERATION, handledEntry } from "../sync/inbox.js";
 import { NAVIGATION_KEY } from "../lib/navigation.js";
 
 const props = () => ({ run: async (task) => { await task(); return true; }, queue: { flush: vi.fn(async () => {}) },
@@ -35,16 +35,16 @@ it("shows an empty screen after reload and fills from the next sync state", asyn
   render(<SyncReview {...props()} />);
   await screen.findByText("No suggestions waiting.");
   act(() => syncSession.update({ proposals: versions }));
-  await screen.findByText("2 notes · from Claude Code on the XPS");
+  await screen.findByText("2 suggestions · from Claude Code on the XPS");
   expect(screen.queryByText("No suggestions waiting.")).toBeNull();
 });
 it("shows the approved shared rows, quoted reason, audit, selection and title validation", async () => {
   versions[0].body += '<script>bad()</script><p style="text-align: right">Added line</p>';
   syncSession.update({ proposals: versions });
   render(<SyncReview {...props()} />);
-  await screen.findByText("2 notes · from Claude Code on the XPS");
+  await screen.findByText("2 suggestions · from Claude Code on the XPS");
   expect(screen.getAllByText("“Make the fixture clearer.”")).toHaveLength(2);
-  expect(screen.getByText("Nothing changes until you tap Apply. Undo works afterwards.")).toBeTruthy();
+  expect(screen.getByText("Nothing changes until you tap Apply or Add as a new note. Undo works afterwards.")).toBeTruthy();
   expect(screen.getByText(/Removed by the editor: 1 script; 1 style the app doesn't support/)).toBeTruthy();
   expect(screen.getAllByRole("checkbox").every((box) => box.checked)).toBe(true);
   fireEvent.click(button("Edit"));
@@ -85,7 +85,7 @@ it("leaves stale rows visible, grey and disabled, applies only current cards, an
   syncSession.update({ proposals: versions });
   await updateNote(a.id, { title: "Phone edit" });
   render(<SyncReview {...props()} />);
-  await screen.findByText(STALE_XPS);
+  await screen.findByText(STALE_KEEP_BOTH);
   const stale = screen.getByRole("article", { name: "Phone edit" });
   expect(within(stale).getAllByRole("checkbox").every((box) => box.disabled)).toBe(true);
   expect(stale.querySelectorAll(".opacity-55").length).toBeGreaterThan(0);
@@ -100,7 +100,7 @@ it("shows no Apply bar when only stale suggestions are left", async () => {
   syncSession.update({ proposals: versions.filter((version) => version.note === a.id) });
   await updateNote(a.id, { title: "Phone edit" });
   render(<SyncReview {...props()} />);
-  await screen.findByText(STALE_XPS);
+  await screen.findByText(STALE_KEEP_BOTH);
   expect(screen.queryByRole("button", { name: /^(Apply|Nothing ticked)/ })).toBeNull();
   expect(screen.getByRole("button", { name: "Dismiss" })).toBeTruthy();
 });
@@ -109,7 +109,7 @@ it("preserves the reviewed diff when the source changes, with all ticks disabled
   await screen.findByRole("button", { name: "Apply 2 changes to 1 note" });
   const diff = document.querySelector(".review-added")?.textContent;
   await act(async () => { await updateNote(a.id, { html: "<p>Completely different local text</p>" }); });
-  await screen.findByText(STALE_XPS);
+  await screen.findByText(STALE_KEEP_BOTH);
   expect(document.querySelector(".review-added")?.textContent).toBe(diff);
   expect(document.body.textContent).not.toContain("Completely different local text");
   expect(screen.getAllByRole("checkbox").every((box) => box.disabled)).toBe(true);
@@ -120,7 +120,7 @@ it("refuses the entire batch if a note changes during queue flush, then refreshe
   render(<SyncReview {...shared} />);
   fireEvent.click(await screen.findByRole("button", { name: "Apply 3 changes to 2 notes" }));
   await screen.findByText("Something changed while you were reviewing. Nothing was applied. Check the suggestions again.");
-  await screen.findByText(STALE_XPS);
+  await screen.findByText(STALE_KEEP_BOTH);
   expect(await db.notes.get(a.id)).toEqual(a);
   expect(await readOutbox()).toEqual([]); expect(await db.prefs.get("claudeLastChange")).toBeUndefined();
   expect(button("Apply 2 changes to 1 note").disabled).toBe(false);
@@ -141,7 +141,7 @@ it("filters saved outcomes on mount and keeps the copy decision above proposals"
   fireEvent.click(button("The XPS copy needs your decision · Review"));
   expect(onOpen).toHaveBeenLastCalledWith({ screen: "settings-sync" });
   act(() => syncSession.update({ confirm: null }));
-  fireEvent.click(await screen.findByRole("button", { name: "Claude Code suggests changes to 1 note · Review" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Claude Code has 1 suggestion · Review" }));
   expect(onOpen).toHaveBeenLastCalledWith({ screen: "sync-review" });
 });
 it.each([{ readOnly: true }, { replaced: true }, { versionChange: "pending" }])("disables Apply and Dismiss under notebook guard %j", async (guard) => {
@@ -165,7 +165,7 @@ it("Settings → Sync offers the shared Undo and its confirmation with the xps l
 it("routes through App and Android Back closes the formatted preview and title edit before leaving", async () => {
   render(<App />); await idle();
   act(() => syncSession.update({ proposals: [versions[0]] }));
-  fireEvent.click(await screen.findByRole("button", { name: "Claude Code suggests changes to 1 note · Review" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Claude Code has 1 suggestion · Review" }));
   await screen.findByRole("heading", { name: "Claude Code's suggestions" }); await idle();
   fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
   fireEvent.click(button("Show before and after"));
@@ -181,4 +181,112 @@ it("routes through App and Android Back closes the formatted preview and title e
   expect(screen.getByRole("heading", { name: "Claude Code's suggestions" })).toBeTruthy();
   act(() => window.history.back());
   await screen.findByRole("heading", { name: "Notes", exact: true }); await idle();
+});
+it("renders a new note and Trash, validates a new title, and applies and undoes both", async () => {
+  syncSession.update({ proposals: [newProposalFixture({ newFolder: "Recipes" }), trashProposalFixture(b)] });
+  render(<SyncReview {...props()} />);
+  await screen.findByText("2 suggestions · from Claude Code on the XPS");
+  expect(screen.getByRole("checkbox", { name: /^New note/ })).toBeTruthy(); expect(screen.getByRole("checkbox", { name: "Move to Trash" })).toBeTruthy();
+  fireEvent.click(button("Edit")); fireEvent.change(screen.getByLabelText("Proposed title"), { target: { value: "x".repeat(201) } });
+  expect(button("Apply 2 changes to 2 notes").disabled).toBe(true);
+  fireEvent.change(screen.getByLabelText("Proposed title"), { target: { value: "My new note" } });
+  fireEvent.click(button("Apply 2 changes to 2 notes")); await screen.findByText("Applied 2 changes to 2 notes.");
+  const copy = await db.notes.filter((n) => n.title === "My new note").first(); expect(copy).toBeTruthy(); expect((await db.notes.get(b.id)).deletedAt).not.toBeNull();
+  fireEvent.click(await screen.findByRole("button", { name: "Undo Claude Code's last change" }));
+  const dialog = screen.getByRole("dialog"); expect(dialog.textContent).toContain('1 new note moves to Trash, “Second note” comes back from Trash.');
+  fireEvent.click(within(dialog).getByRole("button", { name: "Undo", exact: true }));
+  await screen.findByText("Claude Code's change undone."); expect((await db.notes.get(copy.id)).deletedAt).not.toBeNull(); expect((await db.notes.get(b.id)).deletedAt).toBeNull();
+  expect(await db.folders.count()).toBe(0);
+});
+it("offers Keep both only for a readable stale edit in this generation, and uses the exact stale sentences", async () => {
+  await updateNote(a.id, { title: "Local" }); await updateNote(b.id, { title: "Local trash" });
+  const fresh = newProposalFixture({ generation: "old" });
+  syncSession.update({ proposals: [versions[0], trashProposalFixture({ ...b, rev: 1 }), fresh] });
+  const view = render(<SyncReview {...props()} />);
+  await screen.findByText(STALE_KEEP_BOTH); expect(button("Keep both")).toBeTruthy();
+  expect(screen.getByText(STALE_TRASH)).toBeTruthy(); expect(screen.getByText(STALE_GENERATION)).toBeTruthy();
+  view.unmount(); syncSession.update({ proposals: [{ ...versions[0], extra: true }] }); render(<SyncReview {...props()} />);
+  await screen.findByText("This suggestion can't be read safely. Dismiss it and ask Claude Code to try again.");
+  expect(screen.queryByRole("button", { name: "Keep both" })).toBeNull();
+});
+it("Keep both shows the fresh copy, saves it and offers Undo", async () => {
+  syncSession.update({ proposals: [versions[0]] }); await updateNote(a.id, { title: "Local" });
+  render(<SyncReview {...props()} />); fireEvent.click(await screen.findByRole("button", { name: "Keep both" }));
+  const dialog = await screen.findByRole("dialog", { name: "Keep both" });
+  expect(dialog.textContent).toContain("Clear title (from Claude Code)"); expect(dialog.textContent).toContain("New wording");
+  expect(dialog.textContent).not.toContain("Old wording");
+  fireEvent.click(within(dialog).getByRole("button", { name: "Add as a new note" }));
+  await screen.findByText("Added “Clear title (from Claude Code)”.");
+  expect(screen.queryByRole("dialog")).toBeNull(); expect(await db.notes.filter((n) => n.title === "Clear title (from Claude Code)").count()).toBe(1);
+  expect((await readHandled())[0].outcome).toBe("kept"); expect((await db.notes.get(a.id)).title).toBe("Local");
+});
+it.each(["title", "folder"])("closes Keep both on a %s race and requires opening and confirming the sheet again", async (field) => {
+  syncSession.update({ proposals: [versions[0]] }); await updateNote(a.id, { title: "Local" });
+  await db.folders.put({ id: "folder", name: "Folder", position: 0 });
+  const shared = props(); render(<SyncReview {...shared} />);
+  fireEvent.click(await screen.findByRole("button", { name: "Keep both" })); await screen.findByRole("dialog");
+  shared.queue.flush.mockImplementationOnce(() => updateNote(a.id, field === "title" ? { title: "Later" } : { folderId: "folder" }));
+  fireEvent.click(button("Add as a new note"));
+  await screen.findByText("Something changed while you were reviewing. Nothing was added. Open Keep both and check the copy again.");
+  expect(screen.queryByRole("dialog")).toBeNull(); expect(await db.notes.count()).toBe(2); expect(await readHandled()).toEqual([]);
+  fireEvent.click(button("Keep both")); const dialog = await screen.findByRole("dialog");
+  if (field === "folder") expect(within(dialog).getByText("Folder")).toBeTruthy();
+  fireEvent.click(button("Add as a new note")); await screen.findByText("Added “Clear title (from Claude Code)”.");
+});
+it("disables Apply for a ticked link into ticked Trash and clears the error when either is unticked", async () => {
+  syncSession.update({ proposals: [newProposalFixture({ body: `<p><a href="note:${b.id}">Same words</a></p>` }), trashProposalFixture(b)] });
+  render(<SyncReview {...props()} />);
+  const message = "A ticked change links to “Second note”, which you're moving to Trash. Untick one of them.";
+  await screen.findByText(message); expect(button("Apply 2 changes to 2 notes").disabled).toBe(true);
+  fireEvent.click(screen.getByRole("checkbox", { name: "Move to Trash" })); expect(screen.queryByText(message)).toBeNull(); expect(button("Apply 1 change to 1 note").disabled).toBe(false);
+  fireEvent.click(screen.getByRole("checkbox", { name: "Move to Trash" })); fireEvent.click(screen.getByRole("checkbox", { name: /^New note/ }));
+  expect(screen.queryByText(message)).toBeNull(); expect(button("Apply 1 change to 1 note").disabled).toBe(false);
+});
+it("a handled version remains hidden on a fresh session, and a competing pid is Dismiss only", async () => {
+  const old = newProposalFixture(), next = { ...old, hash: "d".repeat(64) };
+  await writeTransaction([db.prefs], () => appendHandledInTransaction([handledEntry(old, null, "applied")]));
+  syncSession.update({ proposals: [old] }); const view = render(<SyncReview {...props()} />);
+  await screen.findByText("No suggestions waiting."); view.unmount(); syncSession.reset(); syncSession.update({ proposals: [next] });
+  render(<SyncReview {...props()} />); await screen.findByText("You already added this note.");
+  expect(screen.queryByRole("checkbox")).toBeNull(); expect(screen.queryByRole("button", { name: /^Apply/ })).toBeNull();
+  expect(button("Dismiss")).toBeTruthy();
+});
+it("mixed Undo names its decisions without treating a new note as an edited source", async () => {
+  syncSession.update({ proposals: [versions[0], newProposalFixture(), trashProposalFixture(b)] });
+  render(<SyncReview {...props()} />); fireEvent.click(await screen.findByRole("button", { name: "Apply 4 changes to 3 notes" }));
+  await screen.findByText("Applied 4 changes to 3 notes.");
+  await act(async () => { await updateNote(a.id, { title: "My later edit" }); });
+  fireEvent.click(await screen.findByRole("button", { name: "Undo Claude Code's last change" }));
+  const dialog = screen.getByRole("dialog"); expect(dialog.textContent).toContain('1 note gets its earlier version back. If notes changed since, nothing is overwritten:');
+  fireEvent.click(within(dialog).getByRole("button", { name: "Undo", exact: true }));
+  await screen.findByText("Some notes changed after Claude Code's change.");
+  expect(screen.getByText("New fixture stays as it is")).toBeTruthy(); expect(screen.getByText("Second note comes out of Trash")).toBeTruthy();
+  expect(screen.getByText("My later edit stays as it is now; its earlier version comes back as “First note (before Claude)”")).toBeTruthy();
+  fireEvent.click(button("Undo, keeping later changes")); await screen.findByText("Claude Code's change undone.");
+  expect((await db.notes.get(a.id)).title).toBe("My later edit");
+});
+it("Android Back closes Show the note and Keep both before leaving the review", async () => {
+  await updateNote(a.id, { title: "Local" }); render(<App />); await idle();
+  act(() => syncSession.update({ proposals: [versions[0], trashProposalFixture(b)] }));
+  fireEvent.click(await screen.findByRole("button", { name: "Claude Code has 2 suggestions · Review" }));
+  await screen.findByRole("heading", { name: "Claude Code's suggestions" }); await idle();
+  fireEvent.click(await screen.findByRole("button", { name: "Show the note" }));
+  const route = window.history.state[NAVIGATION_KEY];
+  act(() => window.history.back()); await waitFor(() => expect(screen.queryByRole("button", { name: "Hide the note" })).toBeNull()); await idle();
+  expect(window.history.state[NAVIGATION_KEY]).toEqual(route);
+  fireEvent.click(button("Keep both")); await screen.findByRole("dialog", { name: "Keep both" }); await idle();
+  act(() => window.history.back()); await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull()); await idle();
+  expect(window.history.state[NAVIGATION_KEY]).toEqual(route);
+  expect(screen.getByRole("heading", { name: "Claude Code's suggestions" })).toBeTruthy();
+  act(() => window.history.back()); await screen.findByRole("heading", { name: "Notes", exact: true }); await idle();
+});
+
+it("the list bar remembers legacy outbox-only outcomes after acknowledgement", async () => {
+  await appendOutbox({ proposal: versions[0].proposal, hash: versions[0].hash, outcome: "applied", applied: [], at: new Date().toISOString() });
+  syncSession.update({ proposals: versions });
+  render(<SyncBar onOpen={() => {}} />);
+  await screen.findByRole("button", { name: "Claude Code has 1 suggestion · Review" });
+  await act(async () => { await db.prefs.delete("syncOutbox"); syncSession.update({ proposals: versions }); });
+  await waitFor(() => expect(syncSession.getSnapshot().proposals).toEqual([versions[1]]));
+  expect(screen.queryByRole("button", { name: "Claude Code has 2 suggestions · Review" })).toBeNull();
 });

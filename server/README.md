@@ -35,7 +35,9 @@ The full contract remains [`docs/PHASE-4-DIRECTION.md`](../docs/PHASE-4-DIRECTIO
   `status = outcome` and an `outcome` object containing `outcome`, `applied` and `at`. The first
   recorded outcome wins. New filenames use `<pid>-<first 16 hex of hash>.json`; records and the
   wire retain the full SHA-256, checked before an outcome can update a record. Run A's full-hash
-  filenames remain readable. Outcomes are `applied`, `dismissed` or `stale`.
+  filenames remain readable. Outcomes are `applied`, `kept` (4d's Keep both), `dismissed` or
+  `stale`. An owner outcome on a new-note version also retires (`superseded`) any other pending
+  new-note version under the same pid, in the same journalled batch.
 
 ## Recovery and history
 
@@ -133,8 +135,11 @@ only `inbox/`, leave its contents alone, and retire the old root helper file wit
 links. Legacy inbox subdirectories, if present, are unrelated entries and are left alone.
 
 Claude Code writes `inbox/<pid>.html` first (complete raw UTF-8 HTML, at most 512 KiB), then
-`inbox/<pid>.json` (at most 16 KiB) with exactly `note`, `basedOnRev`, `generation`, `title`,
-`folderId`, `tags`, `why`. A pid matches `^p-[a-z0-9-]{3,80}$`. There is no shell in note
+`inbox/<pid>.json` (at most 16 KiB). Three kinds, told apart by shape (`proposalKind`): an edit
+has exactly `note`, `basedOnRev`, `generation`, `title`, `folderId`, `tags`, `why`; a new note
+(4d) the same without `note` and `basedOnRev`; both may add `newFolder` (a name, only with
+`folderId: null`). A Trash move (4d) is the JSON file alone with exactly `note`, `basedOnRev`,
+`generation`, `trash: true`, `why`. A pid matches `^p-[a-z0-9-]{3,80}$`. There is no shell in note
 sessions. The launcher names only Read, Edit, Write, Glob and Grep, passes CLAUDE.md explicitly
 with `--append-system-prompt-file`, and both policy templates deny Bash. The fail-closed sandbox
 block remains as defence in depth.
@@ -142,18 +147,26 @@ block remains as defence in depth.
 The scanner remembers size, modification time and inode for both files, and ingests only after
 two unchanged observations. It rechecks stats during reads and before cleanup to avoid
 capturing or removing a changed pair. Observations are in memory; a restart needs two scans
-again and restarts half-pair timers. A lone file older than ten minutes is refused as
-`missing-body` or `missing-details`. Nonmatching names and nonregular entries (including
+again and restarts half-pair timers. A lone JSON is read once stable; it is complete only if it
+has a `trash` key (refused `invalid-shape` if malformed, `trash-with-body` if an HTML file
+sits beside it). Any other lone file older than ten minutes is refused as `missing-body` or
+`missing-details`. Nonmatching names and nonregular entries (including
 symlinks) are ignored, never followed or deleted; a pid with either path nonregular is skipped
 as a whole. An unsafe inbox is logged and skipped without affecting pending proposals.
 
 All shape, revision, generation, Trash, folder, live-note link and existing-image checks use
-`store.published`, never view metadata. The body is valid UTF-8 but is not normalized: the
-phone still audits formatting in 4c. At most 50 versions are pending. A valid proposal for the
-same note supersedes its pending version, even at the limit; refused replacements leave it
-alone. Deleting inbox files does not withdraw proposals.
+`store.published`, never view metadata, plus `folder-exists` for a `newFolder` that already
+exists and, for new notes, pictures referenced by any live note and `pid-used` once the owner
+handled a new-note version under that pid. The body is valid UTF-8 but is not normalized: the
+phone audits formatting. At most 50 versions are pending, of every kind. A valid edit or Trash
+version supersedes the pending version for the same note; a new-note version supersedes the
+pending new-note version with the same pid, even at the limit; refused replacements leave it
+alone. `GET /v1/state` lists new-note and Trash versions, and edits with `newFolder`, only when
+asked with `?proposals=2` (0.4.2 apps); `proposals.json` gains `kind`, and shows a new note's
+proposed title only while it is pending in the current generation. Deleting inbox files does not withdraw proposals.
 
-Versions use SHA-256 of canonical fields plus body, without the filename pid. Malformed or
+Versions use SHA-256 of canonical fields plus body (a Trash version: canonical fields alone),
+without the filename pid. Malformed or
 unreadable input uses bounded byte hashes/refusal markers when a canonical value cannot be
 formed. Refusals retain validated details and a reason but no body. A monotonically increasing
 `sequence` preserves ingestion order even when timestamps tie. Truncated filename hash

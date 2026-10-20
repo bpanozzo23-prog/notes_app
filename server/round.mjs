@@ -4,7 +4,7 @@ import { guard } from "./guard.mjs";
 import { dailyBackup } from "./backup.mjs";
 import { readJson, writeJson } from "./fsutil.mjs";
 import { fail, validatePush, validateOutcomes } from "./validate.mjs";
-import { proposalFilename } from "./proposals.mjs";
+import { proposalFilename, recordKind, readProposals } from "./proposals.mjs";
 
 export const ROUND_STEPS = ["journal", "apply", "commit", "publish", "device", "view", "backup", "uploads", "clear-journal", "response"];
 export const OUTCOME_STEPS = ["journal", "apply", "commit", "publish", "view", "clear-journal", "response"];
@@ -122,27 +122,38 @@ export async function recordOutcomes(context, body) {
   validateOutcomes(body);
   const { store } = context;
   if (store.published.meta.historyError) fail(503, "history-blocked");
-  const updates = [], recorded = [], seen = new Set();
+  const updates = new Map(), recorded = [], seen = new Set();
+  const records = await readProposals(context.config.storeDir);
   for (const item of body) {
     let filename = proposalFilename(item.proposal, item.hash);
     const identity = `${item.proposal}-${item.hash}`;
     if (seen.has(identity)) continue;
     seen.add(identity);
     recorded.push({ proposal: item.proposal, hash: item.hash });
-    let record = await readJson(store.file(`proposals/${filename}`), null);
+    let record = updates.get(filename)?.record ?? await readJson(store.file(`proposals/${filename}`), null);
     if (record && record.hash !== item.hash) continue;
     if (!record) {
       // Run A's fixtures/records used the full hash; retain their idempotent outcome behavior.
       filename = `${identity}.json`;
-      record = await readJson(store.file(`proposals/${filename}`), null);
+      record = updates.get(filename)?.record ?? await readJson(store.file(`proposals/${filename}`), null);
     }
     // Acknowledgement of an unknown immutable version is intentional (phone outbox drains).
     if (!record || record.outcome != null || record.hash !== undefined && record.hash !== item.hash) continue;
-    updates.push({ filename, record: { ...record, status: item.outcome,
+    updates.set(filename, { filename, record: { ...record, status: item.outcome,
       outcome: { outcome: item.outcome, applied: item.applied ?? null, at: item.at } } });
+    if (recordKind(record) === "new") {
+      for (const sibling of records) {
+        const current = updates.get(sibling.filename)?.record ?? sibling.record;
+        if (sibling.filename !== filename && current.status === "pending" && recordKind(current) === "new" &&
+            current.proposal === item.proposal) {
+          updates.set(sibling.filename, { filename: sibling.filename,
+            record: { ...current, status: "superseded", handledAt: new Date(context.now()).toISOString() } });
+        }
+      }
+    }
   }
-  if (updates.length) {
-    await commitProposalUpdates(context, updates, `round ${store.published.meta.round}: ${updates.length} outcomes recorded`);
+  if (updates.size) {
+    await commitProposalUpdates(context, [...updates.values()], `round ${store.published.meta.round}: ${updates.size} outcomes recorded`);
   }
   return { recorded };
 }

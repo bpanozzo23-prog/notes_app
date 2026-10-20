@@ -17,7 +17,7 @@ import { openStore } from "../server/store.mjs";
 import { readProposals } from "../server/proposals.mjs";
 import { guardTailnet } from "./tailnet-guard.mjs";
 import { makePng } from "./image-fixture.mjs";
-import { acceptImport, backFromScreen, button, changedSample, checkPreview, confirmation, importNotebook, until, unreachable, waitSynced, writeProposalPair, staleSuggestion } from "./sync-browser-fixtures.mjs";
+import { acceptImport, backFromScreen, button, changedSample, checkPreview, confirmation, importNotebook, until, unreachable, waitSynced, writeProposalPair, writeNewNoteProposal, writeTrashProposal, staleSuggestion } from "./sync-browser-fixtures.mjs";
 
 const run = promisify(execFile);
 const MAIN = fileURLToPath(new URL("../server/main.mjs", import.meta.url));
@@ -139,11 +139,8 @@ export async function syncCheck(args = process.argv.slice(2), print = (s) => pro
     await request("POST", "/v1/push", samplePush(sample, await request("GET", "/v1/state"), generation, [edited]));
     await verify();
     pass("incremental note edit");
-    const submit = async (pid, extra = {}) => {
-      const { body, ...details } = { note: edited.id, basedOnRev: edited.rev, generation,
-        title: edited.title, folderId: edited.folderId, tags: edited.tags, why: "Fixture check",
-        body: `${edited.html}<p>Proposed fixture addition.</p>`, ...extra };
-      await fs.writeFile(path.join(config.viewDir, `inbox/${pid}.html`), body);
+    const submitFiles = async (pid, details, body) => {
+      if (body !== undefined) await fs.writeFile(path.join(config.viewDir, `inbox/${pid}.html`), body);
       await fs.writeFile(path.join(config.viewDir, `inbox/${pid}.json`), JSON.stringify(details));
       // Poll only the view: this also proves the timer works without a phone state request.
       for (let i = 0; i < 80; i++) {
@@ -156,6 +153,12 @@ export async function syncCheck(args = process.argv.slice(2), print = (s) => pro
         await delay(100);
       }
       throw new Error("proposal-ingestion-timeout");
+    };
+    const submit = (pid, extra = {}) => {
+      const { body, ...details } = { note: edited.id, basedOnRev: edited.rev, generation,
+        title: edited.title, folderId: edited.folderId, tags: edited.tags, why: "Fixture check",
+        body: `${edited.html}<p>Proposed fixture addition.</p>`, ...extra };
+      return submitFiles(pid, details, body);
     };
     assert.equal((await submit("p-fixture-first")).status, "pending");
     const proposal = (await request("GET", "/v1/state")).proposals.find((p) => p.proposal === "p-fixture-first");
@@ -178,6 +181,42 @@ export async function syncCheck(args = process.argv.slice(2), print = (s) => pro
     assert.equal(superseded.find((p) => p.proposal === "p-fixture-replaced").status, "superseded");
     assert.equal(superseded.filter((p) => p.status === "pending").length, 1);
     pass("new valid proposal supersedes the pending proposal for its note");
+    const newDetails = { generation, title: "New fixture note", folderId: null, newFolder: "Run I fixture folder",
+      tags: [], why: "Fixture new note" };
+    const newProposal = await submitFiles("p-fixture-new", newDetails, edited.html);
+    assert.equal(newProposal.status, "pending");
+    assert.equal(newProposal.kind, "new");
+    assert.equal(newProposal.title, newDetails.title);
+    pass("new-note pair with a new folder ingested pending");
+    const trashNote = sample.notes.find((n) => n.deletedAt === null && n.id !== edited.id);
+    const trashDetails = { note: trashNote.id, basedOnRev: trashNote.rev, generation, trash: true, why: "Fixture Trash move" };
+    const trashProposal = await submitFiles("p-fixture-trash", trashDetails);
+    assert.equal(trashProposal.status, "pending");
+    assert.equal(trashProposal.kind, "trash");
+    assert.ok(!(await fs.readdir(path.join(config.viewDir, "inbox"))).includes("p-fixture-trash.json"));
+    pass("lone Trash JSON ingested pending and removed");
+    const trashWithBody = await submitFiles("p-fixture-trash-body", trashDetails, "<p>Unexpected</p>");
+    assert.equal(trashWithBody.status, "refused");
+    assert.equal(trashWithBody.reason, "trash-with-body");
+    const folderExists = await submitFiles("p-fixture-folder-exists", { ...newDetails,
+      newFolder: sample.folders[0].name.toUpperCase() }, edited.html);
+    assert.equal(folderExists.status, "refused");
+    assert.equal(folderExists.reason, "folder-exists");
+    pass("trash-with-body and folder-exists refusals");
+    const oldState = await request("GET", "/v1/state");
+    assert.deepEqual(oldState.proposals.map((p) => p.proposal), ["p-fixture-replacement"]);
+    const newState = await request("GET", "/v1/state?proposals=2");
+    assert.deepEqual(newState.proposals.map((p) => p.proposal), ["p-fixture-replacement", "p-fixture-new", "p-fixture-trash"]);
+    assert.equal(newState.proposals.find((p) => p.proposal === "p-fixture-new").newFolder, newDetails.newFolder);
+    assert.ok(!Object.hasOwn(newState.proposals.find((p) => p.proposal === "p-fixture-trash"), "body"));
+    pass("state replies hide new kinds unless proposals=2 is requested");
+    await request("POST", "/v1/outcomes", [{ proposal: newProposal.proposal, hash: newProposal.hash,
+      outcome: "kept", applied: [], at: new Date().toISOString() }]);
+    const kept = (await readJson(path.join(config.viewDir, "notebook/proposals.json"))).find((p) => p.hash === newProposal.hash);
+    assert.equal(kept.status, "kept");
+    assert.equal(kept.title, "New note");
+    assert.deepEqual(kept.outcome.applied, []);
+    pass("kept outcome recorded with the handled new-note title hidden");
     generation = "sample-generation-B";
     edited.title += " (imported)";
     await upload();
@@ -566,7 +605,7 @@ export async function browserSyncCheck(print = console.log) {
     await until("proposal file pair ingested", () => proposalRecord(pid), (record) => record?.status === "pending");
     await button(page, "Sync now").click(); await waitSynced(page);
     await back(); await back();
-    await button(page, "Claude Code suggests changes to 1 note · Review").click();
+    await button(page, "Claude Code has 1 suggestion · Review").click();
     await page.getByRole("heading", { name: "Claude Code's suggestions", exact: true }).waitFor();
     await page.getByRole("checkbox", { name: /^Title:/ }).uncheck();
     await button(page, "Apply 1 change to 1 note").click();
@@ -601,7 +640,7 @@ export async function browserSyncCheck(print = console.log) {
     const staleBody = page.getByLabel("Note body", { exact: true });
     await staleBody.click(); await staleBody.press("Control+End"); await staleBody.press("End");
     await staleBody.pressSequentially(" Local edit after the proposal.");
-    await back(); await button(page, "Claude Code suggests changes to 2 notes · Review").click();
+    await back(); await button(page, "Claude Code has 2 suggestions · Review").click();
     const staleCard = page.getByRole("article", { name: staleNote.title, exact: true });
     await staleCard.getByText(staleSuggestion, { exact: true }).waitFor();
     const staleBoxes = await staleCard.getByRole("checkbox").all();
@@ -613,10 +652,72 @@ export async function browserSyncCheck(print = console.log) {
     await until("Dismiss reported", () => proposalRecord("p-browser-dismiss"), (record) => record?.status === "dismissed", 75_000);
     await until("stale Dismiss reported", () => proposalRecord("p-browser-stale"), (record) => record?.status === "stale", 75_000);
     assertHealthy(); pass("phone edit makes a proposal stale; Dismiss reports dismissed and stale outcomes");
+    activeCheck = "mixed edit, new note and Trash Apply and Undo";
+    await back(); await button(page, "Settings").click(); await openSync();
+    await button(page, "Sync now").click(); await waitSynced(page);
+    const mixedBefore = await storeSnapshot(), mixedEdit = mixedBefore.notes.find((note) => note.id === reviewNote.id);
+    const mixedTrash = mixedBefore.notes.find((note) => note.title === "Recordatorio suelto" && note.deletedAt === null);
+    const pictureNote = mixedBefore.notes.find((note) => note.title === "Captura de ejemplo" && note.deletedAt === null);
+    assert.ok(mixedTrash && pictureNote);
+    const imageElement = pictureNote.html.match(/<img\b[^>]*\bdata-file=[^>]*>/i)?.[0]; assert.ok(imageElement);
+    await writeProposalPair(config.viewDir, "p-browser-mixed-edit", mixedEdit, mixedBefore.meta.generation, { body: mixedEdit.html + "<p>Mixed Apply fixture.</p>" });
+    await writeNewNoteProposal(config.viewDir, "p-browser-mixed-new", mixedBefore.meta.generation, { title: "Recetas de la semana", newFolder: "Recetas", tags: ["cocina"], body: `<p>Verduras y arroz.</p>${imageElement}` });
+    await writeTrashProposal(config.viewDir, "p-browser-mixed-trash", mixedTrash, mixedBefore.meta.generation, "Finished fixture reminder.");
+    for (const id of ["p-browser-mixed-edit", "p-browser-mixed-new", "p-browser-mixed-trash"]) await until("mixed proposal ingested", () => proposalRecord(id), (record) => record?.status === "pending");
+    await button(page, "Sync now").click(); await waitSynced(page); await back(); await back();
+    await button(page, "Claude Code has 3 suggestions · Review").click();
+    await button(page, "Apply 3 changes to 3 notes").click();
+    await page.getByText("Applied 3 changes to 3 notes.", { exact: true }).waitFor();
+    await until("mixed outcome reported", () => proposalRecord("p-browser-mixed-new"), (record) => record?.status === "applied", 75_000);
+    const mixedAfter = await storeSnapshot(), newNote = mixedAfter.notes.find((note) => note.title === "Recetas de la semana");
+    assert.ok(newNote && !newNote.pinned && newNote.html.includes(imageElement.match(/data-file="([^"]+)"/)[1]));
+    assert.equal(mixedAfter.notes.length, mixedBefore.notes.length + 1);
+    assert.equal(mixedAfter.folders.length, mixedBefore.folders.length + 1);
+    assert.equal(mixedAfter.notes.filter((note) => note.deletedAt === null).length, mixedBefore.notes.filter((note) => note.deletedAt === null).length);
+    assert.ok(mixedAfter.notes.find((note) => note.id === mixedTrash.id).deletedAt);
+    // The XPS publishes a round before it rebuilds the view, so wait for the view itself.
+    const viewIndex = () => readJson(path.join(config.viewDir, "notebook/index.json"));
+    const mixedView = await until("mixed Apply in the view", viewIndex, (index) => index.notes.some((note) => note.id === newNote.id), 75_000);
+    assert.equal(mixedView.notes.length, mixedBefore.notes.filter((note) => note.deletedAt === null).length);
+    assert.ok(mixedView.notes.some((note) => note.id === newNote.id)); assert.ok(!mixedView.notes.some((note) => note.id === mixedTrash.id));
+    await button(page, "Undo Claude Code's last change").click();
+    await page.getByRole("dialog", { name: "Undo Claude Code's last change?", exact: true }).getByRole("button", { name: "Undo", exact: true }).click();
+    await page.getByText("Claude Code's change undone.", { exact: true }).waitFor();
+    const undone = await until("mixed Undo synced", storeSnapshot, (copy) => copy.notes.find((note) => note.id === newNote.id)?.deletedAt && copy.notes.find((note) => note.id === mixedTrash.id)?.deletedAt === null, 75_000);
+    assert.equal(undone.notes.find((note) => note.id === newNote.id).folderId, null);
+    assert.equal(undone.folders.length, mixedBefore.folders.length);
+    assert.equal(undone.notes.find((note) => note.id === mixedEdit.id).html, mixedEdit.html);
+    const undoneView = await until("mixed Undo in the view", viewIndex, (index) => !index.notes.some((note) => note.id === newNote.id), 75_000);
+    assert.equal(undoneView.notes.length, mixedView.notes.length);
+    assert.ok(!undoneView.notes.some((note) => note.id === newNote.id)); assert.ok(undoneView.notes.some((note) => note.id === mixedTrash.id));
+    assertHealthy(); pass("one mixed Apply creates a note/folder and moves to Trash; next round and Undo agree in store and view");
+
+    activeCheck = "Keep both copy and kept outcome";
+    const keepSource = undone.notes.find((note) => note.id === mixedEdit.id);
+    await writeProposalPair(config.viewDir, "p-browser-keep-both", keepSource, undone.meta.generation, { title: "Kept fixture", body: "<p>Keep this proposed copy.</p>" });
+    await until("Keep both proposal ingested", () => proposalRecord("p-browser-keep-both"), (record) => record?.status === "pending");
+    await back(); await button(page, "Settings").click(); await openSync(); await button(page, "Sync now").click(); await waitSynced(page);
+    await back(); await back(); await button(page, keepSource.title).click();
+    const keepEditor = page.getByLabel("Note body", { exact: true });
+    await keepEditor.click(); await keepEditor.press("Control+End"); await keepEditor.press("End"); await keepEditor.pressSequentially(" Keep my later words.");
+    await back(); await button(page, "Claude Code has 1 suggestion · Review").click();
+    await page.getByText(staleSuggestion, { exact: true }).waitFor(); await button(page, "Keep both").click();
+    const sheet = page.getByRole("dialog", { name: "Keep both", exact: true });
+    await sheet.getByText("Kept fixture (from Claude Code)", { exact: false }).waitFor();
+    await sheet.getByRole("button", { name: "Add as a new note", exact: true }).click();
+    await page.getByText("Added “Kept fixture (from Claude Code)”.", { exact: true }).waitFor();
+    await until("kept outcome reported", () => proposalRecord("p-browser-keep-both"), (record) => record?.status === "kept", 75_000);
+    const kept = await storeSnapshot(), copy = kept.notes.find((note) => note.title === "Kept fixture (from Claude Code)");
+    assert.ok(copy && copy.deletedAt === null && copy.html === "<p>Keep this proposed copy.</p>");
+    assert.ok(kept.notes.find((note) => note.id === keepSource.id).html.includes("Keep my later words."));
+    assert.deepEqual((await proposalRecord("p-browser-keep-both")).outcome.applied, []);
+    assertHealthy(); pass("stale edit → Keep both sheet → exact new copy → kept recorded on the XPS");
     print(`PASS ${passed}/${passed} browser checks; temporary loopback services only.`);
   } catch (error) {
     // Never print arbitrary Playwright/child-process errors: they can contain headers/codes.
     print(`FAIL browser: ${activeCheck} (${error.code ?? error.name})`);
+    // Assertion messages hold only sample-notebook values; opt in when diagnosing a failure.
+    if (process.env.SYNC_CHECK_DEBUG && error instanceof assert.AssertionError) process.stderr.write(`${error.message}\n`);
     throw error;
   } finally {
     closing = true;

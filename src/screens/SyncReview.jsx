@@ -7,6 +7,9 @@ import ReadOnlyBody from "../components/review/ReadOnlyBody.jsx";
 import TitleRow from "../components/review/TitleRow.jsx";
 import TagsRow from "../components/review/TagsRow.jsx";
 import FolderRow from "../components/review/FolderRow.jsx";
+import NewNoteRow from "../components/review/NewNoteRow.jsx";
+import TrashRow from "../components/review/TrashRow.jsx";
+import KeepBothSheet from "../components/review/KeepBothSheet.jsx";
 import StaleBanner from "../components/review/StaleBanner.jsx";
 import ReviewActionBar from "../components/review/ReviewActionBar.jsx";
 import ClaudeUndo from "../components/ClaudeUndo.jsx";
@@ -14,10 +17,11 @@ import { notebookAccess, NotebookReplacedError, ReadOnlyNotebookError, DATABASE_
 import { applyClaudeChanges, STALE_PROPOSAL } from "../db/claudeChanges.js";
 import { validateTitle } from "../claude/proposals.js";
 import { noteTitle } from "../lib/notebookView.js";
+import { htmlToText } from "../lib/text.js";
 import { syncSession } from "../sync/session.js";
-import { buildInbox, dismissProposal, pendingProposals, proposalIsStale, readInboxSnapshot, STALE_XPS } from "../sync/inbox.js";
+import { buildInbox, dismissProposal, pendingProposals, proposalIsStale, readInboxSnapshot, handledMessage, keepBothModel, STALE_XPS, STALE_KEEP_BOTH, STALE_TRASH, STALE_GENERATION } from "../sync/inbox.js";
 import { outboxId } from "../sync/prefs.js";
-import { inboxPlan } from "../sync/plan.js";
+import { inboxPlan, keepBothPlan, linkIntoTrashError } from "../sync/plan.js";
 
 const count = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 export default function SyncReview({ run, queue, busy, onBack, refresh }) {
@@ -26,19 +30,21 @@ export default function SyncReview({ run, queue, busy, onBack, refresh }) {
   const [review, setReview] = useState(null), [revision, setRevision] = useState(0);
   const [unticked, setUnticked] = useState(new Set()), [titles, setTitles] = useState({});
   const [applied, setApplied] = useState(null), [message, setMessage] = useState("");
+  const [copy, setCopy] = useState(null);
   useEffect(() => {
     const subscription = liveQuery(readInboxSnapshot).subscribe({
       next(snapshot) {
-        syncSession.hideProposals(snapshot.outbox);
+        syncSession.hideProposals([...snapshot.outbox, ...snapshot.handled]);
         setReview((previous) => {
           const cached = revision === previous?.revision ? new Map(previous.cards.map((card) => [card.key, card])) : new Map();
-          const pending = pendingProposals(proposals, snapshot.outbox);
+          const pending = pendingProposals(proposals, snapshot.outbox, snapshot.handled);
           const fresh = new Map(buildInbox(pending.filter((version) => !cached.has(outboxId(version))), snapshot).map((card) => [card.key, card]));
           const cards = pending.map((version) => {
             const card = cached.get(outboxId(version)) ?? fresh.get(outboxId(version));
             // Keep the exact reviewed diff and ids when the source changes. Only the
             // freshness flag changes; rebuilding could silently give an old tick new words.
-            return { ...card, stale: proposalIsStale(version, snapshot.notes.find(({ id }) => id === version.note), snapshot.generation) };
+            return { ...card, handledMessage: handledMessage(version, snapshot.handled, snapshot.generation),
+              stale: proposalIsStale(version, snapshot.notes.find(({ id }) => id === version.note), snapshot.generation) };
           });
           return { cards, generation: snapshot.generation, revision, titles: new Map(snapshot.notes.map((note) => [note.id, noteTitle(note)])) };
         });
@@ -50,17 +56,18 @@ export default function SyncReview({ run, queue, busy, onBack, refresh }) {
   const cards = review?.cards ?? [];
   const guard = access.replaced ? new NotebookReplacedError().message : access.readOnly ? new ReadOnlyNotebookError().message : access.versionChange ? DATABASE_UPDATED : "";
   const disabled = busy || !!guard;
-  const selected = new Set(cards.filter((card) => !card.stale && !card.invalid).flatMap((card) => card.ids.filter((id) => !unticked.has(id))));
+  const selected = new Set(cards.filter((card) => !card.stale && !card.invalid && !card.handledMessage).flatMap((card) => card.ids.filter((id) => !unticked.has(id))));
   const noteCount = cards.filter((card) => card.ids.some((id) => selected.has(id))).length;
   const titleErrors = {};
-  for (const card of cards) if (selected.has(card.ticks?.title)) {
+  for (const card of cards) if (selected.has(card.ticks?.title) || card.kind === "new" && selected.has(card.ids[0])) {
     try { validateTitle(titles[card.key] ?? card.title); } catch (error) { titleErrors[card.key] = error.message; }
   }
+  const linkError = linkIntoTrashError(cards, selected);
   function toggle(id) {
     setUnticked((old) => { const next = new Set(old); next.has(id) ? next.delete(id) : next.add(id); return next; });
   }
   async function apply() {
-    if (disabled || !selected.size || Object.keys(titleErrors).length) return;
+    if (disabled || !selected.size || Object.keys(titleErrors).length || linkError) return;
     // Capture what was approved before awaiting the queue. A change during flush must refuse
     // this whole batch, never silently leave that card out of the just-approved transaction.
     const plan = inboxPlan(cards, selected, review.generation, titles);
@@ -69,7 +76,7 @@ export default function SyncReview({ run, queue, busy, onBack, refresh }) {
       try {
         const result = await applyClaudeChanges(plan);
         syncSession.hideProposals(plan.outbox);
-        setApplied({ changeId: result.changeId, count: selected.size, notes: plan.notes.length });
+        setApplied({ changeId: result.changeId, count: selected.size, notes: plan.notes.length + plan.createNotes.length });
         setMessage("");
         await refresh();
       } catch (error) {
@@ -86,51 +93,83 @@ export default function SyncReview({ run, queue, busy, onBack, refresh }) {
     const snapshot = await readInboxSnapshot();
     await dismissProposal({ ...card, stale: proposalIsStale(card.version, snapshot.notes.find(({ id }) => id === card.version.note), snapshot.generation) });
   });
+  const openCopy = (card) => run(async () => {
+    await queue.flush();
+    try { setCopy(keepBothModel(card.version, await readInboxSnapshot())); }
+    catch { setMessage("Something changed while you were reviewing. Check the suggestion and open Keep both again."); setRevision((value) => value + 1); }
+  });
+  const addCopy = () => {
+    if (disabled || !copy) return;
+    const plan = keepBothPlan(copy), title = copy.title;
+    return run(async () => {
+      await queue.flush();
+      try {
+        const result = await applyClaudeChanges(plan);
+        syncSession.hideProposals(plan.outbox);
+        setApplied({ changeId: result.changeId, title }); setMessage("");
+      } catch (error) {
+        if (error.message !== STALE_PROPOSAL) throw error;
+        setMessage("Something changed while you were reviewing. Nothing was added. Open Keep both and check the copy again.");
+        setRevision((value) => value + 1);
+      } finally { setCopy(null); }
+      await refresh();
+    });
+  };
   return <section className="review-screen pb-[calc(120px+env(safe-area-inset-bottom))] text-[17px] leading-[1.5]">
     <ScreenHeader title="Claude Code's suggestions" onBack={onBack} busy={busy} />
     <div className="space-y-4 break-words px-4">
       {guard && <p role="status">{guard}</p>}
       {message && <p role="alert">{message}</p>}
       {applied && <div className="space-y-3 rounded-xl border border-[var(--color-line)] bg-white px-3.5 py-3">
-        <p role="status">Applied {count(applied.count, "change")} to {count(applied.notes, "note")}.</p>
+        <p role="status">{applied.title ? `Added “${applied.title}”.` : `Applied ${count(applied.count, "change")} to ${count(applied.notes, "note")}.`}</p>
         <ClaudeUndo changeId={applied.changeId} run={run} queue={queue} refresh={refresh} disabled={disabled} />
       </div>}
       {!review && !message && <p role="status">Loading suggestions…</p>}
       {review && !cards.length && <p>No suggestions waiting.</p>}
       {cards.length > 0 && <div className="rounded-xl border border-[var(--color-line)] bg-white px-3.5 py-3">
-        <p className="mb-1">{count(cards.length, "note")} · from Claude Code on the XPS</p>
-        <p className="text-sm text-[var(--color-muted)]">Nothing changes until you tap Apply. Undo works afterwards.</p>
+        <p className="mb-1">{count(cards.length, "suggestion")} · from Claude Code on the XPS</p>
+        <p className="text-sm text-[var(--color-muted)]">Nothing changes until you tap Apply or Add as a new note. Undo works afterwards.</p>
       </div>}
       {cards.map((card) => {
         const before = card.note ?? { title: "", tags: [], folderId: null };
-        const rowsDisabled = disabled || card.stale || card.invalid;
+        const rowsDisabled = disabled || card.stale || card.invalid || !!card.handledMessage;
+        const sameGeneration = card.version.generation === review.generation;
+        const canKeep = card.stale && card.kind === "edit" && !card.invalid && sameGeneration;
         const checked = (id) => !unticked.has(id);
-        return <NoteReviewCard key={card.key} title={card.note ? noteTitle(card.note) : card.version.title || "Deleted note"} reason={card.version.why}
+        return <NoteReviewCard key={card.key} title={card.kind === "new" ? noteTitle({ title: titles[card.key] ?? card.title ?? "", text: htmlToText(card.html ?? "") }) : card.note ? noteTitle(card.note) : typeof card.version.title === "string" && card.version.title || "Deleted note"} reason={typeof card.version.why === "string" ? card.version.why : ""}
           action={{ label: "Dismiss", disabled, onClick: () => dismiss(card) }}>
-          {card.stale && <StaleBanner message={STALE_XPS} />}
-          {card.invalid ? <p role="alert">This suggestion can't be read safely. Dismiss it and ask Claude Code to try again.</p> : <>
+          {card.stale && <StaleBanner message={!sameGeneration ? STALE_GENERATION : card.kind === "trash" ? STALE_TRASH : canKeep ? STALE_KEEP_BOTH : STALE_XPS}
+            action={canKeep ? { label: "Keep both", disabled, onClick: () => openCopy(card) } : undefined} />}
+          {card.handledMessage ? <p role="status">{card.handledMessage}</p> : card.invalid ? <p role="alert">This suggestion can't be read safely. Dismiss it and ask Claude Code to try again.</p> : <>
             {card.ids.length > 0 && <div className="flex justify-end"><button type="button" className="min-h-11 text-sm text-[var(--color-accent)]" disabled={rowsDisabled}
               onClick={() => setUnticked((old) => { const next = new Set(old), any = card.ids.some((id) => !old.has(id)); for (const id of card.ids) any ? next.add(id) : next.delete(id); return next; })}>
               {card.ids.some(checked) ? "Untick all" : "Tick all"}
             </button></div>}
+            {card.kind === "new" && <NewNoteRow model={card} title={titles[card.key] ?? card.title} titles={review.titles} checked={checked(card.ids[0])} onToggle={() => toggle(card.ids[0])} disabled={rowsDisabled}
+              error={titleErrors[card.key]} onEdit={(value) => setTitles((old) => ({ ...old, [card.key]: value }))} />}
+            {card.kind === "trash" && <TrashRow model={card} checked={checked(card.ids[0])} onToggle={() => toggle(card.ids[0])} disabled={rowsDisabled} />}
+            {card.kind === "edit" && <>
             {card.title !== null && <TitleRow before={before.title} title={titles[card.key] ?? card.title} checked={checked(card.ticks.title)} onToggle={() => toggle(card.ticks.title)} disabled={rowsDisabled}
               error={titleErrors[card.key]} onEdit={(value) => setTitles((old) => ({ ...old, [card.key]: value }))} />}
             {card.tags !== null && <TagsRow added={card.tags.filter((tag) => !before.tags.includes(tag))} removed={before.tags.filter((tag) => !card.tags.includes(tag))}
               checked={checked(card.ticks.tags)} onToggle={() => toggle(card.ticks.tags)} disabled={rowsDisabled} />}
             {card.folder.action !== "keep" && <FolderRow before={card.folders.find(({ id }) => id === before.folderId)?.name ?? "No folder"} after={card.folder.name ?? "No folder"}
-              checked={checked(card.ticks.folder)} onToggle={() => toggle(card.ticks.folder)} disabled={rowsDisabled} />}
+              isNew={card.folder.action === "create"} checked={checked(card.ticks.folder)} onToggle={() => toggle(card.ticks.folder)} disabled={rowsDisabled} />}
             {card.changes.map((change, index) => change.unchanged ? <details key={`same-${index}`} className="border-t border-dashed border-[var(--color-line)]">
               <summary className="min-h-11 cursor-pointer py-2 text-sm text-[var(--color-muted)]">⋯ {count(change.unchanged.length, "unchanged block")} (show)</summary>
               <ReadOnlyBody html={change.unchanged.join("")} />
             </details> : <ChangeRow key={change.id} change={change} checked={checked(change.id)} onToggle={() => toggle(change.id)} disabled={rowsDisabled} titles={review.titles} />)}
             {!card.ids.length && <p>No changes to apply.</p>}
+            </>}
           </>}
           {card.audit.length > 0 && <div className="my-2 rounded-[10px] bg-[var(--color-warn-bg)] px-3 py-2.5 text-[15px] text-[var(--color-warn-ink)]">Removed by the editor: {card.audit.join("; ")}.</div>}
         </NoteReviewCard>;
       })}
     </div>
+    {linkError && <p role="alert" className="mx-4 text-[var(--color-del-ink)]">{linkError}</p>}
+    {copy && <KeepBothSheet model={copy} busy={disabled} onClose={() => setCopy(null)} onAdd={addCopy} />}
     {/* No bar when nothing left could be applied (only stale or unusable suggestions remain). */}
-    {cards.some((card) => !card.stale && !card.invalid && card.ids.length) && <ReviewActionBar primary={{ label: selected.size ? `Apply ${count(selected.size, "change")} to ${count(noteCount, "note")}` : "Nothing ticked", onClick: apply,
-      disabled: disabled || !selected.size || !!Object.keys(titleErrors).length }} />}
+    {cards.some((card) => !card.stale && !card.invalid && !card.handledMessage && card.ids.length) && <ReviewActionBar primary={{ label: selected.size ? `Apply ${count(selected.size, "change")} to ${count(noteCount, "note")}` : "Nothing ticked", onClick: apply,
+      disabled: disabled || !selected.size || !!Object.keys(titleErrors).length || !!linkError }} />}
   </section>;
 }

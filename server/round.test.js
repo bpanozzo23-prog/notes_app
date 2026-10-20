@@ -327,3 +327,50 @@ it("checks versions before the guard, so a refused push never uses up a confirma
   // The confirmation is still unused, but it was bound to the original push, which still works.
   expect((await send({ ...changed, confirm: asked.body.confirm })).status).toBe(200);
 });
+
+it.each(OUTCOME_STEPS)("records kept and retires pending new-note siblings in one batch, recovering after %s", async (step) => {
+  const { proposalFilename } = await import("./proposals.mjs");
+  const pid = "p-new-fixture", hash = "a".repeat(64), siblingHash = "b".repeat(64);
+  const details = { generation: null, title: "New fixture", folderId: null, tags: [], why: "Fixture", body: "<p>New</p>" };
+  const versions = [
+    { ...details, proposal: pid, hash, status: "superseded" },
+    { ...details, proposal: pid, hash: siblingHash, status: "pending" },
+    { ...details, proposal: pid, hash: "c".repeat(64), status: "pending" },
+    { ...details, proposal: pid, hash: "d".repeat(64), status: "refused" },
+    { ...details, proposal: pid, hash: "e".repeat(64), status: "dismissed", outcome: { outcome: "dismissed", at: AT } },
+    { ...details, proposal: "p-other-new", hash, status: "pending" },
+    { ...details, proposal: pid, hash: "f".repeat(64), note: pid, basedOnRev: 1, status: "pending" },
+  ];
+  const filename = (record) => proposalFilename(record.proposal, record.hash);
+  for (const record of versions) await writeJson(f.context.store.file(`proposals/${filename(record)}`), record);
+  const item = { proposal: pid, hash, outcome: "kept", applied: [], at: AT };
+  let journal;
+  f.context.afterStep = async (name) => {
+    if (name === "journal") journal = await f.context.store.readJournal();
+    if (name === step) throw new Error("crash");
+  };
+  expect((await f.request("POST", "/v1/outcomes", [item, item])).status).toBe(503);
+  expect(journal.kind).toBe("outcomes");
+  expect(journal.payload.updates).toHaveLength(3);
+  expect(journal.payload.updates.map((u) => u.record.status)).toEqual(["kept", "superseded", "superseded"]);
+  for (const update of journal.payload.updates.slice(1)) expect(update.record.handledAt).toBe(AT);
+  const fresh = await f.restart();
+  expect((await f.request("POST", "/v1/outcomes", [{ ...item, outcome: "dismissed" }])).body.recorded).toEqual([{ proposal: pid, hash }]);
+  const saved = await Promise.all(versions.map((r) => readJson(f.context.store.file(`proposals/${filename(r)}`))));
+  expect(saved.map((r) => r.status)).toEqual(["kept", "superseded", "superseded", "refused", "dismissed", "pending", "pending"]);
+  expect(saved[0].outcome).toEqual({ outcome: "kept", applied: [], at: AT });
+  expect(f.git.commit).toHaveBeenCalledTimes(1);
+  expect(await fresh.store.readJournal()).toBeNull();
+});
+it.each([false, true])("preserves explicit outcomes for competing new-note versions in either batch order (%s)", async (reverse) => {
+  const { proposalFilename } = await import("./proposals.mjs");
+  const pid = "p-new-fixture", hashes = ["a".repeat(64), "b".repeat(64)];
+  for (const hash of hashes) await writeJson(f.context.store.file(`proposals/${proposalFilename(pid, hash)}`), {
+    proposal: pid, hash, generation: null, title: "Fixture", status: "pending",
+  });
+  const items = hashes.map((hash, i) => ({ proposal: pid, hash, outcome: i ? "dismissed" : "applied", applied: [], at: AT }));
+  expect((await f.request("POST", "/v1/outcomes", reverse ? items.toReversed() : items)).status).toBe(200);
+  for (const item of items) expect((await readJson(f.context.store.file(`proposals/${proposalFilename(pid, item.hash)}`))).outcome)
+    .toEqual({ outcome: item.outcome, applied: [], at: AT });
+  expect(f.git.commit).toHaveBeenCalledTimes(1);
+});

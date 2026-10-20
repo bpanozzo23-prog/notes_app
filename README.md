@@ -167,6 +167,14 @@ LLM can read. The code may become public; the notes never are.
   ticked ones together, with Undo (also in Settings → Sync); outcomes go back to the XPS.
   Owner-verified on the phone 2026-10-20 (partial Apply, Undo, a stale card, Dismiss, the new
   look); the two-window Undo is left for 4e.
+- **Phase 4d — new notes, Trash and Keep both from Claude Code, 0.4.2, 2026-10-20.** Claude Code
+  can also suggest a new note (with its folder, which can be a new one, and pictures already in
+  your notes), moving a note to Trash, and a new folder by name; the notes list says "Claude
+  Code has N suggestions". A note you edited after Claude Code read it gets **Keep both**, which
+  shows the copy and adds it beside your note as "… (from Claude Code)". Undo works as split's:
+  new notes to Trash, trashed notes back, nothing changed since overwritten. Contract in
+  `docs/PHASE-4-DIRECTION.md` "4d" (Codex-reviewed twice); plain-language summary in
+  `docs/DECISIONS-EXPLAINED.md` §78. Owner phone check pending.
 
 ## Running it
 

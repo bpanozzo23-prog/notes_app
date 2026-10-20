@@ -4,7 +4,7 @@ import path from "node:path";
 import { Store } from "./store.mjs";
 import { extractFileIds } from "./constants.mjs";
 import { keyFor, sha256, readJson, stableStringify, writeJson } from "./fsutil.mjs";
-import { readProposals } from "./proposals.mjs";
+import { recordKind, readProposals } from "./proposals.mjs";
 import { loadViewTemplates } from "./templates.mjs";
 import { withDirectory, readViewFile, writeViewFile, unlinkInDirectory } from "./view-fs.mjs";
 
@@ -58,13 +58,16 @@ export async function rebuildView({ storeDir, viewDir, templates, now = new Date
   const proposals = (await readProposals(storeDir)).map(({ record }) => {
     // No proposed bodies in this index. In particular it cannot re-expose a trashed note's text.
     const { proposal, hash, note, status, ingestedAt, sequence, handledAt, reason, outcome } = record;
-    const title = live.find((n) => n.id === note)?.title ?? "";
-    return Object.fromEntries(Object.entries({ proposal, hash, note, title, status, ingestedAt, sequence, handledAt, reason, outcome })
+    const kind = recordKind(record) ?? undefined;
+    const title = kind === "new" ? status === "pending" && record.generation === snapshot.meta.generation ? record.title : "New note" :
+      live.find((n) => n.id === note)?.title ?? "";
+    return Object.fromEntries(Object.entries({ proposal, hash, kind, note, title, status, ingestedAt, sequence, handledAt, reason, outcome })
       .filter(([, value]) => value !== undefined));
   });
   files.set("notebook/proposals.json", json(proposals));
   files.set("notebook/proposals-log.md", "# Proposal outcomes\n\n" + proposals.filter((p) => p.status !== "pending").map((p) =>
-    `- ${oneLine(p.outcome?.at ?? p.handledAt ?? p.ingestedAt)} · ${oneLine(p.title || "(note unavailable)")} · ${oneLine(p.status)}` +
+    `- ${oneLine(p.outcome?.at ?? p.handledAt ?? p.ingestedAt)} · ${p.kind === "new" ? "new note: " : p.kind === "trash" ? "to Trash: " : ""}` +
+    `${oneLine(p.title || "(note unavailable)")} · ${oneLine(p.status)}` +
     (p.reason ? ` · reason: ${oneLine(p.reason)}` : "") +
     ` · applied: ${(p.outcome?.applied ?? []).map(oneLine).join(", ") || "none"}\n`).join(""));
 

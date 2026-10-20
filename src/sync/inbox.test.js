@@ -80,7 +80,7 @@ it("applies partial ticks across several notes and the outbox in one transaction
   expect(plan.outbox.map(({ applied }) => applied)).toEqual([ticked.slice(0, 2), ticked.slice(2)]);
   const undo = (await db.prefs.get("claudeLastChange")).value;
   expect(undo.kind).toBe("xps"); expect(isClaudeChange(undo)).toBe(true);
-  expect(isClaudeChange({ ...undo, createdNotes: [{ id: "no", writtenRev: 1 }] })).toBe(false);
+  expect(isClaudeChange({ ...undo, createdNotes: [{ id: "no", writtenRev: 1 }] })).toBe(true);
   expect(isClaudeChange({ ...undo, notes: undo.notes.map((row) => ({ ...row, role: "content" })) })).toBe(false);
   await undoClaudeChange(result.changeId);
   expect(await db.notes.get(a.id)).toEqual({ ...a, rev: a.rev + 2 });
@@ -89,7 +89,7 @@ it("applies partial ticks across several notes and the outbox in one transaction
 });
 it("leaves already stale cards out but refuses the entire reviewed batch if a current card changes", async () => {
   const a = await createNote({ title: "A" }), b = await createNote({ title: "B" }), c = await createNote({ title: "C" });
-  const versions = [a, b, c].map((note, index) => proposalFixture(note, { title: `${note.title} new`, sequence: index }));
+  const versions = [a, b, c].map((note, index) => proposalFixture(note, { title: `${note.title} new`, sequence: index + 1 }));
   await updateNote(c.id, { title: "C local" });
   const cards = await build(versions), plan = inboxPlan(cards, allTicks(cards), null);
   expect(plan.notes.map(({ id }) => id)).toEqual([a.id, b.id]);

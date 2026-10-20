@@ -1350,3 +1350,47 @@ app", because Claude Code on the XPS is a separate path.
 notes, moving notes to Trash and new pictures are 4d, if you want them.
 
 **Lock-in: none.** It's presentation, plus a review that can only apply what you tick.
+
+### 78. Step 4d: new notes, Trash and Keep both from Claude Code (0.4.2)
+
+**What you'll see:**
+- **More kinds of suggestion.** In a `claude-notes` session, Claude Code can now suggest:
+  - **a new note**, with its title, text, tags and folder. The folder can be an existing one,
+    No folder, or a **new folder** by name. A new note may reuse a picture already in one of
+    your notes, never a new picture;
+  - **moving a note to Trash**, where it stays 30 days as usual.
+- **The notes list** now says "Claude Code has 3 suggestions · Review".
+- **In the review:**
+  - a new note is one card with one tick: its title in green (with Edit), its folder,
+    "(new folder)" if one would be created, its tags, the whole text, and where its links go;
+  - a Trash move is one red "Move to Trash" row, with "Show the note" and the notes that link to
+    it;
+  - a new folder is created only if you tick a change that uses it.
+- **Keep both.** When you edited a note after Claude Code read it, its amber card now has a
+  **Keep both** button. It shows you the exact copy first: Claude Code's version, titled
+  "… (from Claude Code)", in the folder your note is in. **Add as a new note** saves it beside
+  your note; nothing of yours changes.
+- **Undo** works as it does for split:
+  - new notes go to Trash, notes moved to Trash come back, edits go back, and a folder the change
+    created disappears if it's empty and still has its name;
+  - if you changed anything since, nothing is overwritten. You see a list first: your later
+    version stays, the earlier one comes back as a "(before Claude)" copy, and a new note you
+    kept working on stays.
+
+**Choices you made (20 October):** Claude Code picks a new note's folder; one tick per new note
+and per Trash move; Undo as split does; Keep both puts the copy beside your note. New notes are
+never pinned, and Claude Code still can't delete anything for good, rename or delete folders, or
+add pictures.
+
+**Safety added after Codex's two reviews:**
+- **What you see is what's saved.** Keep both saves exactly the copy its sheet shows. If
+  anything it depends on changed meanwhile, it asks you to look again.
+- **No doubles.** The phone remembers every suggestion you've applied, kept or dismissed, so two
+  open windows can't add the same note twice.
+- **Old app versions are safe.** The XPS shows the new kinds of suggestion only to 0.4.2, so an
+  older window can't show them as broken cards.
+- **Trash stays private.** The XPS stops showing a new note's title in Claude Code's list once
+  you've handled it, so a note you later moved to Trash doesn't stay readable there.
+
+**Lock-in: none.** No change to how notes are stored; the XPS keeps every suggestion in its
+history.

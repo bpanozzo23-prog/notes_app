@@ -144,3 +144,78 @@ it("removes the retired helper without following a link and recreates a missing 
   expect(await fs.readdir(view(""))).not.toContain("propose");
   expect(await fs.readdir(view("inbox"))).toEqual([]);
 });
+
+it("projects kinds and safe titles for every status, with no proposed body in the index or log", async () => {
+  const { writeJson } = await import("./fsutil.mjs");
+  const { proposalFilename } = await import("./proposals.mjs");
+  await seed();
+  const versions = [
+    ...["pending", "applied", "kept", "dismissed", "stale", "refused", "superseded"].map((status) => ({ status })),
+    { status: "pending", generation: "old-generation" },
+    { status: "pending", note: "note-1", title: "Proposed edit" },
+    { status: "dismissed", note: "note-1", trash: true },
+    { status: "dismissed", note: "trashed", trash: true },
+    { status: "applied", note: "absent" },
+  ].map((extra, i) => ({ proposal: `p-view-${String(i).padStart(3, "0")}`, hash: "a".repeat(64), sequence: i,
+    title: "PRIVATE PROPOSED TITLE", body: "PRIVATE PROPOSED BODY", generation: "generation-A", ingestedAt: AT, ...extra }));
+  for (const record of versions) await writeJson(f.context.store.file(`proposals/${proposalFilename(record.proposal, record.hash)}`), record);
+  await rebuild();
+  const index = await readJson(view("notebook/proposals.json"));
+  expect(index.map((p) => [p.kind, p.title])).toEqual([
+    ["new", "PRIVATE PROPOSED TITLE"], ...Array.from({ length: 7 }, () => ["new", "New note"]),
+    ["edit", "Fixture title"], ["trash", "Fixture title"], ["trash", ""], ["edit", ""],
+  ]);
+  expect(index.every((p) => !Object.hasOwn(p, "body"))).toBe(true);
+  const log = await fs.readFile(view("notebook/proposals-log.md"), "utf8");
+  expect(log).toContain("new note: New note · kept");
+  expect(log).toContain("to Trash: Fixture title · dismissed");
+  expect(log).toContain("to Trash: (note unavailable) · dismissed");
+  expect(log).not.toContain("PRIVATE PROPOSED");
+});
+it("hides handled new-note titles through Apply, Trash and purge, including a competing revision", async () => {
+  await seed();
+  const submit = async (title) => {
+    await fs.writeFile(view("inbox/p-new-view.html"), "<p>New fixture text</p>");
+    await fs.writeFile(view("inbox/p-new-view.json"), JSON.stringify({ generation: "generation-A", title,
+      folderId: null, tags: [], why: "Fixture" }));
+    await f.request("GET", "/v1/state?proposals=2");
+    return (await f.request("GET", "/v1/state?proposals=2")).body.proposals[0];
+  };
+  const first = await submit("First private title");
+  await submit("Competing private title");
+  expect((await readJson(view("notebook/proposals.json"))).map((p) => [p.status, p.title])).toEqual([
+    ["superseded", "New note"], ["pending", "Competing private title"],
+  ]);
+  expect((await f.request("POST", "/v1/outcomes", [{ proposal: first.proposal, hash: first.hash, outcome: "applied", at: AT }])).status).toBe(200);
+  const original = structuredClone(f.context.store.published.notes);
+  for (const deletedAt of [null, AT, "purged"]) {
+    const rows = deletedAt === "purged" ? original : [...original, note({ id: "created-note", title: "First private title",
+      deletedAt, rev: deletedAt === null ? 1 : 2 })];
+    expect((await f.request("POST", "/v1/push", await f.next(rows, { folders: f.context.store.published.folders,
+      files: [file()], tombstones: deletedAt === "purged" ? [{ id: "created-note", purgedAt: AT }] : [] }))).status).toBe(200);
+    const index = await readJson(view("notebook/proposals.json"));
+    expect(index.map((p) => [p.kind, p.status, p.title])).toEqual([["new", "applied", "New note"], ["new", "superseded", "New note"]]);
+    expect(await fs.readFile(view("notebook/proposals-log.md"), "utf8")).not.toContain("private title");
+  }
+});
+it("hides a pending new-note title when a push replaces the notebook generation", async () => {
+  expect((await f.request("POST", "/v1/push", push())).status).toBe(200);
+  await fs.writeFile(view("inbox/p-old-generation.html"), "<p>Private fixture</p>");
+  await fs.writeFile(view("inbox/p-old-generation.json"), JSON.stringify({ generation: "generation-A", title: "Old private title",
+    folderId: null, tags: [], why: "Fixture" }));
+  await f.request("GET", "/v1/state?proposals=2"); await f.request("GET", "/v1/state?proposals=2");
+  expect((await readJson(view("notebook/proposals.json")))[0].title).toBe("Old private title");
+  expect((await f.request("POST", "/v1/push", await f.next([note()], { generation: "generation-B" }))).status).toBe(200);
+  expect((await readJson(view("notebook/proposals.json")))[0]).toMatchObject({ kind: "new", status: "pending", title: "New note" });
+  expect(await fs.readFile(view("notebook/proposals-log.md"), "utf8")).not.toContain("Old private title");
+});
+it("gives a version refused for its shape no kind, since it was stored without details", async () => {
+  await seed();
+  await fs.writeFile(view("inbox/p-bad-tags.html"), "<p>Fixture</p>");
+  await fs.writeFile(view("inbox/p-bad-tags.json"), JSON.stringify({ note: "note-1", basedOnRev: 1, generation: "generation-A",
+    title: "Fixture title", folderId: null, tags: [" untrimmed"], why: "Fixture" }));
+  await f.request("GET", "/v1/state?proposals=2"); await f.request("GET", "/v1/state?proposals=2");
+  const [entry] = await readJson(view("notebook/proposals.json"));
+  expect(entry).toMatchObject({ proposal: "p-bad-tags", status: "refused", reason: "invalid-tags", title: "" });
+  expect(Object.hasOwn(entry, "kind")).toBe(false);
+});

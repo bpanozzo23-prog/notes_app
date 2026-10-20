@@ -9,6 +9,7 @@ import { HttpError, detectImage, fail } from "./validate.mjs";
 import { rebuildView } from "./view.mjs";
 import { scanInbox, enqueueInboxScan } from "./inbox.mjs";
 import { loadViewTemplates } from "./templates.mjs";
+import { proposalKind } from "./proposals.mjs";
 
 const METHODS = ["GET", "POST", "PUT", "DELETE"];
 const ALLOWED_HEADERS = ["authorization", "content-type"];
@@ -142,6 +143,9 @@ export function createHandler(context) {
     // fullPush tells a newly paired phone to send every row (the XPS compares content then).
     async function stateBody(proposals) {
       const device = await context.pairing.device();
+      const query = new URLSearchParams(typeof requestPath === "string" && requestPath.includes("?") ?
+        requestPath.slice(requestPath.indexOf("?") + 1) : "");
+      if (query.get("proposals") !== "2") proposals = proposals.filter((p) => proposalKind(p) === "edit" && !Object.hasOwn(p, "newFolder"));
       return { ...context.store.state(), fullPush: Boolean(device?.firstPushPending), proposals };
     }
   };
