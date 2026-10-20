@@ -84,7 +84,9 @@ backup); local-first in IndexedDB, works offline.
   store on the XPS with history and daily backups; Claude Code reads a rebuilt, locked-down view
   and proposes changes that the owner reviews and applies on the phone. A proposal for a note
   edited since Claude Code read it is refused and kept in the XPS history, so both versions
-  survive (an optional "Keep both" can follow). The Surface sharing the notebook is tabled.
+  survive; from 4d, Keep both also adds Claude Code's version as a separate note on the phone.
+  Claude Code can also propose new notes, moving a note to Trash and new folders (4d). The
+  Surface sharing the notebook is tabled.
 - "Collect" selection: tap several non-adjacent words, apply one formatting to all (mobile
   browsers cannot select non-contiguous ranges natively).
 - Comments / sticky notes attached to a passage, hidden by default.

@@ -165,7 +165,8 @@ LLM can read. The code may become public; the notes never are.
   Suggestions Claude Code writes on the XPS (`claude-notes`) arrive as "Claude Code suggests
   changes to N notes · Review": one card per note with its reason and Dismiss; Apply changes the
   ticked ones together, with Undo (also in Settings → Sync); outcomes go back to the XPS.
-  Owner phone check pending.
+  Owner-verified on the phone 2026-10-20 (partial Apply, Undo, a stale card, Dismiss, the new
+  look); the two-window Undo is left for 4e.
 
 ## Running it
 

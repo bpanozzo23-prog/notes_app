@@ -1527,3 +1527,53 @@ Append-only. One dated line per decision: what was decided, then why, after the 
 - 2026-10-20 — **4c released as 0.4.1** (schema 4): the new review look for every Claude review,
   and Claude Code's suggestions on the phone. No server change; the XPS service stays at its
   4a deploy. Owner's phone check pending.
+- 2026-10-20 — Owner's 4c phone check (published app 0.4.1, real `claude-notes` session):
+  suggestions for two notes arrived; review, unticking one change, Apply and Undo behaved; asked
+  again, a note edited on the phone before Apply showed the amber card and couldn't be applied
+  while the other applied; Dismiss worked. The new review look reads right on the phone in Tidy
+  and in Claude Code's suggestions. Not tried: Apply in one window with another open, then Undo
+  there (left for 4e's full phone check). — 4c is owner-verified apart from the two-window case;
+  the owner asked for 4d next.
+
+## Phase 4d — new notes, Trash moves, new folders and Keep both (2026-10-20)
+
+- 2026-10-20 — Owner's choices for 4d, all the recommended options: Claude Code sets a new note's
+  title, text, tags, reason and folder (an existing one, No folder, or a new folder by name) and
+  may reuse pictures already in live notes, never add one; new notes are never pinned. One tick
+  for a whole new note (its title keeps Edit) and one for a Trash move; a Trash proposal can't
+  also edit the note. Undo works as split's: a new note goes to Trash, trashed notes come back,
+  and nothing changed since is overwritten ("(before Claude)" copies instead). Keep both adds
+  Claude Code's version as a new note "… (from Claude Code)" in the folder the owner's note is in
+  now, with its own Undo and the outcome `kept`; not offered after an import. — One tick per new
+  note because there is no "before" to keep part of; Trash rather than deletion on Undo because
+  it can itself be undone; the copy beside the original because that is where the owner looks.
+- 2026-10-20 — Shapes: a new note is a file pair without `note`/`basedOnRev`; a Trash move is the
+  JSON file alone with `trash: true`; any edit or new note may carry `newFolder` (a name, with
+  `folderId: null`). A new-note pid stands for one proposed note: Claude Code revises it under the
+  same pid while it waits; once the owner handled it, `pid-used`. — Without a shell, Claude Code
+  can only write files; a body file for a Trash move would be meaningless, and a pid is the only
+  identity a not-yet-existing note has.
+- 2026-10-20 — Added by Claude Code, not asked for: the XPS lists new-note and Trash proposals
+  only to an app that asks for them (`GET /v1/state?proposals=2`). — A 0.4.1 window would show
+  them as broken cards that Dismiss would throw away. Codex's review moved this from "the last
+  push's app version" to a per-request parameter.
+- 2026-10-20 — Codex reviewed the 4d draft read-only (xhigh): 13 findings (1 P0, 5 P1, 7 P2), all
+  taken. P0: Keep both re-cleaned Claude Code's text with a wider picture rule than its card,
+  so it could save a picture or link shown as removed; now Keep both opens a sheet with the exact
+  copy and Apply writes exactly that, refusing if anything it depends on changed. P1s: a durable
+  record of handled versions (`syncHandled`) so two windows can't add the same note twice; the
+  per-request compatibility parameter; mixed Undo spelled out (roleless edits decided as split's
+  content note); folder reuse built from the resolved review (only real new folders are
+  "expected new"); new-note titles in `proposals.json` only while pending. P2s: a canonical hash
+  for body-less Trash versions; the complete `kept` outcome entry; typed pending keys; a renamed
+  created folder never deleted by Undo; `db.files` in every checking transaction and picture
+  retention tests; link destinations shown for new notes; the amended contract rules. A focused
+  second pass found 11 resolved and 2 partly, plus 6 more, all taken: no cap on the handled
+  record within a notebook generation (a sleeping window could act on an evicted entry); an
+  owner outcome retires pending sibling versions under its pid and titles show only for the
+  current generation; Keep both rechecks the source note's `rev`; `folderId` resolves by id and
+  only `newFolder` by name; Undo records written before 0.4.2 (without folder names) keep their
+  created folders; every Dismiss, stale included, is recorded as handled. — Each closes a
+  duplicate, a silent difference between review and write, or a leak of a trashed note's title.
+- 2026-10-20 — The owner approved the 4d contract (`docs/PHASE-4-DIRECTION.md` "4d"). BRIEF
+  Tier 4 now mentions Keep both and the new proposal kinds. — Next: run I (server), run J (app).

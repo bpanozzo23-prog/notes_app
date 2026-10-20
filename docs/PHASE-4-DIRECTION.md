@@ -49,22 +49,25 @@ These cut across every step.
    sync; a sync never blocks input or navigation (it runs outside `nav.run`); an XPS that is off,
    frozen or unreachable produces a status line, never a dialog in the middle of typing.
 2. **Nothing on the XPS writes to the phone's notes.** The only writes sync makes on the phone are
-   device-local preferences. A note changes only when the owner taps Apply on a reviewed proposal,
-   through `applyClaudeChanges` in one `writeTransaction` (generation and every `rev` checked,
-   all-or-nothing), or when the owner imports a backup through the existing Import preview.
+   device-local preferences. A note changes only when the owner taps Apply on a reviewed proposal
+   (or, from 4d, Add as a new note in a Keep both sheet), through `applyClaudeChanges` in one
+   `writeTransaction` (generation and every `rev` checked, all-or-nothing), or when the owner
+   imports a backup through the existing Import preview.
 3. **Claude Code's HTML is never trusted.** A proposed body is audited and cleaned on the phone:
    a pre-parse audit lists what the editor will drop *(Codex)*, then the Phase 3 pipeline
    (`fromClaudeHtml` with handle maps built from real ids, then `normalizeBody`) runs; images
-   resolve only to images already in that note; note links only to live notes, enforced again
-   inside Apply *(Codex)*. The XPS-side checks are a convenience for Claude Code, never a
+   resolve only to images already in that note (from 4d: for a new note, pictures referenced by
+   any live note; for Keep both, by any note on the phone); note links only to live notes,
+   enforced again inside Apply *(Codex)*. The XPS-side checks are a convenience for Claude Code, never a
    substitute.
 4. **Two places on the XPS, and only one is trusted.** The **private store**
    (`~/.local/share/notes_app-sync/`, mode 0700) holds exactly what the phone sent; Backups and
    Restore are built only from it. The **view** (`~/notes`) is rebuilt from the store for Claude
    Code; its files are read-only and are never read back into the store. The writable **inbox**
    is hostile ground *(Codex)*: the service only reads it (no symlinks followed, regular files
-   only, sizes capped), copies what it reads into the store as immutable proposal versions, and
-   never writes, renames or deletes anything there. A change made on the XPS can reach the phone
+   only, sizes capped), copies what it reads into the store as immutable proposal versions, never
+   writes or renames anything there, and deletes only the exact files it captured, after
+   recording them (4d wording, *Codex*). A change made on the XPS can reach the phone
    only as a proposal the owner approves.
 5. **Claude Code sessions on the notes are locked down and isolated** *(Codex)*. They start
    through a launcher that loads one complete policy and excludes the owner's other settings
@@ -90,7 +93,7 @@ These cut across every step.
    rounds; a journal left by a failure is resolved before anything else changes.
 10. **No schema change.** No new tables and no new note vocabulary: schema stays 4 and the backup
     format is unchanged. New state on the phone is device-local preferences (`syncAddress`,
-    `syncToken`, `syncOutbox`) plus in-memory status.
+    `syncToken`, `syncOutbox`, and from 4d `syncHandled`) plus in-memory status.
 11. **Tests, screenshots and checks never touch the real XPS service or the owner's notes.** The
     server's logic is a plain request handler tested on temporary folders; test setup makes a real
     `fetch` to `*.ts.net` throw; Playwright scripts fail closed on any request to it. The live
@@ -419,9 +422,9 @@ stored versions.
   card that is current; cards already stale are left out *(Codex)*. If anything goes stale between
   review and Apply, the whole Apply is refused and the screen refreshes, as in Phase 3.
 - **Stale:** a card whose note's `rev` or the generation no longer matches, or whose note is in
-  Trash or gone, says "This note changed after Claude Code read it" and offers only Dismiss.
-  Claude Code's version stays in the store, so both versions are kept (BRIEF §5's "conflicts keep
-  both copies", until 4d adds Keep both).
+  Trash or gone, says "This note changed after Claude Code read it" and offers only Dismiss
+  (from 4d, a stale edit card also offers Keep both). Claude Code's version stays in the store,
+  so both versions are kept (BRIEF §5's "conflicts keep both copies").
 - **Links:** for kind `"xps"`, Apply refuses a new note link whose target is not live inside its
   transaction *(Codex: Phase 3 allows links to notes in Trash; this kind doesn't)*.
 - **Undo** is Phase 3's single slot (`claudeLastChange`), its record marked `kind: "xps"`;
@@ -433,7 +436,7 @@ stored versions.
   waits. The XPS journals each outcome batch, updates the stored versions, and rebuilds
   `notebook/proposals.json` and `proposals-log.md`.
 - Code changes in `src/db/claudeChanges.js`: `isClaudeChange` accepts kind `"xps"` with the same
-  rules as kind `undefined` (no created or trashed notes in 4c); `checkPlan` gains the live-target
+  rules as kind `undefined` (no created or trashed notes in 4c; 4d widens this, below); `checkPlan` gains the live-target
   rule for kind `"xps"`; the outbox entry is written in the same transaction.
 
 ### The review look (4c, owner-approved 2026-10-20)
@@ -465,12 +468,258 @@ reviews and `sync-review`:
 - Merge, split and duplicates keep their content layout and adopt the bar and the banner.
 - The behaviour, plans and tick ids don't change; only presentation. Shots and tests follow.
 
-### 4d (optional, after the owner has used 4c)
+### 4d: new notes, Trash moves, new folders and Keep both (owner-approved 2026-10-20)
 
-New notes (a pair without `note`) and moving a note to Trash (`trash: true`),
-reusing the merge/split machinery for created and trashed notes and their Undo; a new folder by
-name; and **Keep both** on a stale card (adds Claude Code's version as a new note titled
-"… (from Claude Code)"). Specified in detail when the owner asks for it.
+Asked for by the owner after the 4c phone check. Claude Code can also propose **a new note**,
+**moving a note to Trash** and **a new folder by name**, and a stale edit card offers **Keep
+both**. Every change still waits for the owner's tap, goes through `applyClaudeChanges`, and can
+be undone. **Owner's choices (2026-10-20):** Claude Code picks a new note's folder (existing, No
+folder, or new by name) and may reuse pictures already in live notes, never add one; new notes
+are never pinned; one tick per new note and per Trash move, and a Trash proposal can't also edit
+the note; Undo works as split's (a new note goes to Trash, trashed notes come back, nothing that
+changed since is overwritten); Keep both adds Claude Code's version as "… (from Claude Code)" in
+the folder the owner's note is in now, not after an import. Codex reviewed this section twice,
+read-only (xhigh): 13 findings, then 6 more on the revision, all folded in and marked *(Codex)*
+and *(Codex 2)*. The rules above are amended where 4d changes them (rules 2, 3, 4 and 10; the 4c
+stale and `isClaudeChange` clauses).
+
+#### 4d.1 What Claude Code writes (three shapes)
+
+| Kind | Files | JSON fields (exactly these) |
+|---|---|---|
+| Edit (4c) | `inbox/<pid>.html` then `inbox/<pid>.json` | `note, basedOnRev, generation, title, folderId, tags, why`, optionally `newFolder` |
+| New note | `inbox/<pid>.html` then `inbox/<pid>.json` | `generation, title, folderId, tags, why`, optionally `newFolder` (no `note`, no `basedOnRev`) |
+| Move to Trash | `inbox/<pid>.json` **alone** | `note, basedOnRev, generation, trash, why` with `trash: true` |
+
+- The kind comes from the shape: a `trash` key → Trash; no `note` → new note; otherwise edit.
+- **`newFolder`** is a folder name (trimmed; the app's safe-text rule: 1–512 characters, no
+  control characters, not blank), allowed only with `folderId: null`: "put the note in a new
+  folder of this name". A folder is created on Apply only if a ticked change uses it; ticked
+  changes naming the same folder (ignoring case) create one folder.
+- **A new-note pid is one proposed note** *(Codex)*. Claude Code revises a pending new note by
+  writing it again under the same pid; once the owner has handled it (added, kept, dismissed),
+  that pid can't propose another new note.
+- **Pictures:** an edit keeps 4c's rule (only pictures already in that note); a new note may use
+  pictures referenced by any live note. Neither may add a picture.
+- **Links:** to live notes only (as 4c), for edits and new notes.
+- Limits as 4c: body ≤ 512 KB, details ≤ 16 KB, title ≤ 200, tags ≤ 50, `why` ≤ 300, 50 pending.
+
+#### 4d.2 On the XPS (`server/proposals.mjs`, `server/inbox.mjs`, `server/view.mjs`, `server/validate.mjs`, `server/handler.mjs`)
+
+- **Shape check per kind** (`proposalProblem`): the exact field set for that kind; `trash` must be
+  literally `true`; `newFolder` only with `folderId: null`, else `invalid-folder`.
+- **A Trash file arrives alone.** A lone `<pid>.json` is read once it has been unchanged across
+  two scans (the stability rule pairs use). Parsed JSON with a `trash` key is a Trash proposal:
+  complete if its shape is right, refused `invalid-shape` at once if not. Any other lone JSON
+  (including unparseable) keeps waiting as half a pair (refused after 10 minutes, as now). A
+  Trash JSON with a `<pid>.html` beside it is refused `trash-with-body`, also when the HTML
+  appears between the two observations.
+- **Hashes** *(Codex)*: edits and new notes hash the canonical details plus `body`, as 4c; a
+  Trash version hashes its canonical details alone (no `body` key at all), so key order and
+  whitespace never make a new version or revive a handled one.
+- **Checks against the private store** (`referenceProblem`), per kind:
+  - Edit: 4c's checks, plus `folder-exists` when `newFolder` names an existing folder (ignoring
+    case): Claude Code should use its id.
+  - New note: `generation` matches (`changed-since-read`); `folderId` exists or is null
+    (`unknown-folder`); `folder-exists`; links to live notes (`unknown-note-link`); pictures
+    only those referenced by a live note (`new-image`); `pid-used` when the owner already
+    handled a new-note version under this pid (an outcome `applied`, `kept`, `dismissed` or
+    `stale`; a refusal or superseding doesn't count) *(Codex 2)*.
+  - Trash: the note exists (`unknown-note`), isn't in Trash (`note-in-trash`), `basedOnRev` and
+    `generation` match (`changed-since-read`).
+- **Superseding:** an edit or Trash version supersedes the pending version for the same note,
+  whichever kind it was; a new-note version supersedes the pending new-note version with the
+  same pid. A refusal never supersedes. The 50-pending limit counts every kind. When an owner
+  outcome is recorded for a new-note version, any other pending new-note version with that pid
+  becomes `superseded` in the same journalled batch *(Codex 2)*.
+- **Stored versions** keep 4c's form; Trash versions have no body.
+- **`notebook/proposals.json`** gains `kind` (`edit`, `new`, `trash`). A new-note entry shows its
+  proposed title **only while pending and from the store's current generation**; otherwise it
+  says "New note", so a note that was added and later moved to Trash or deleted, or one from a
+  replaced notebook, never leaves its title readable there *(Codex, Codex 2)*.
+  The log names the kind the same way.
+- **Outcomes** gain `kept` (Keep both) besides `applied`, `dismissed`, `stale`.
+- **Older apps** *(Codex)*: the app asks `GET /v1/state?proposals=2`. Without that parameter the
+  answer lists only 4c-shaped edits (no new notes, no Trash moves, no edit with `newFolder`), so
+  a 0.4.1 window can't misread them, whatever another window pushed.
+
+#### 4d.3 On the phone — reading suggestions (`src/sync/inbox.js`, `src/sync/client.js`)
+
+- Rule 3 holds: the phone re-checks each shape and treats a failed check as 4c's unreadable card
+  (Dismiss only).
+- `pendingProposals` keys edits and Trash moves as `["note", id]` (latest wins, as 4c) and new
+  notes as `["new", pid]`, so a note id can never collide with a pid *(Codex)*; version identity
+  stays `(proposal, hash)`.
+- **Handled versions stay handled** *(Codex)*: a new device-local preference `syncHandled` keeps
+  `{ proposal, hash, pid (new notes), generation, outcome }` for every version this phone
+  applied, kept or dismissed (stale Dismiss included), written in the same transaction as the
+  outcome and kept after the XPS acknowledges it. Every entry of the current generation is kept
+  (no cap, so a window left asleep can't act on an evicted one); entries of other generations
+  are dropped on the next write, since a card from a replaced notebook can never create
+  anything *(Codex 2)*. Never exported, never synced, doesn't start a sync, survives an import
+  like the outbox. A handled version never shows again; a new-note version whose pid was
+  already handled in this generation shows "You already added this note." (or "You already
+  dismissed this note.") with Dismiss.
+- **Folder resolution** *(Codex, Codex 2)*: `folderId` resolves by id (`null` = No folder);
+  only `newFolder` resolves by name: to *existing* when exactly one folder has that name
+  (ignoring case), to *create* when none does; two such folders make the card unreadable.
+  Shown as "(new folder)" only when it will be created. A reused name is rechecked inside Apply
+  (still exactly one folder of that name, the same one).
+- **Edit model:** 4c's, with the resolved folder.
+- **New-note model** (`newNoteModel`, also used by Keep both): the body goes through the
+  pre-parse audit, `fromClaudeHtml` (note handles: live notes; image handles: pictures
+  referenced by live notes on this phone) and `normalizeBody`; it must have text or a picture;
+  title, tags and folder checked as above; its links (note targets and web addresses) listed as
+  `ChangeRow` lists them. One tick id `<pid>:<hash>:note`. Stale only when the generation differs.
+- **Trash model:** the note, its current body for "Show the note", and the live notes that link
+  to it. One tick id `<pid>:<hash>:trash`. Stale as 4c (rev, generation, Trash, gone).
+- **Keep both model** *(Codex, Codex 2)*: built from a fresh read when the sheet opens, by
+  `newNoteModel` from Claude Code's raw body, with image handles = pictures referenced by any
+  note on this phone (live or in Trash, which keeps the pictures of a note that is itself in
+  Trash) and note handles = live notes; title, tags and folder as in 4d.5. It records what it
+  depends on: the source note's `rev` (or that it is gone), each folder, link target and
+  picture. Offered on a stale edit card that is readable and whose generation is the phone's
+  current one.
+
+#### 4d.4 On the phone — the review (`src/components/review/`, `src/screens/SyncReview.jsx`)
+
+In the approved look (compact rows, real checkboxes with 44 px targets, the sticky Apply bar):
+
+- **New note** (`NewNoteRow`, in a card headed by the new note's title or first line): one row,
+  label "New note · N words"; inside, the title in green with **Edit** (as `TitleRow`), the
+  folder ("Recetas (new folder)" or an existing name, or "No folder"), tag chips (+ green), the
+  formatted body (`ReadOnlyBody`) on a green edge, and its links: "Links to: Note title ·
+  https://…" *(Codex)*. Claude Code's reason under the card title, as 4c.
+- **Move to Trash** (`TrashRow`, in the note's card): one row, label "Move to Trash" in the
+  delete red; "It stays in Trash for 30 days. Undo, or Restore in Trash, brings it back.";
+  "Linked from: A, B (their links stay)" when other notes link to it; "Show the note" folds the
+  current body.
+- **New folder:** `FolderRow`'s existing "(new folder)" variant, now used by sync-review for
+  edits, and inside `NewNoteRow`. No tick of its own.
+- **Keep both** (`StaleBanner`'s existing button slot, as Phase 3's Ask again): the amber text
+  becomes "You edited this note after Claude Code read it, so this suggestion can't be applied.
+  Keep both adds Claude Code's version as a separate note." and the button **Keep both** opens a
+  sheet showing exactly the copy that will be saved *(Codex)*: title, folder, tags, the body
+  with its links, and "Removed by the editor" if anything was dropped, with **Add as a new note**
+  and Cancel (Android Back closes the sheet). Dismiss stays in the card header. Other stale
+  sentences: a Trash card "This note changed after Claude Code read it, so moving it to Trash
+  can't be applied."; a card whose notebook was replaced "The notebook was replaced since Claude
+  Code wrote this, so it can't be applied." (both Dismiss only).
+- **Wording:** the notes-list bar becomes "Claude Code has N suggestions · Review" ("1
+  suggestion"); the review's intro "N suggestions · from Claude Code on the XPS" and "Nothing
+  changes until you tap Apply or Add as a new note. Undo works afterwards." The Apply label stays
+  "Apply N changes to M notes" (a new note counts as one change and one note).
+- **A link into Trash:** if a ticked change adds a link to a note that a ticked Trash move sends
+  to Trash, Apply is disabled with "A ticked change links to “X”, which you're moving to Trash.
+  Untick one of them." (like a title error), and Apply refuses it too.
+
+#### 4d.5 Apply, Keep both and Undo (`src/sync/plan.js`, `src/db/claudeChanges.js`, `src/components/ClaudeUndo.jsx`)
+
+- **Plan (`inboxPlan`)**, kind `"xps"`, built from the resolved review models *(Codex)*: ticked
+  edits → `notes` (no role); ticked Trash → `notes` with `role: "trashed"`, patch
+  `{ deletedAt: now }`; ticked new notes → `createNotes` `{ id: newId(), title, html, tags,
+  folderId }`. Only ticked changes whose folder resolved to *create* go into `createFolders`
+  (one per name, first spelling wins, every use rewritten to it) and `expectedNewFolders`; every
+  existing folder used, and each changed note's current folder, go into `folderChecks`. If a
+  folder of that name appears between review and Apply, Apply is refused, the cards rebuild
+  showing the existing folder, and the owner taps Apply again. Outbox `applied` entries with
+  the ticked ids and the `syncHandled` entries, in the Apply transaction.
+- **Keep both (`keepBothPlan`)** writes exactly the sheet's copy *(Codex)*: `{ kind: "xps",
+  generation, notes: [], createNotes: [copy], folderChecks, outbox: [{ proposal, hash,
+  outcome: "kept", applied: [], at }] }` *(Codex: complete entry)*, plus `syncHandled`. The copy:
+  title `"<base> (from Claude Code)"`, base = the proposed title, else the note's current title,
+  else "Untitled", shortened so the whole stays ≤ 200 characters; the proposal's tags; the folder
+  the owner's note is in now (No folder if the note or folder is gone); the sheet's cleaned body.
+  The plan carries `sourceCheck: { id, rev | null }`; Apply refuses if the source note's `rev`
+  (or its absence), a folder, a link target or a picture changed since the sheet opened, and the
+  owner must open and confirm the sheet again; nothing is cleaned again silently *(Codex 2)*. Success shows "Added “X (from Claude
+  Code)”." with Undo; like any Apply it replaces the single Undo slot.
+- **`checkPlan` for kind "xps":** `notes` may be empty only when `createNotes` isn't; no plan
+  outbox identity or new-note pid is already in `syncHandled` *(Codex)*; every picture a created
+  note uses exists in `db.files`, with `db.files` (and `syncHandled`'s preference) inside every
+  transaction that runs the check, `claudePlanIsCurrent` included *(Codex)*; a new link may not
+  point to a note the same plan moves to Trash; a reused folder name still matches exactly that
+  one folder; Keep both's `sourceCheck` holds *(Codex 2)*; everything else as 4c.
+- **`applyClaudeChanges`:** "nothing to apply" counts created notes too. Every Undo record it
+  writes, of any kind, gains `createdFolderNames` beside `createdFolders` *(Codex)*.
+  `isClaudeChange` accepts records without it (written before 0.4.2); for those, Undo keeps the
+  folders it created, since their original names are unknown *(Codex 2)*.
+- **`isClaudeChange` for kind "xps":** entries without a role are edits (fields only title,
+  html, folderId, tags); entries with `role: "trashed"` change exactly `deletedAt` on a note
+  that wasn't in Trash; `createdNotes` pass split's checks (unique ids, disjoint from `notes`);
+  `notes: []` only with at least one created note; `trashedNotes` match the trashed entries; no
+  other roles. Edits-only records are unchanged from 4c.
+- **Undo:** an xps record with created or trashed notes goes through `undoMovedNotes`; roleless
+  edits are treated as split's content note for decisions without gaining a stored role
+  *(Codex)*. As left (every note exactly as Apply left it) → new notes to Trash (out of a folder
+  the change created), trashed notes back, edits restored. Otherwise nothing is overwritten,
+  with the displayed-decision recheck as now: every edited note keeps its current version and
+  its earlier version comes back as a "(before Claude)" copy; every created note stays as it
+  is; a trashed note comes out of Trash, is left if already back, or comes back as a copy if it
+  was deleted for good; created folders stay. Either way a created folder is removed only if no
+  note (Trash included) uses it and it still has its original name *(Codex)*. An edits-only xps
+  record keeps 4c's path. `restoreClaudeCopies` refuses moved-note records.
+- **`ClaudeUndo`:** for these records the confirmation says, for example, "2 new notes move to
+  Trash, “X” comes back from Trash, 1 note gets its earlier version back. If notes changed since,
+  nothing is overwritten: you'll see what Undo can do first."; the conflict heading "Some notes
+  changed after Claude Code's change."; done "Claude Code's change undone."
+
+#### 4d.6 Claude Code's instructions (`server/view/CLAUDE.md`)
+
+The three shapes with one example each; `newFolder`; pictures for new notes; revising a pending
+new note under its pid, and a fresh pid for each further new note; Trash is the JSON alone;
+statuses including `kept` ("the owner kept your version as a separate note"); the new refusals
+(`folder-exists`, `trash-with-body`, `pid-used`) and `new-image` for new notes; never delete for
+good, rename or delete folders, or add pictures. The outdated "In Phase 4c the phone will
+check…" sentence goes. Deploying rebuilds the view, so `~/notes/CLAUDE.md` updates itself.
+
+#### 4d.7 Not in 4d
+
+Deleting notes for good, renaming or deleting folders, adding pictures, pinning, settings; edits
+using another note's pictures; Codex access (unchanged).
+
+#### 4d.8 Verification added to the contract
+
+- **Server tests:** each shape accepted; every new refusal; a lone Trash JSON taken after two
+  stable scans, replayed canonically (reformatted JSON is the same version), recovered after an
+  interruption, left alone if changed during cleanup; an HTML companion appearing between
+  observations; a lone non-Trash JSON still timing out; superseding by note across edit/Trash
+  and by pid for new notes; `pid-used` (owner outcomes only); an outcome retiring pending
+  siblings under its pid; `kept` through `validateOutcomes` and `recordOutcomes`;
+  `proposals.json` kind, pending-only, current-generation titles (Apply → Trash → purge, a
+  competing version, and notebook replacement);
+  `GET /v1/state` with and without `proposals=2`, including an old request after a 0.4.2 push and
+  an edit with `newFolder`.
+- **App tests:** models per kind and the phone's own shape refusals; typed pending keys (a note
+  id equal to a pid); `syncHandled` (two windows applying the same new note: one note, one Undo;
+  delayed acknowledgement; competing versions under one pid; a window asleep through many later
+  outcomes; stale Dismiss recorded; old-generation entries dropped); folder resolution (by id,
+  reuse by name, a folder appearing during review, two matches, an unticked folder change);
+  `createdFolderNames` on new records of every kind and its absence on older tidy, links,
+  merge, split and xps records; Keep both refused after the source note changes folder or
+  title; a mixed plan (edit + new
+  note in a new folder + Trash) in one transaction; `checkPlan`'s new rules; `isClaudeChange`
+  xps cases and refusal of other roles; Undo for new-only, Trash-only and mixed records, as left
+  and with one changed entry beside unchanged ones, a renamed created folder kept; pictures
+  (an image-bearing new note current; a picture removed between review and Apply; rollback
+  keeping image marks; a new note keeping a picture after its original note is purged; Undo
+  moving it to Trash; a trashed original purged after 30 days coming back from Undo with its
+  pictures); Keep both (sheet equals what is saved, the `kept` entry reaching the real handler
+  and draining, its Undo); two bodies with the same words but different link targets; the
+  link-into-Trash refusal; rows' rendering, keyboard ticks and Back.
+- **Checks:** `sync-check` server part (shapes, refusals) and browser part (a mixed Apply, Undo,
+  Keep both through real files); shots 185 onward: list bar, new-note card, Trash card, new
+  folder on an edit, stale card with Keep both, the Keep both sheet, after Keep both, the mixed
+  Undo confirmation and its decision list.
+- **Phone checklist (owner, in a `claude-notes` session, published 0.4.2):**
+  1. Ask Claude Code for a new note in a new folder, to move a note to Trash, and to move another
+     note into an existing folder. Open the app: "Claude Code has 3 suggestions · Review".
+  2. Untick the folder move; Apply. The new note is in the new folder; the other note is in Trash.
+  3. Undo: the new note goes to Trash, the trashed note comes back, the new folder disappears.
+  4. Ask for an edit to a note, then edit that note on the phone first. On the amber card tap
+     Keep both, check the sheet, Add as a new note: "… (from Claude Code)" sits beside your
+     note. Ask Claude Code to read `notebook/proposals.json`: it says `kept`.
+  5. If there's time, 4c's two-window Undo.
 
 ### Claude Code in `~/notes`
 
@@ -636,8 +885,8 @@ server/*.test.js          `// @vitest-environment node`
 - The Surface or any second device sharing the notebook; any change applied without the owner's
   tap.
 - Codex reading the notes (a rule change in AGENTS.md and the view's AGENTS.md, if the owner asks).
-- Claude Code adding images, renaming or deleting folders, deleting notes for good, editing
-  settings, toolbar or styles; new notes and Trash until 4d.
+- Claude Code adding images, renaming or deleting folders, deleting notes for good, pinning,
+  editing settings, toolbar or styles; edits using another note's pictures.
 - Any copy beyond the XPS (encrypted cloud backup): BRIEF §6.
 - Obsidian or another viewer; per-note Markdown files (the view can be relaid out later).
 - Erasing a note from the XPS history (manual, on request).
@@ -688,7 +937,9 @@ published app.**
    Apply, check the notes, Undo; ask again, edit one of the notes on the phone before applying
    (its card is refused, the other applies); Dismiss one; Apply in one window while another is
    open, then Undo there *(Codex)*.
-4. **4d — new notes and Trash (0.4.2), only if the owner asks after using 4c.**
+4. **4d — new notes, Trash moves, new folders and Keep both (0.4.2)**, asked for by the owner
+   after using 4c and specified in "4d" above. Run I (server), run J (app).
+   *Phone:* the checklist at the end of "4d".
 5. **4e — closeout.** Codex reviews `git diff phase-4-base...HEAD` read-only (xhigh) against
    this document (`phase-4-base` = a local tag on the commit that adds this file); fixes; README;
    `DECISIONS-EXPLAINED.md`; BRIEF amendments checked; the owner's full phone check.
