@@ -1427,3 +1427,20 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   folders, 2 pictures, none missing, history recording, no journal left; the request log showed
   only 200/204 answers. The owner confirmed the counts match the phone. — The XPS is now an
   automatic backup of the real notebook.
+- 2026-10-20 — The owner keeps both Claudes: the in-app one (API key) for quick work on the note
+  in hand, questions with tappable sources, merge and split, and whenever the XPS is down; Claude
+  Code on the XPS (subscription) for longer, conversational work across many notes. — They
+  differ in cost, reach and availability; the in-app one costs nothing when unused.
+- 2026-10-20 — Correction: a locked-down note session sees only `~/notes`, so Claude Code can't
+  "connect notes to other projects" there, as the discussion on 2026-10-19 suggested. Read access
+  to a named folder would be a deliberate policy change. — `--restricted` confines the file
+  tools to the working directory.
+- 2026-10-20 — 4c starts with a redesign of the shared review parts, used by both the Tidy review
+  and the new XPS review, so they share one look and one phone check. Mockups at phone size (in
+  `private-data/mockups/`): inline word changes (struck red, added green) instead of repeated
+  Before/After blocks, with "Show before and after" on demand; one compact row per change with a
+  tick, a small label ("Text · 4 words", "now a bulleted list") and Claude's reason; tags as
+  added/removed chips; the new title first with "was: …" and Edit; a sticky bottom bar with
+  Apply (and Discard); per-note cards with Dismiss for the XPS; a clear amber banner and greyed,
+  disabled rows for a changed-since-read note. — The owner asked for a better review screen; the
+  current one repeats each paragraph twice and puts the actual changes in small print.
