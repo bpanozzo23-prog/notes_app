@@ -1047,3 +1047,48 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   read-only and conflict-notice shots checked), `npm run browser-checks` (15/15). No real Claude
   request: no Claude code changed. The owner approved the look from before/after screenshots
   (note top, a short window imitating the open keyboard, both sheets): "Looks good".
+
+## Phase 4 — sync to the XPS (discussed 2026-10-19)
+
+- 2026-10-19 — Owner answers before planning: Claude Code on the XPS should both read the notes
+  and change them; the same notebook on the Surface is wanted but tabled if it needs full two-way
+  sync; the notes may sit readable on the XPS (plain ext4, no disk encryption, readable by every
+  program running as `brent`) since that is what lets Claude read and write them; Codex may be
+  given access later, not now. — The choices the repo could not answer. They rule out a
+  read-only mirror and point to the middle level discussed (a mirror on the XPS plus an inbox of
+  proposed changes the owner approves on the phone), planned next.
+- 2026-10-19 — Claude Code's changes wait for the owner's tap on the phone (review, Apply, Undo),
+  not applied automatically with Undo; the owner's choice. — Keeps Phase 3's "nothing changes
+  without approval": a mistake is never in the notes before it has been seen.
+- 2026-10-19 — Plan approved: one-way sync from the phone (the one true copy) to the XPS, plus an
+  inbox of proposals. The XPS keeps a private exact copy outside `~/notes` (history in a local git
+  repository with no remote, daily backups; Backups and Restore come only from it) and rebuilds
+  `~/notes` as a read-only view where Claude Code reads and proposes, in sessions locked down by a
+  settings file (no web, no connectors, sandboxed shell, writes only to `inbox/`). Rounds carry the
+  notebook generation and apply atomically; a note may vanish from the XPS copy only with a
+  tombstone, otherwise the app asks first. Inbox edits to existing notes come first (4c); new notes
+  and Trash are optional (4d). A user service with linger, deployed from a committed copy. Steps:
+  spike, contract (`docs/PHASE-4-DIRECTION.md`, Codex-reviewed), 4a–4e. — A planning review of
+  the first draft found that mirror files Claude Code can edit would reach the phone through a
+  backup or Restore without approval, that a note's `rev` alone does not identify a version after
+  an import, and that a session with web tools could send notes elsewhere; the design closes each.
+- 2026-10-19 — No Obsidian (or other Markdown viewer) for now. — The XPS has no screen, so a
+  viewer needs another way to move files to the Surface; Markdown cannot hold the notes'
+  formatting; and a second place to edit would bypass approval. `~/notes` is rebuilt from the
+  private copy, so an Obsidian-style layout later costs nothing.
+- 2026-10-19 — Spike before the contract: a throwaway page `public/sync-spike.html` on the
+  published site and a throwaway endpoint (`tailscale serve --https=8443` →
+  `127.0.0.1:8790`, tmux session `notes-spike`, log in `private-data/sync-spike/`). The page
+  sends only test bytes and timings; it names the XPS's tailnet address, which is already public
+  through the certificate logs Tailscale's HTTPS certificates are published in and reachable only
+  from the owner's devices. — Whether the published HTTPS app can reach the XPS decides the
+  architecture. Both are removed after the test.
+- 2026-10-19 — Headless Chromium 156 (Playwright 1.64) treats the Tailscale address as Chrome's
+  `local` address space: a fetch from `https://bpanozzo23-prog.github.io` fails ("Permission was
+  denied for this request to access the `local` address space", seen by the page only as "Failed
+  to fetch") until `local-network-access` is granted. Granted, simple and preflighted requests and
+  1 MB and 8 MB uploads succeed (8 MB in about 1.6 s on the XPS itself), and Tailscale Serve
+  passes the caller's tailnet identity. `navigator.permissions.query` reports the state under
+  `local-network-access`, `local-network` and `loopback-network`. — On the phone, Chrome should
+  ask once; the app must read the permission state to explain a refusal, which otherwise looks
+  like a network failure. Phone results follow.
