@@ -1,8 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
 import { randomBytes } from "node:crypto";
-import { keyFor, stableStringify } from "./fsutil.mjs";
+import { isEntryPoint, keyFor, stableStringify } from "./fsutil.mjs";
 import { MAX_JSON_BYTES, MAX_PROPOSAL_BYTES, isSafeId } from "./constants.mjs";
 import { MAX_BODY_BYTES, PENDING_NAME, proposalHash, proposalProblem, referenceProblem } from "./proposals.mjs";
 import { readViewFile, withDirectory, writeInDirectory, unlinkInDirectory, readRegular, refuse } from "./view-fs.mjs";
@@ -149,6 +148,6 @@ export async function propose(args = process.argv.slice(2), {
     return 1;
   }
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isEntryPoint(import.meta.url)) {
   process.exitCode = await propose();
 }

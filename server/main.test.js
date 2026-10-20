@@ -116,3 +116,21 @@ it("uses execFile arguments for Tailscale, and the HTTP adapter refuses non-loop
   ]);
   expect(() => createServer(() => {}, { listen: "0.0.0.0" })).toThrow("invalid-listen");
 });
+
+it("runs as a program when reached through a symlink, as the deployed service is", async () => {
+  const { execFile } = await import("node:child_process");
+  const { promisify } = await import("node:util");
+  const fsp = await import("node:fs/promises");
+  const os = await import("node:os");
+  const pathModule = await import("node:path");
+  const root = await fsp.mkdtemp(pathModule.join(os.tmpdir(), "notes-sync-entry-"));
+  try {
+    const link = pathModule.join(root, "current");
+    await fsp.symlink(pathModule.resolve("server"), link);
+    // An unknown command proves main() ran: it refuses with a JSON error and exit code 1.
+    const result = await promisify(execFile)(process.execPath, [pathModule.join(link, "main.mjs"), "no-such-command"],
+      { env: { ...process.env, NOTES_SYNC_CONFIG: pathModule.join(root, "missing.json") } }).catch((error) => error);
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain('"error"');
+  } finally { await fsp.rm(root, { recursive: true, force: true }); }
+});

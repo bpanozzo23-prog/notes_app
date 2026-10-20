@@ -5,10 +5,10 @@ import path from "node:path";
 import net from "node:net";
 import { spawn, execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 import assert from "node:assert/strict";
-import { keyFor, readJson, sha256 } from "../server/fsutil.mjs";
+import { isEntryPoint, keyFor, readJson, sha256 } from "../server/fsutil.mjs";
 import { EXPORTED_PREFS, extractFileIds } from "../server/constants.mjs";
 import { IMAGE_EXT } from "../server/view.mjs";
 import { openStore } from "../server/store.mjs";
@@ -190,6 +190,6 @@ export async function syncCheck(args = process.argv.slice(2), print = (s) => pro
     await fs.rm(root, { recursive: true, force: true });
   }
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isEntryPoint(import.meta.url)) {
   syncCheck().catch(() => { process.exitCode = 1; });
 }

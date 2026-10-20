@@ -1,12 +1,11 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { pathToFileURL } from "node:url";
 import { createContext, createHandler } from "./handler.mjs";
 import { loadConfig, validateConfig } from "./config.mjs";
 import { createGit, initStore } from "./store.mjs";
 import { createPairing } from "./pairing.mjs";
 import { createServer } from "./http.mjs";
-import { mkdir, removeTemps } from "./fsutil.mjs";
+import { isEntryPoint, mkdir, removeTemps } from "./fsutil.mjs";
 import { resolveJournal, retryHistory } from "./round.mjs";
 import path from "node:path";
 
@@ -121,7 +120,7 @@ export async function main(args = process.argv.slice(2), overrides = {}) {
     default: throw new Error("unknown-command");
   }
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isEntryPoint(import.meta.url)) {
   main().catch((error) => {
     // Never print child-process stderr or arbitrary exception messages: they can contain data.
     const safe = ["invalid-config", "invalid-config-paths", "git-remote", "funnel-unreadable", "funnel-enabled", "unknown-command"];

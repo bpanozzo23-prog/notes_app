@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
-import { constants } from "node:fs";
+import { constants, realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 
@@ -60,4 +61,11 @@ export async function removeTemps(directory) {
     if (entry.isFile() && entry.name.startsWith(TEMP_PREFIX)) await removeFile(path.join(directory, entry.name));
     else if (entry.isDirectory() && entry.name !== ".git") await removeTemps(path.join(directory, entry.name));
   }
+}
+// True when this module is the program being run, also when it is reached through a symlink
+// (the deployed service runs …/current/server/main.mjs; Node resolves `current` itself).
+export function isEntryPoint(metaUrl, argv1 = process.argv[1]) {
+  if (!argv1) return false;
+  try { return realpathSync(argv1) === realpathSync(fileURLToPath(metaUrl)); }
+  catch { return false; }
 }

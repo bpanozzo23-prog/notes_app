@@ -7,7 +7,7 @@ import { promisify } from "node:util";
 import { pipeline } from "node:stream/promises";
 import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
-import { atomicWrite, mkdir, readJson, syncDirectory } from "../server/fsutil.mjs";
+import { atomicWrite, isEntryPoint, mkdir, readJson, syncDirectory } from "../server/fsutil.mjs";
 import { renderTemplate } from "../server/templates.mjs";
 import { validateConfig } from "../server/config.mjs";
 
@@ -223,7 +223,7 @@ export async function deploy(args = process.argv.slice(2), {
   }
   return actions;
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isEntryPoint(import.meta.url)) {
   deploy().catch((error) => {
     const safe = /^[a-z][a-z -]{1,100}$/.test(error.message) ? error.message : "deployment-failed; current version kept for diagnosis";
     process.stderr.write(`Refused: ${safe}\n`);
