@@ -1295,3 +1295,19 @@ Append-only. One dated line per decision: what was decided, then why, after the 
 - 2026-10-20 — Run C reviewed by Claude Code; verification before redeploying: `npm test` (77
   files, 1,795 tests), `npm run sync-check` (10/10, including timer ingestion of a file pair, a
   `changed-since-read` refusal and superseding), all on temporary data.
+- 2026-10-20 — Deployed `6fc3006`; then the final lock-down test in real sessions, with a
+  deliberately permissive `~/notes/.claude/settings.local.json` in place (allow
+  `Edit(/notebook/**)`, `Bash`, `WebFetch`; `acceptEdits`; sandbox off; a SessionStart hook):
+  `claude-notes` sessions had exactly Edit, Glob, Grep, Read and Write, `dontAsk`, no MCP
+  servers; `CLAUDE.md` loaded; the hook never ran; Read was refused for a sentinel in
+  `~/.config/notes_app-sync/` and for `~/.ssh/`; Read of the notebook and Write into `inbox/`
+  worked. With `CLAUDE.md` loaded, Claude Code declined even to attempt the forbidden writes; the
+  same launcher flags and policy without the appended instructions refused, at the permission
+  layer, writes to `notebook/`, `CLAUDE.md`, `AGENTS.md`, the private store and
+  `~/.local/bin/notes-sync`, and allowed `inbox/`. The permissive file, test files and sentinel
+  were removed; the real store has no commits. — Rule 5 holds against the owner's own settings
+  sources as well as against note text. Built-in skills and subagents are listed in these
+  sessions but unusable without the Skill and Agent tools.
+- 2026-10-20 — **4a is complete.** The service runs on the XPS (user unit `notes-sync`, linger,
+  `127.0.0.1:8790`, Tailscale Serve `:8443`, Funnel off), empty and unpaired, with the view at
+  `~/notes` and the launcher `claude-notes`. — Next is 4b, the app side (0.4.0).

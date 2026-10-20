@@ -63,6 +63,12 @@ features; the owner's notes are the one thing that must never be lost or leaked.
   remains the final check for typing.
 - Multi-line commit messages: a bash heredoc (`git commit -F - <<'MSG' … MSG`); read the message
   back with `git log -1 --pretty=%B`.
+- **The sync service (Phase 4)** runs on the XPS as the user unit `notes-sync` (`systemctl --user
+  status notes-sync`, logs with `journalctl --user -u notes-sync`), listening on
+  `127.0.0.1:8790` behind Tailscale Serve `:8443`. `notes-sync status` shows counts and dates
+  only; `notes-sync pair` opens a 10-minute pairing window. Change it only with
+  `npm run sync-deploy` (after committing; `--rollback` to go back); test with
+  `npm run sync-check`, which uses temporary data. Note sessions start with `claude-notes`.
 - **Never run `npx skills remove`** (it switched a checkout's branch mid-command once in
   mi-cuaderno).
 
