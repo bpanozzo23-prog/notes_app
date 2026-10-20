@@ -1311,3 +1311,45 @@ Append-only. One dated line per decision: what was decided, then why, after the 
 - 2026-10-20 — **4a is complete.** The service runs on the XPS (user unit `notes-sync`, linger,
   `127.0.0.1:8790`, Tailscale Serve `:8443`, Funnel off), empty and unpaired, with the view at
   `~/notes` and the launcher `claude-notes`. — Next is 4b, the app side (0.4.0).
+- 2026-10-20 — Phase 4b, run D adds only the app's sync engine and tests. App boot starts the
+  scheduler; pairing, confirmation, Disconnect and Restore are callable operations for run E's
+  UI. There are no new screens, navigation routes, tables, dependencies or version bump, and
+  `server/` is unchanged. — This is the approved engine-only boundary; phone setup comes next.
+- 2026-10-20 — Sync captures all stored notes (Trash included), folders, tombstones, exported
+  preferences, referenced image metadata and generation in one read transaction. Image bytes
+  are read separately with a generation check in the same transaction; requests check both
+  generation and connection before and after awaiting a reply. A 409 recaptures at most three
+  times; confirmation retries reuse the captured push only while it remains unchanged. —
+  A save during a round belongs to the next round, and an import must never mix two notebooks.
+- 2026-10-20 — A module-level sync lifecycle cancels requests and retained confirmations on
+  import (start and local post-commit), replacement broadcasts, Disconnect and database updates.
+  Connection changes also broadcast a credential-free notification. Pairing writes and outbox
+  acknowledgements remain cancellable through transaction commit. — Late replies must not
+  reconnect a disconnected phone or clear outcomes belonging to invalidated work.
+- 2026-10-20 — The scheduler checks Dexie's database/table paths and primary-key ranges for
+  exported preferences and `syncOutbox`; it ignores token, spend and other device preference
+  writes. It uses the approved debounce, maximum wait, visibility rules and back-off, one
+  in-window flight and a nonwaiting Web Lock when available. Its status store contains no
+  address, connection token or retry closure. — Saving and navigation remain independent of
+  network delays, and sync's bookkeeping cannot create an endless loop.
+- 2026-10-20 — Missing images retain the server's list-of-ids shape, unioned with locally
+  skipped references; outcomes use the server's exact `(proposal, hash)` acknowledgements.
+  Restore returns `validateBackup`'s preview result without importing. Sync tokens are refused
+  before backup upgrades and all sync preferences stay out of React's notebook state. The
+  Markdown view uses UTC and the latest live edit, while ordinary text exports stay unchanged.
+  — These reuse 4a's wire format and the existing import safety boundary.
+- 2026-10-20 — Run D verification passed: `npm test` (83 files, 1,904 tests, including
+  107 sync tests), `npm run build` and whitespace checks. The build retains Vite's
+  large-chunk warning. Client/round integration uses the real handler with temporary stores
+  and Request/Response adapters, never sockets; cancellation, capture races, confirmation,
+  full pushes, missing images, exact outcomes, scheduler guards/timing and sentinel-token
+  privacy are covered. No network, protected owner data, live service, commit or deployment.
+  Phone typing, real Tailscale/permission behavior and run E's controls were not tested.
+- 2026-10-20 — Claude Code reviewed run D (the app's sync engine): one read-transaction capture
+  per round, generation and connection re-checked around every request and before each picture
+  read, recapture after 409 `changed`, the confirmation bound to the exact capture, no writes to
+  notes (only exact outbox acknowledgements), token never in the status store, requests with
+  `credentials: "omit"` and `redirect: "error"`, a storage-change filter limited to this
+  database's notebook tables, exported preferences and the outbox. Verification: `npm test`
+  (83 files, 1,904 tests), `npm run build`. Not released: the engine starts with the app but
+  stays idle without a saved connection.

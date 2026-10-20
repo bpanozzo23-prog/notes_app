@@ -2,27 +2,29 @@ import { noteToClaudeText } from "../claude/projection.js";
 import { noteTitle, visibleNotes } from "./notebookView.js";
 
 // Match Claude's context dates: absolute days in English, in the device's time zone.
-const date = (value) => new Date(value).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+const date = (value, view = false) => new Date(value).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", ...(view ? { timeZone: "UTC" } : {}) });
 const lookupNotes = (notes) => new Map(notes.filter((note) => note.deletedAt === null).map((note) => [note.id, note]));
 
-function noteBlock(note, lookup, level, folder) {
+function noteBlock(note, lookup, level, folder, view = false) {
   const metadata = [
+    ...(view ? [`id: ${note.id}`] : []),
     ...(folder === undefined ? [] : [`Folder: ${folder}`]),
     ...(note.tags.length ? [`Tags: ${note.tags.join(", ")}`] : []),
-    `Created ${date(note.createdAt)}`, `Edited ${date(note.updatedAt)}`,
+    `Created ${date(note.createdAt, view)}`, `Edited ${date(note.updatedAt, view)}`,
     ...(note.pinned ? ["Pinned"] : []),
   ].join(" · ");
   const body = noteToClaudeText(note.html, lookup, { headingOffset: level }) || "(empty note)";
   return `${"#".repeat(level)} ${noteTitle(note)}\n${metadata}\n\n${body}`;
 }
 
-export function notebookToText({ notes, folders, now }) {
+export function notebookToText({ notes, folders, now, view = false }) {
   const live = visibleNotes(notes.filter((note) => note.deletedAt === null));
   const lookup = lookupNotes(live);
-  const exported = new Date(now);
-  const time = exported.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  const exported = new Date(view ? Math.max(...live.map((note) => Date.parse(note.updatedAt))) : now);
+  const time = exported.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", ...(view ? { timeZone: "UTC" } : {}) });
+  const header = view ? live.length ? `as of ${date(exported, true)}, ${time} UTC` : "No notes yet" : `exported ${date(exported)}, ${time}`;
   const sections = [
-    `# Notes — exported ${date(exported)}, ${time}\n${live.length} ${live.length === 1 ? "note" : "notes"}. Made by notes_app. Pictures appear as [image]; links between notes as "text [→ Title]".`,
+    `# Notes — ${header}\n${live.length} ${live.length === 1 ? "note" : "notes"}. Made by notes_app. Pictures appear as [image]; links between notes as "text [→ Title]".`,
   ];
   const folderIds = new Set(folders.map((folder) => folder.id));
   const groups = [...folders].sort((a, b) => a.position - b.position).map((folder) => ({
@@ -31,7 +33,7 @@ export function notebookToText({ notes, folders, now }) {
   // An orphaned folder reference still exports its note, under No folder.
   groups.push({ name: "No folder", notes: live.filter((note) => !folderIds.has(note.folderId)) });
   for (const group of groups) {
-    if (group.notes.length) sections.push(`## ${group.name}\n\n${group.notes.map((note) => noteBlock(note, lookup, 3)).join("\n\n")}`);
+    if (group.notes.length) sections.push(`## ${group.name}\n\n${group.notes.map((note) => noteBlock(note, lookup, 3, undefined, view)).join("\n\n")}`);
   }
   return `${sections.join("\n\n")}\n`;
 }

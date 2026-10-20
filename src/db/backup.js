@@ -10,6 +10,8 @@ import { clearFileUrls } from "../editor/fileUrls.js";
 
 import { claudeApiKey, claudeEnabled, claudeSpend, claudeLastChange } from "../claude/prefs.js";
 import { claudeSession } from "../claude/session.js";
+import { syncAddress, syncToken, syncOutbox } from "../sync/prefs.js";
+import { syncLifecycle } from "../sync/lifecycle.js";
 
 // Measured on the owner's phone (2026-10-18): 40 MB and 118 MB backups each took about 1–2 s to
 // import and export. The warning starts just above the largest size proven comfortable.
@@ -17,7 +19,7 @@ export const COMFORTABLE_BACKUP_BYTES = 150 * 1024 * 1024;
 const V1_EXPORTED_PREFS = Object.freeze(["lastBackupAt", "toolbar"]);
 export const EXPORTED_PREFS = Object.freeze(["lastBackupAt", ...FORMATTING_KEYS]);
 // Device-local preferences that older backups contained: accepted with a warning, never restored.
-export const IGNORED_PREFS = Object.freeze(["storagePersisted", claudeEnabled, claudeSpend, claudeLastChange]);
+export const IGNORED_PREFS = Object.freeze(["storagePersisted", claudeEnabled, claudeSpend, claudeLastChange, syncAddress, syncOutbox]);
 export const BACKUP_FORMAT = "notes_app-backup";
 
 export async function buildBackup() {
@@ -205,6 +207,9 @@ export function validateBackup(raw) {
     if (isObject(parsed.preferences) && Object.hasOwn(parsed.preferences, claudeApiKey)) {
       errors.push("This file contains an Anthropic API key, so it was not made by this app's export. Nothing was imported.");
     }
+    if (isObject(parsed.preferences) && Object.hasOwn(parsed.preferences, syncToken)) {
+      errors.push("This file contains a sync token, so it was not made by this app's export. Nothing was imported.");
+    }
     for (const key of ["notes", "folders", "tombstones"]) {
       summary[key] = Array.isArray(parsed[key]) ? parsed[key].length : 0;
     }
@@ -235,24 +240,28 @@ export async function importBackup(envelope) {
   const notes = clean.notes.map((note) => ({ ...note, text: htmlToText(note.html), linkedIds: extractNoteLinks(note.html) }));
   const prefs = Object.entries(clean.preferences).filter(([key]) => EXPORTED_PREFS.includes(key)).map(([key, value]) => ({ key, value }));
   const generation = newId();
-  await writeTransaction([db.notes, db.folders, db.tombstones, db.prefs, db.files, db.fileData], async () => {
-    // Only the exportable preferences are replaced: device-local ones such as a future API key
-    // are not in any backup and must survive a restore.
-    await Promise.all([db.files.clear(), db.fileData.clear(), db.notes.clear(), db.folders.clear(), db.tombstones.clear(), db.prefs.bulkDelete([...EXPORTED_PREFS, claudeLastChange])]);
-    await db.notes.bulkAdd(notes);
-    await db.folders.bulkAdd(clean.folders);
-    await db.tombstones.bulkAdd(clean.tombstones);
-    for (const file of clean.files) {
-      const { id, type, size, width, height, createdAt, data } = file;
-      await db.files.add({ id, type, size, width, height, createdAt, unusedSince: null });
-      await db.fileData.add({ id, bytes: fromBase64(data) });
-    }
-    await db.prefs.bulkAdd(prefs);
-    await db.prefs.put({ key: "notebookGeneration", value: generation });
-  });
-  clearFileUrls();
-  notebookAccess.adopt(generation);
-  claudeSession.notebookReplaced();
-  announceReplacement(generation);
-  return checked.summary;
+  syncLifecycle.beginImport();
+  try {
+    await writeTransaction([db.notes, db.folders, db.tombstones, db.prefs, db.files, db.fileData], async () => {
+      // Only exported preferences and the old Undo slot are replaced. Device-local
+      // connection credentials, outbox entries and Claude settings survive a restore.
+      await Promise.all([db.files.clear(), db.fileData.clear(), db.notes.clear(), db.folders.clear(), db.tombstones.clear(), db.prefs.bulkDelete([...EXPORTED_PREFS, claudeLastChange])]);
+      await db.notes.bulkAdd(notes);
+      await db.folders.bulkAdd(clean.folders);
+      await db.tombstones.bulkAdd(clean.tombstones);
+      for (const file of clean.files) {
+        const { id, type, size, width, height, createdAt, data } = file;
+        await db.files.add({ id, type, size, width, height, createdAt, unusedSince: null });
+        await db.fileData.add({ id, bytes: fromBase64(data) });
+      }
+      await db.prefs.bulkAdd(prefs);
+      await db.prefs.put({ key: "notebookGeneration", value: generation });
+    });
+    clearFileUrls();
+    notebookAccess.adopt(generation);
+    claudeSession.notebookReplaced();
+    syncLifecycle.invalidate(); // Local, after commit; BroadcastChannel does not echo to its sender.
+    announceReplacement(generation);
+    return checked.summary;
+  } finally { syncLifecycle.endImport(); }
 }

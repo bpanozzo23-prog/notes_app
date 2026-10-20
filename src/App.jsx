@@ -27,6 +27,7 @@ import ClaudeSettings from "./screens/settings/ClaudeSettings.jsx";
 import { claudeSession } from "./claude/session.js";
 import { getClaudeStatus, useClaudeStatus } from "./claude/prefs.js";
 import { loadClaudeSdk } from "./claude/client.js";
+import { startSync } from "./sync/trigger.js";
 
 export default function App() {
   const [queue] = useState(() => new SaveQueue({ save: updateNote, resolveConflict: (error, id, patch) => {
@@ -107,6 +108,10 @@ export default function App() {
       flush();
     };
   }, [nav, queue, refresh]);
+
+  useEffect(() => {
+    if (ready) return startSync({ queue });
+  }, [ready, queue]);
 
   useEffect(() => {
     if (access.versionChange !== "pending" || access.replaced) return;

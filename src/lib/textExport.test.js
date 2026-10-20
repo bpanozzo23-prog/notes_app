@@ -60,3 +60,29 @@ it("exports the public sample deterministically without preferences or image byt
   expect(text).not.toMatch(/base64|data:image|sk-ant/);
   expect(notebookToText({ ...sample, preferences: { claudeApiKey: "sk-ant-SENTINEL", anything: "PREF-SENTINEL" }, now })).toBe(text);
 });
+
+it("view output includes ids, uses UTC, and derives its time only from the newest live edit", () => {
+  const notes = [
+    note("first", { createdAt: "2026-10-01T00:30:00.000Z", updatedAt: "2026-10-19T23:05:00.000Z" }),
+    note("second", { updatedAt: "2026-10-20T00:30:00.000Z" }),
+    note("trash", { updatedAt: "2099-01-01T00:00:00.000Z", deletedAt: "2026-10-20" }),
+  ];
+  const before = process.env.TZ;
+  try {
+    process.env.TZ = "America/Chicago";
+    const text = notebookToText({ notes, folders, now, view: true });
+    expect(text).toContain("# Notes — as of 20 Oct 2026, 00:30 UTC");
+    expect(text).toContain("id: first · Created 1 Oct 2026 · Edited 19 Oct 2026");
+    process.env.TZ = "Pacific/Auckland";
+    expect(notebookToText({ notes, folders, now: "2099-12-31", view: true })).toBe(text);
+    expect(text).not.toContain("id: trash");
+  } finally {
+    if (before === undefined) delete process.env.TZ; else process.env.TZ = before;
+  }
+});
+
+it("empty view output has a fixed No notes yet line, independent of wall-clock time", () => {
+  const first = notebookToText({ notes: [], folders, view: true });
+  expect(first).toContain("# Notes — No notes yet\n0 notes.");
+  expect(notebookToText({ notes: [], folders, now: "2099-01-01", view: true })).toBe(first);
+});

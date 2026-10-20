@@ -151,6 +151,11 @@ LLM can read. The code may become public; the notes never are.
   `npm run sync-check`. Running on the XPS as the user service `notes-sync`, empty and unpaired;
   the lock-down passed in real sessions. No app change until 4b. Maintainer notes:
   [`server/README.md`](server/README.md).
+- **Phase 4b, run D — app engine implemented, 2026-10-20; not released.** Background capture,
+  image upload, push/retry/confirmation, outbox acknowledgements, pairing/disconnect/restore
+  methods, device-local token protection and the change/visibility scheduler. Tests use the real
+  handler in temporary folders without sockets. No Sync screens yet (run E); version remains
+  0.3.11 and schema 4. No live service or phone verification in this run.
 
 ## Running it
 

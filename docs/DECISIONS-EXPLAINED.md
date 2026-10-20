@@ -5,7 +5,7 @@ this one is for the owner: what was chosen, why, what it means for the app, what
 and how hard it would be to reverse ("lock-in"). Ordered by lock-in, hardest first. Updated whenever
 `DECISIONS.md` gains an entry with consequences for how the app behaves.
 
-Last updated 2026-10-19, at step 4a (§74).
+Last updated 2026-10-20, at step 4b (§75).
 
 ---
 
@@ -1279,3 +1279,22 @@ new code. Using the simpler version first shows whether they're wanted.
 - **No shell in note sessions** (§65): the first real lock-down test showed Claude Code's command
   fence can't run on the XPS, so note sessions have no command line.
 - The phone side (Settings → Sync) comes in 4b.
+
+### 75. The phone's sync engine, before its controls (2026-10-20)
+
+Run D builds the background work; run E will add Settings → Sync and its messages. Nothing
+connects until a connection has been saved.
+
+Each sync takes one consistent copy of the stored notebook. Editing stays available while
+that copy travels; edits made meanwhile go in another round. Importing, disconnecting or
+updating cancels old work, so a late answer cannot mix notebooks or reconnect the phone.
+If replacing the XPS copy needs approval, that approval belongs to the exact copy reviewed;
+another edit means asking again.
+
+The connection token stays on the device and goes only in the request's authorization header.
+Backups exclude it, and imports refuse a file containing one. Restore only prepares the
+existing preview: it never replaces notes on its own. Missing pictures are reported without
+preventing the notes themselves from being backed up.
+
+Tests call the real server logic with made-up notebooks in temporary folders, without a
+network connection. Phone behavior and the controls remain for run E.
