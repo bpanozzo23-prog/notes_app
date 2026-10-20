@@ -79,7 +79,12 @@ backup); local-first in IndexedDB, works offline.
 
 **Tier 4 — later and optional.**
 - Sync to the XPS over Tailscale so Claude Code can work on the notes as files, and so the XPS is
-  an automatic backup. Conflicts keep both copies.
+  an automatic backup. Conflicts keep both copies. Design (2026-10-19,
+  `docs/PHASE-4-DIRECTION.md`): one way from the phone, which keeps the true copy, to a private
+  store on the XPS with history and daily backups; Claude Code reads a rebuilt, locked-down view
+  and proposes changes that the owner reviews and applies on the phone. A proposal for a note
+  edited since Claude Code read it is refused and kept in the XPS history, so both versions
+  survive (an optional "Keep both" can follow). The Surface sharing the notebook is tabled.
 - "Collect" selection: tap several non-adjacent words, apply one formatting to all (mobile
   browsers cannot select non-contiguous ranges natively).
 - Comments / sticky notes attached to a passage, hidden by default.
@@ -94,8 +99,16 @@ owner's own XPS; feature parity with Samsung Notes for its own sake.
 
 Notes are personal data. They live in the browser's IndexedDB and in backups the owner keeps; the
 repo never contains a note, a backup, or a key. If the repo becomes public, that rule is what makes
-it safe. Notes leave the device only when the owner sends a Claude request, and then only to
-Anthropic (2026-10-18).
+it safe. ~~Notes leave the device only when the owner sends a Claude request, and then only to
+Anthropic (2026-10-18).~~ Notes leave the phone only to Anthropic when the owner sends a Claude
+request from the app, and to the owner's XPS while sync is connected (2026-10-19). On the XPS
+(Phase 4): the notes sit in `~/notes` and `~/.local/share/notes_app-sync/` on a disk that isn't
+encrypted, readable by programs running as the owner; a Claude Code session in `~/notes` sends
+what it reads to Anthropic under the owner's Claude account terms (not the API terms the app
+uses), and Claude Code keeps transcripts with note text in `~/.claude/projects/`; the XPS history
+keeps notes deleted for good on the phone; nothing goes to any cloud from there. The published
+app shares its web origin with mi-cuaderno (true since Phase 1b), so each app's code could read
+the other's stored data.
 
 ## 8. Phases
 
@@ -124,3 +137,6 @@ Anthropic (2026-10-18).
   ⌈width/28⌉ × ⌈height/28⌉ tokens, at most 4,784 per image; above 20 images in one request every
   image must be within 2,000 px. The 2026-10-17 numbers hold.
 - **Phase 4:** `tombstones` and `rev` are what sync uses for deletion tracking and conflicts.
+  Refined 2026-10-19 (`docs/PHASE-4-DIRECTION.md`): `rev` identifies a version only within one
+  notebook generation, so a sync after an import resends every note; a note may vanish from the
+  XPS copy only with a tombstone, otherwise the owner confirms.

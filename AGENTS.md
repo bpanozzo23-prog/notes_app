@@ -3,7 +3,8 @@
 These apply to any agent working in this repository (Claude Code, Codex). `CLAUDE.md` imports
 this file; rules live here once.
 
-A personal notes app (PWA) for one owner, one phone, no server. Simplicity and durability beat
+A personal notes app (PWA) for one owner, one phone, and (from Phase 4) one small sync service on
+the owner's XPS. Simplicity and durability beat
 features; the owner's notes are the one thing that must never be lost or leaked.
 
 ## Read order
@@ -23,6 +24,11 @@ features; the owner's notes are the one thing that must never be lost or leaked.
 - **Verify on the phone.** The dev server runs on the XPS with `--host`; report the Tailscale URL
   (`http://brent-dell-system-xps-l502x:5174/`) and ask the owner to check. The agent has no screen:
   say plainly what it did not see.
+- **The owner's real notes on the XPS (Phase 4).** `~/notes` and `~/.local/share/notes_app-sync/`
+  hold the owner's real notes once sync is connected. Agents working on the app never open them
+  unless the owner asks in that session; check the service with `notes-sync status` (counts and
+  dates only). Codex never opens them, for now. Tests and checks use temporary folders and the
+  sample notebook. The live service changes only through `npm run sync-deploy`.
 - **Never commit a note, a backup or a key.** `.gitignore` covers the known paths; keep it that way
   and check `git status` before every commit. Commit only when asked.
 - **Real Claude requests cost the owner money.** Tests and shots use made-up fixtures. For real-API

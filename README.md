@@ -136,6 +136,13 @@ LLM can read. The code may become public; the notes never are.
   (tags are edited in their own sheet); Pin moved to the top row; Copy as text and Move to Trash
   are in a ⋯ sheet. Text starts about 95 points higher, roughly double the visible text with the
   keyboard open.
+- **Phase 4 — planned and approved 2026-10-19.** Sync to the XPS:
+  the phone copies the notebook one way to a small service on the XPS over Tailscale (a private
+  copy with history and daily backups); Claude Code reads a locked-down view there and proposes
+  edits the owner reviews and applies on the phone. The spike passed on the phone 2026-10-19.
+  Contract: `docs/PHASE-4-DIRECTION.md` (Codex-reviewed); plain-language review in
+  `docs/DECISIONS-EXPLAINED.md` §63–73. Steps: 4a the XPS service, 4b the app sends (0.4.0), 4c
+  the inbox for edits (0.4.1), 4d new notes and Trash (optional), 4e closeout.
 
 ## Running it
 

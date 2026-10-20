@@ -5,7 +5,7 @@ this one is for the owner: what was chosen, why, what it means for the app, what
 and how hard it would be to reverse ("lock-in"). Ordered by lock-in, hardest first. Updated whenever
 `DECISIONS.md` gains an entry with consequences for how the app behaves.
 
-Last updated 2026-10-18, at step 3d (§57).
+Last updated 2026-10-19, at the Phase 4 plan (§73).
 
 ---
 
@@ -1067,3 +1067,190 @@ text. Android Back closes each sheet first.
 
 **Lock-in: none.** It's layout only. Moving Pin into the ⋯ sheet, or anything back, is a small
 change.
+
+## Phase 4: your notes on the XPS (planned 2026-10-19)
+
+The decisions in `docs/PHASE-4-DIRECTION.md` that could lock the app in. Terms used: **sync** is
+the app copying your notes to the XPS on its own; **Tailscale** is the private network joining
+your phone, Surface and XPS, and **Tailscale Serve** is the part that lets your devices reach a
+program on the XPS over HTTPS; a **token** is a long random password the app keeps to prove it's
+your phone; the **private store** is the XPS's exact copy of what your phone sent; the **view**
+is the `~/notes` folder rebuilt from it for Claude Code; **git history** is a record of every
+version of every file; the **generation** is a random id your notebook gets each time you import
+a backup; a **tombstone** is the record a note leaves when you delete it for good; a **sandbox**
+is a fence around the commands Claude Code runs; **prompt injection** is text inside a note that
+tries to give Claude instructions.
+
+### 63. One-way from the phone, plus an inbox you approve
+
+**Chosen:** your phone keeps the one true copy. It copies your notes to the XPS by itself.
+Claude Code on the XPS reads them and can only *propose* changes. Proposals appear in the app,
+and you review and Apply them the way you approve Tidy, with Undo afterwards.
+**Why:** you wanted Claude Code to read and change notes, with every change waiting for your
+tap. Copying one way keeps the hard part simple: the XPS can never overwrite a note on the
+phone.
+**What it leads to:**
+- The XPS is an automatic backup from the first sync.
+- Changes from Claude Code land only through the same checked Apply that Phase 3 uses.
+- If you edited a note after Claude Code read it, its proposal can't be applied. Claude Code's
+  version stays in the XPS history, so both versions are kept.
+**Not chosen:**
+- Full two-way sync. It's needed for the Surface to share the notebook, and you tabled that. It
+  would also need real conflict handling.
+- A read-only copy. Claude Code couldn't change anything.
+- Applying Claude Code's changes automatically with Undo. You chose to see changes first.
+**Lock-in: medium.** Two-way sync later would build on the same store and rounds. The app's side
+would change, the notes wouldn't.
+
+### 64. Two places on the XPS, and only one is trusted
+
+**Chosen:** the XPS keeps a **private store** of exactly what your phone sent, with its history
+and daily backups. Claude Code never touches it. From it, the XPS rebuilds **`~/notes`**, a
+read-only view where Claude Code reads. Claude Code can write only in its `inbox/` folder. If a
+view file is ever changed, it's rewritten from the store.
+**Why:** if Claude Code could edit the files backups are made from, an edit could reach your
+phone through a Restore without you ever seeing it. A planning review found that hole in the
+first draft.
+**What it leads to:** Restore from the XPS always gives you back what your phone sent. A change
+from the XPS reaches your notes only as a proposal you approve.
+**Not chosen:** one folder for everything (simpler, but it had the hole above).
+**Lock-in: low.** The view is rebuilt every sync, so its layout can change freely. An
+Obsidian-style folder later is a small change.
+
+### 65. Claude Code is locked down when it works on your notes
+
+**Chosen:** a settings file in `~/notes`, and a launcher (`claude-notes`), restrict any Claude
+Code session there:
+- no web tools, and none of your connected accounts (Google Drive, Notion, Calendar);
+- shell commands run inside a sandbox with no network at all;
+- it can write only in `inbox/`;
+- it can't read your SSH keys, the test API key or the sync service's own files.
+
+Its instructions say note text is information, never instructions.
+**Why:** some notes contain text pasted from web pages. On the XPS, Claude Code can run commands,
+so a hidden instruction in a note could otherwise try to send your notes somewhere. Inside the
+app, Claude can only propose. On the XPS, the lock-down plays that role.
+**What it leads to:**
+- Claude Code in `~/notes` can read, think and propose, nothing else. For anything that needs the
+  web, use a session somewhere else.
+- The launcher also leaves out your own Claude Code settings, hooks and plugins, so nothing there
+  can loosen the rules by accident.
+- Step 4a tests every rule in a real session before any note arrives, including with deliberately
+  loose settings added.
+- If the isolation can't be proven, Claude Code doesn't get the notes, and you still get the
+  automatic backup.
+**Not chosen:** relying on instructions alone, which a clever injection might override.
+**Lock-in: none.** It's a settings file and a launcher.
+
+### 66. Connecting your phone: a one-time code, then a token kept like your API key
+
+**Chosen:** you run `notes-sync pair` on the XPS (or ask me to). It shows a 6-digit code for 10
+minutes. You type it in Settings → Sync, and the XPS gives the app a long token. The token
+behaves like your API key:
+- it stays on this phone and is never in a backup (a backup containing one is refused);
+- it's never shown.
+
+The XPS keeps only a fingerprint of it. One phone is connected at a time.
+**Why:** only your devices can reach the XPS at all. Even so, the token makes sure only the app
+you connected can use the service, so another website, or another app on the same web address,
+can't.
+**What it leads to:** after restoring a backup on a new phone, you connect again with a new
+code.
+**Not chosen:** no token, relying on Tailscale alone; a password you'd have to remember.
+**Lock-in: low.**
+
+### 67. How a sync round stays safe
+
+**Chosen:** each sync asks the XPS what it holds, uploads missing pictures, then sends
+everything that differs in one request. The XPS handles one change at a time. It applies a
+request in one go, and only if nothing changed in between. A note's revision number tells the
+two sides apart. After you import a backup, the generation changes, and the XPS takes a complete
+fresh copy, pictures included: an imported picture can reuse an old picture's id. A round cut
+short by a freeze is finished from a journal when the XPS restarts. If you import, disconnect or
+update the app during a sync, that sync stops without changing anything.
+**Why:** your phone keeps no record of what it sent, so nothing can get out of step. The XPS
+has frozen several times this month, and a half-written copy must be impossible.
+**What it leads to:** syncing starts about 10 seconds after you stop editing, and when you open
+or come back to the app. Typing never waits for it. If the XPS is off, the app says so quietly
+and catches up later.
+**Not chosen:** a list of sent changes kept on the phone. It's faster, but it can drift out of
+step after an import or a crash.
+**Lock-in: low.**
+
+### 68. Nothing vanishes from the XPS copy without a tombstone or your OK
+
+**Chosen:** in everyday use, a note can disappear from the XPS copy only if you deleted it for
+good on the phone, which leaves a tombstone. After you import a backup, or on a newly connected
+phone, the rule is stricter: any note that would be removed from the XPS copy or changed there
+asks you first. Revision numbers from a different notebook can't be trusted to say which version
+is newer. Identical notes and new notes pass without a question. The question offers "Restore
+from the XPS instead", "Replace the XPS copy" and "Not now".
+**Why:** a wiped phone, an old backup or the wrong notebook should never quietly overwrite your
+good copy.
+**What it leads to:** you'll see this question only after imports or on a new phone.
+**Not chosen:** "ask above 5 notes or a quarter of them" (arbitrary; smaller losses would pass
+silently).
+**Lock-in: none.**
+
+### 69. History is kept and never pushed anywhere, and Delete forever doesn't reach it
+
+**Chosen:** every sync is saved in the private store's history. That history has no remote, and
+the service refuses to start if one is ever added. It also refuses if Tailscale Funnel would
+expose it to the public internet. Fourteen daily backups sit beside it, in the app's own format.
+**Why:** being able to see any note as it was on any day is most of the value of an automatic
+backup. Nothing about your notes should leave your machines.
+**What it leads to:** if the XPS ever can't record history, syncing pauses with a message rather
+than let a version slip through unrecorded. Your notes stay safe on the phone meanwhile.
+**Delete forever on the phone doesn't erase a note from the XPS history.**
+If a note ever needs wiping there, ask me; it's a manual step. Keep exporting a backup now and
+then while the XPS keeps freezing, so the XPS isn't your only backup.
+**Not chosen:** an encrypted copy in a cloud, which the brief rules out.
+**Lock-in: low.**
+
+### 70. The service runs from a fixed copy and restarts itself
+
+**Chosen:** the sync service is a small program in this repo, with no extra packages. It runs
+from a copy of a committed version, installed by `npm run sync-deploy`, never from the working
+folder agents edit. It's a user service that restarts after a crash. **Linger**, which lets your
+services run without you being logged in, starts it at boot. You can switch linger on without
+sudo.
+**Why:** after a freeze and reboot, half-finished code must never be what handles your notes.
+Automatic login is off on the XPS, so without linger the service would stay down after every
+freeze.
+**Lock-in: none.**
+
+### 71. What changes for your privacy
+
+**Chosen and recorded in the brief (§7):**
+- your notes will also sit on the XPS, whose disk isn't encrypted;
+- every program running under your account there can read them;
+- a Claude Code session in `~/notes` sends what it reads to Anthropic under your **Claude
+  account** (your subscription), not the API terms the app uses;
+- Claude Code keeps session transcripts, with note text, in `~/.claude/projects/`.
+
+Already true and now written down: the published app shares its web address with mi-cuaderno.
+Their stored data is technically readable by each other's code, and Chrome's local-network
+permission covers both.
+**Please check:** the "help improve Claude" (model training) setting in your Claude account.
+**Lock-in: none.** Disconnecting stops new copies. The XPS copy and its history stay until
+deleted.
+
+### 72. Proposals: edits first, new notes and Trash later if you want them
+
+**Chosen:** step 4c lets Claude Code propose changes to an existing note's title, text, tags and
+folder. It drafts with a helper (`./propose`) that checks the proposal before it reaches you.
+Step 4d adds new notes, moving a note to Trash, and "Keep both" for a refused proposal. 4d
+happens only if you ask after using 4c.
+**Why:** edits reuse Phase 3's apply and Undo almost unchanged. New notes and Trash need more
+new code. Using the simpler version first shows whether they're wanted.
+**Lock-in: none.**
+
+### 73. Smaller choices, all easy to change
+
+- **Port 8443** on the XPS's Tailscale address. The health tracker keeps the main address.
+- **10 seconds** of quiet before a sync, at most 60 seconds after the first change.
+- **14 daily backups** kept on the XPS.
+- **Chrome's local-network permission** is asked once. Tap Allow. If it was refused, Settings →
+  Sync says how to allow it.
+- **No Obsidian for now.** The view can be laid out for it later.
+- **One connected phone at a time.** Connecting another replaces it.

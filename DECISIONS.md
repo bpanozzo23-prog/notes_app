@@ -1102,3 +1102,38 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   it) and the frozen-device timing (the client uses timeouts regardless). — The published app can
   reach the XPS, so the fallback of serving the app from the XPS is not needed. The test page, the
   endpoint and the :8443 Serve entry are removed; step 4a adds the real service.
+- 2026-10-19 — Contract drafted (`docs/PHASE-4-DIRECTION.md`) and reviewed read-only by Codex
+  (xhigh): 15 findings (2 P0, 8 P1, 4 P2, 1 P3), all folded in, marked *(Codex)*. Note files are
+  named by the SHA-256 of their id (a literal id could equal another id's encoded name). Image
+  bytes are content-addressed and bound to ids per generation, re-uploaded after an import (an
+  import keeps image ids whose bytes may differ). A failed history commit blocks further rounds
+  (otherwise a later round could overwrite an unrecorded version). Across generations and on a
+  new pairing the guard compares content, not `rev` or tombstones from another branch. The inbox
+  is read-only for the service, symlink-safe, and proposals are ingested as immutable versions
+  bound by hash. One mutation queue and an idempotent journal on the XPS. In the app: round
+  identity, recapture after 409, a dirty flag; exported preferences and the outbox trigger sync;
+  only acknowledged outbox entries are removed. A lazy body reader keeps rejected requests from
+  reading bodies. A pre-parse audit lists what the editor drops (`fromClaudeHtml` reports only
+  unknown handles), and kind `"xps"` refuses new links to notes in Trash. Missing images are
+  synced as a reported, degraded state. The Markdown projection is kept in the store so the view
+  can be rebuilt without the phone. Release order: verify, commit, deploy, smoke-check, push. —
+  Each closes a loss, leak or approval hole Codex showed against the code or with fixtures.
+- 2026-10-19 — Codex's scope suggestions: the XPS helper's checks are narrowed to shape,
+  references and size (taken; the phone's editor pipeline judges formatting). Sending every note
+  row on every round is not taken: rows go only for a differing `rev` within a generation, all
+  rows after a generation change or a new pairing. — Saves mobile data as the notebook grows; the
+  guard needs full rows only across generations.
+- 2026-10-19 — Sessions on the notes start through a launcher (`claude-notes`) that loads one
+  policy file and leaves out the owner's user and local Claude Code settings, because settings
+  lists merge across sources and a project file alone can't stop a user-level grant, hook or
+  plugin from loosening it. Claude Code's docs (read for 2.1.304) offer `--restricted` (only
+  managed settings and `--settings`) and `--setting-sources project` with `--settings`; neither
+  is fully specified, so 4a picks by test (CLAUDE.md loads, sandbox on, `/status` sources,
+  deliberately permissive local settings change nothing, no plugins), and Phase 4 stops at 4b if
+  neither passes. `sandbox.network.strictAllowlist`, `syncClaudeAiPlugins` and
+  `syncClaudeAiSkills` are honoured from `--settings`, not project settings. No managed settings
+  exist on the XPS; `bubblewrap` 0.11.1 and `socat` are installed, and Ubuntu's
+  `bwrap-userns-restrict` profile lets bubblewrap build a network-less sandbox without sudo. —
+  Rule 5 must hold whatever else is configured on the machine.
+- 2026-10-19 — The owner approved the Phase 4 contract. — Next is 4a, the XPS service; the app
+  doesn't change until 4b.
