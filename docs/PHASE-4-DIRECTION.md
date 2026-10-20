@@ -436,6 +436,35 @@ stored versions.
   rules as kind `undefined` (no created or trashed notes in 4c); `checkPlan` gains the live-target
   rule for kind `"xps"`; the outbox entry is written in the same transaction.
 
+### The review look (4c, owner-approved 2026-10-20)
+
+The owner asked for a clearer review screen; mockups at phone size were approved before building
+(`DECISIONS.md`). One set of shared review parts (`src/components/review/`) serves the Phase 3
+reviews and `sync-review`:
+
+- **Inline word changes.** A changed paragraph shows once: removed words struck through on red,
+  added words on green (real `<del>`/`<ins>` with visually hidden "removed"/"added" for screen
+  readers), as plain text from the block's word diff. **Show before and after** reveals the
+  current formatted Before/After rendering (`ReadOnlyBody`), so colours and other formatting are
+  one tap away. A formatting-only change shows the formatted After with its label as a chip
+  ("bold added"); a change of shape ("now a bulleted list", "new heading") shows the formatted
+  After with the chip and the Before as one muted line; an added block shows After on a green
+  edge, a removed block Before on a red edge; image and link effects stay listed on the change.
+- **One compact row per change:** the tick (a real checkbox, 44 px target), a small label
+  ("Text · 4 words", "Tags", "Folder", "Title") and the reason Claude gave, if any, under it. No
+  "Change 1 of 2" headings. Unchanged runs stay folded.
+- **Metadata:** tags as chips (+ added on green, removed struck on red); the folder as "Old →
+  New" with "(new folder)"; the title shows the new title first with "was: …" under it and an
+  **Edit** button that opens the existing title field.
+- **Actions:** a sticky bottom bar with the primary **Apply N changes** (and **Discard** where the
+  screen has it); **Untick all / Tick all** as a text button by the note's title; per-note cards
+  in multi-note reviews (reorganise, links, `sync-review`) with the note's title and, for
+  `sync-review`, **Dismiss**.
+- **Stale:** an amber banner at the top (with **Ask again** for the in-app Claude), and on each
+  stale card in `sync-review`; their rows are greyed and their ticks disabled.
+- Merge, split and duplicates keep their content layout and adopt the bar and the banner.
+- The behaviour, plans and tick ids don't change; only presentation. Shots and tests follow.
+
 ### 4d (optional, after the owner has used 4c)
 
 New notes (a pair without `note`) and moving a note to Trash (`trash: true`),
