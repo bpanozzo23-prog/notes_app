@@ -1,0 +1,15 @@
+#!/bin/sh
+if [ -e /etc/claude-code ] || [ -L /etc/claude-code ]; then
+  if [ ! -d /etc/claude-code ] || [ ! -r /etc/claude-code ] || [ ! -x /etc/claude-code ]; then
+    echo "Refused: review managed settings first" >&2
+    exit 1
+  fi
+  for entry in /etc/claude-code/* /etc/claude-code/.[!.]* /etc/claude-code/..?*; do
+    if [ -e "$entry" ] || [ -L "$entry" ]; then
+      echo "Refused: review managed settings first" >&2
+      exit 1
+    fi
+  done
+fi
+cd "{{VIEW}}" || exit 1
+exec claude --restricted --strict-mcp-config --tools "Bash,Read,Edit,Write,Glob,Grep" --settings "{{CONFIG}}/claude-strict.json" "$@"

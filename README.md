@@ -143,6 +143,12 @@ LLM can read. The code may become public; the notes never are.
   Contract: `docs/PHASE-4-DIRECTION.md` (Codex-reviewed); plain-language review in
   `docs/DECISIONS-EXPLAINED.md` §63–73. Steps: 4a the XPS service, 4b the app sends (0.4.0), 4c
   the inbox for edits (0.4.1), 4d new notes and Trash (optional), 4e closeout.
+- **Phase 4a — the XPS service, built 2026-10-19; installation and the lock-down test in
+  progress.** `server/` (request handler, pairing, private store with git history, crash-safe
+  rounds, the generation-aware guard, images by content, daily backups, the read-only `~/notes`
+  view, symlink-safe inbox ingestion, the `./propose` helper), the `claude-notes` launcher and
+  policy, `npm run sync-deploy` (install, deploy, rollback, uninstall) and `npm run sync-check`.
+  No app change until 4b. Notes for maintainers: [`server/README.md`](server/README.md).
 
 ## Running it
 

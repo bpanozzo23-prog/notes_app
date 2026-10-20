@@ -1,0 +1,12 @@
+[Unit]
+Description=Private notes sync
+
+[Service]
+ExecStart=/usr/bin/node "{{LIB}}/current/server/main.mjs" serve
+Restart=always
+RestartSec=5
+UMask=0077
+Environment="NOTES_SYNC_CONFIG={{CONFIG}}/config.json"
+
+[Install]
+WantedBy=default.target

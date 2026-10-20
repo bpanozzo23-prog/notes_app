@@ -1137,3 +1137,99 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   Rule 5 must hold whatever else is configured on the machine.
 - 2026-10-19 — The owner approved the Phase 4 contract. — Next is 4a, the XPS service; the app
   doesn't change until 4b.
+
+- 2026-10-19 — Phase 4a, run A implements the service core only, with no app change, installation,
+  live-service access or dependency. Runtime code is confined to `server/`; a compatibility test
+  compares its copied constants and image-reference extraction with the app and passes generated
+  backups through the app's validator. View rebuild and inbox ingestion are explicitly injected
+  hooks for run B. — The deployed service contains only `server/`, and the approved run boundary
+  keeps the core independently testable without sockets or the owner's data.
+- 2026-10-19 — A round journal carries full previous and target snapshots plus resolved image
+  bindings; stage checkpoints follow durable operations. Reads use the published snapshot and
+  share the mutation queue. Recovery can replay partially written files, while a failed recovery
+  still allows reads of the last published copy. A failed history commit publishes its round
+  with `historyError` and blocks later pushes/outcomes until the retry succeeds. — Recomputing
+  from partly overwritten rows or from uploads that expired during downtime could lose data.
+  The extra temporary disk space is preferable to that ambiguity at this notebook's scale.
+- 2026-10-19 — Ordinary files use fsynced temporary files and rename; immutable image objects and
+  the once-per-day backup use an atomic no-replace hard link from a fsynced temporary file,
+  followed by directory fsync. — A repeated upload or recovery cannot overwrite the existing
+  immutable target. New private files are 0600 and service-created directories are 0700.
+- 2026-10-19 — Note ids retain the app's exact validation and SHA-256-of-UTF-8 filenames, with an
+  additional batch check for equal file keys. — Distinct JavaScript strings containing lone
+  UTF-16 surrogates can encode to the same UTF-8 bytes. Refusing such a batch before journalling
+  prevents one accepted row from overwriting another without changing the app's id vocabulary.
+- 2026-10-19 — The startup Funnel check follows enabled public listeners to their loopback proxy
+  targets; it refuses an enabled listener whose mapping cannot be determined. The test bypass
+  requires both `NOTES_SYNC_TEST=1` and `NOTES_SYNC_SKIP_TAILSCALE=1`. — Testing only port 8790
+  in `AllowFunnel` would miss public exposure through the intended HTTPS listener on 8443.
+  Live Host forwarding and Tailscale output remain for run B's temporary-service verification.
+- 2026-10-19 — Run A verification passed: `npm test` (74 files, 1,604 tests; 277 server tests),
+  `node --check` for all 13 new `.mjs` files, and whitespace checks. Recovery tests include an
+  actual child-process exit at every round stage, without sockets; real git is exercised only
+  in a temporary fixture repository. No owner's notes, private-data, configuration or keys were
+  accessed; no network, live service, app change, dependency, commit in this checkout or deploy.
+  Real HTTP/Tailscale and phone behavior were not seen and remain outside this run.
+- 2026-10-19 — Phase 4a, run B connects the real view and ingestion defaults to run A's hooks.
+  Inbox changes use the existing journal stages and their own `inbox: N new versions` history
+  commit; a sequence number preserves ingestion order when timestamps tie. — Capturing each
+  version before exposing it to the phone also covers a freeze during ingestion and keeps
+  history failures from skipping a proposal version.
+- 2026-10-19 — Proposal filenames use the first 16 hash characters as specified for run B,
+  while records and outcomes retain the full SHA-256; full-hash run A filenames remain readable.
+  A prefix collision is refused. The view's proposal index excludes bodies and uses only live
+  note titles. — Outcomes must identify exact versions, and the view must not expose a trashed
+  note's old proposed text.
+- 2026-10-19 — View and helper filesystem operations pin checked directories with Linux
+  directory descriptors through `/proc/self/fd`, recheck ancestry before mutations, and use
+  no-follow exclusive temporary files. Ingestion reads bounded regular files only and skips an
+  unreadable inbox without marking pending versions withdrawn. — Checking a path only once
+  would leave a symlink replacement race; an unavailable inbox is not evidence of withdrawal.
+- 2026-10-19 — The helper checks generation as well as revision, checks un-ingested local
+  submissions for duplicates, and cleans handled pending files only when the current content
+  hash matches the handled version. — Imports can reuse revisions, and `list` must not erase
+  an edited proposal the service has not captured yet.
+- 2026-10-19 — Deployment and rollback render the policy, launcher and unit from the selected
+  committed release; retention protects current and previous among three kept releases. —
+  Policy fixes must deploy with the code, and rollback must remain possible after a failed check.
+  `--restricted` and the complete absolute-path strict policy implement the approved request;
+  their real-session isolation and Host forwarding remain for Claude's empty-view checks.
+- 2026-10-19 — Run B's `sync-check` is server-only, temporary and loopback-only, with a
+  deterministic fixture projection; it is written but not run by Codex. The production app's
+  deterministic Markdown view option remains in 4b. — This run has no network, browser, app
+  edits, installation, new dependency or commit.
+- 2026-10-19 — Run B verification passed on the final sources: `npm test` (78 files, 1,772
+  tests, including 445 server tests), `node --check` for all 21 server/check `.mjs` files,
+  and whitespace checks. The helper's actual CLI exit codes and messages were tested with
+  temporary-file stdio; this sandbox suppresses Node child-process pipe output. Deployment
+  tests use injected plans/executors; no installer, live status, `sync-check`, network, socket,
+  protected owner path or app source change was used. — Claude still runs the real service,
+  Tailscale and empty-view isolation checks before installation is considered verified.
+- 2026-10-19 — Claude Code's review of run A: request bodies are read after the pre-body checks
+  and before the mutation queue, and the token is checked again inside it (a stalled upload from
+  a frozen phone could otherwise hold every request for minutes); preflights don't wait for the
+  queue; unexpected errors are logged by name and code only; `GET /v1/state` carries `fullPush`
+  (a newly paired phone would otherwise loop on 409 `changed`); version checks run before the
+  guard (a refused push no longer uses up a confirmation); outcomes are limited to `applied`,
+  `dismissed`, `stale` with a bounded tick list. Each has a test. — Found by reading the code.
+- 2026-10-19 — Claude Code's review of run B: the view writer skips a file that is intact and
+  already holds the new content. — Rewriting every picture on every round would cost seconds per
+  sync for a picture-heavy notebook; intact unchanged files are already exactly right.
+- 2026-10-19 — Tailscale Serve forwards `Host: brent-dell-system-xps-l502x.tail1ce757.ts.net:8443`
+  (with the port), plus `X-Forwarded-Host`, `X-Forwarded-Proto: https` and the caller's tailnet
+  identity; measured with a throwaway listener behind a temporary Serve entry, since removed. —
+  The live config accepts exactly that `Host`.
+- 2026-10-19 — The launcher uses `claude --restricted --strict-mcp-config --tools
+  "Bash,Read,Edit,Write,Glob,Grep" --settings <claude-strict.json>`. Claude Code 2.1.304's help
+  says `--restricted` ignores user, project and local settings files (managed settings and
+  `--settings` still apply), removes code-running tools and WebFetch unless `--tools` names them,
+  confines file tools to the working directories and refuses bypassPermissions. Permission
+  rules in a `--settings` file anchor a single leading `/` at that file's own folder, so every
+  path rule in the strict policy is `//absolute` or `~/`; sandbox paths are plain absolute. —
+  The most isolating documented combination; the real-session test decides it.
+- 2026-10-19 — 4a verification before installation: `npm test` (78 files, 1,772 tests; 445
+  server), `npm run sync-check` (8/8: pairing, sample push with store/view hashes, incremental
+  edit, helper submission and outcome, import confirmation, backup with image hashes, journal
+  recovery after apply and after publish), and a real-socket smoke test (pairing, push, git
+  commit, daily backup, 403 for another origin, 401 for a wrong token, counts-only status and
+  log). All on temporary data; no owner's notes involved.

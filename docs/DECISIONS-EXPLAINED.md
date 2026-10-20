@@ -1254,3 +1254,20 @@ new code. Using the simpler version first shows whether they're wanted.
   Sync says how to allow it.
 - **No Obsidian for now.** The view can be laid out for it later.
 - **One connected phone at a time.** Connecting another replaces it.
+
+### 74. The XPS view and helper are now built (2026-10-19)
+
+The service can rebuild the folder Claude Code reads entirely from its private copy. If a
+read-only file is edited, the next rebuild restores it and records the filename and time.
+It refuses folders that redirect writes elsewhere. Drafts and submitted files in the inbox
+are left alone by the service.
+
+Each submitted version is captured in history before the phone receives it. Changing a submitted
+file makes a new version; removing it withdraws the pending version. The helper refuses a second
+pending proposal for the same note and refuses submission after the phone's copy changes.
+The phone's review and Apply screens still come in 4c.
+
+The installer, rollback command and restricted Claude launcher are written. Tests cover their
+plans and policy files using made-up data. They have not been installed or tested against the
+real service or a live Claude session by Codex. Claude still needs to check the launcher on the
+empty view before real notes are made available there.

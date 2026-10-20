@@ -8,7 +8,9 @@
     "test": "vitest run",
     "shots": "node scripts/screenshot.mjs",
     "claude-check": "node scripts/claude-check.mjs",
-    "browser-checks": "node scripts/browser-checks.mjs"
+    "browser-checks": "node scripts/browser-checks.mjs",
+    "sync-deploy": "node scripts/sync-deploy.mjs",
+    "sync-check": "node scripts/sync-check.mjs"
   },
   "type": "module",
   "private": "true",
