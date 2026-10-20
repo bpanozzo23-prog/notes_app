@@ -14,6 +14,7 @@ import { extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "vite";
 import { chromium, devices } from "playwright";
+import { guardTailnet } from "./tailnet-guard.mjs";
 import { notebookAnswer, followupAnswer } from "../src/claude/fixtures/ask.js";
 import { sseFrames } from "../src/claude/fixtures/responses.js";
 
@@ -75,6 +76,7 @@ const url = `http://127.0.0.1:${server.address().port}/notes_app/`;
 
 const browser = await chromium.launch();
 const context = await browser.newContext({ ...devices["Pixel 7"], locale: "en-GB" });
+const assertNoTailnet = await guardTailnet(context);
 // Fail closed: nothing may reach the real Anthropic API.
 const unexpected = [];
 await context.route("https://api.anthropic.com/**", async (route) => { unexpected.push(route.request().url()); await route.abort(); });
@@ -262,6 +264,7 @@ await shot(page, "08-after-update");
 
 await browser.close();
 server.close();
+assertNoTailnet();
 check("no request reached the real Anthropic API", unexpected.length === 0, unexpected.join(", "));
 const summary = { at: new Date().toISOString(), passed: results.filter((item) => item.ok).length, failed: results.filter((item) => !item.ok).length, results,
   claudeRequests: claudeRequests.length };

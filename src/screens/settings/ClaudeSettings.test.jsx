@@ -43,6 +43,7 @@ async function enable(key = "sk-ant-FAKE-UI") {
 }
 it("is off by default, requires acknowledgement and an uncontrolled key, and supports off/on/removal", async () => {
   await start();
+  expect(screen.getByText(/From this app, your notes go to Anthropic only when you tap Send\./)).toBeTruthy();
   const input = screen.getByLabelText("Anthropic API key");
   expect(input.getAttribute("value")).toBeNull();
   expect(input.type).toBe("password");

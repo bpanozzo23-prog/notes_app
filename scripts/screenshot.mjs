@@ -9,6 +9,7 @@ import { makePng } from "./image-fixture.mjs";
 import { mkdirSync, writeFileSync, unlinkSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium, devices } from "playwright";
+import { guardTailnet } from "./tailnet-guard.mjs";
 import { notebookAnswer, followupAnswer, noteAnswer, refusalAnswer, cutAnswer, overloadedAnswer, fallbackAnswer } from "../src/claude/fixtures/ask.js";
 import { tidyClass, tidyImage, tidyMalformed, tidyCut, tidyRefusal, tidyUnknown } from "../src/claude/fixtures/tidy.js";
 import { reorganiseNotebook } from "../src/claude/fixtures/reorganise.js";
@@ -31,6 +32,7 @@ mkdirSync(out, { recursive: true });
 const browser = await chromium.launch();
 // Pixel 7 is the closest built-in profile to the owner's S25 Ultra: 412 px wide, 2.6x, touch.
 const context = await browser.newContext({ ...devices["Pixel 7"], viewport, locale: "en-GB", serviceWorkers: "block" });
+const assertNoTailnet = await guardTailnet(context);
 const unexpectedAnthropic = [];
 await context.route("https://api.anthropic.com/**", async (route) => {
   const request = route.request();
@@ -726,4 +728,5 @@ await button("Settings").click();
 await shot("19-read-only-settings");
 
 await browser.close();
+assertNoTailnet();
 if (unexpectedAnthropic.length) throw new Error(`Unexpected request to Anthropic: ${unexpectedAnthropic.join(", ")}`);

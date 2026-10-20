@@ -8,7 +8,8 @@ export const NETWORK_PERMISSION = "local-network-access";
 export function normalizeAddress(address = DEFAULT_SYNC_ADDRESS) {
   try {
     const url = new URL(address);
-    if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash) throw null;
+    const loopback = url.protocol === "http:" && ["127.0.0.1", "localhost"].includes(url.hostname);
+    if ((!loopback && url.protocol !== "https:") || url.username || url.password || url.search || url.hash) throw null;
     return url.href.replace(/\/+$/, "");
   } catch { throw new Error("Enter a valid HTTPS sync address."); }
 }

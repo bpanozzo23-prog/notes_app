@@ -21,12 +21,13 @@ export function startSync({
   active?.stop();
   session.reset();
   let stopped = false, connected = false, dismissed = false, connecting = false, disconnecting = false, connectionAttempt = null;
+  let checkRestore = true, restoreOffer = null, restoring = false;
   let dirty = false, firstAt = null, lastAt = null, timer = null, retryAt = 0, failures = 0;
   let flight = null, pending = null, revision = 0;
   const visible = () => visibility.visibilityState !== "hidden";
-  const paused = () => stopped || !connected || connecting || dismissed || !!pending ||
+  const paused = () => stopped || !connected || connecting || dismissed || !!pending || !!restoreOffer || restoring ||
     !canSync(notebookAccess.getSnapshot()) || syncLifecycle.isImporting();
-  const publishPause = () => session.update({ connected, paused: paused() });
+  const publishPause = () => session.update({ connected, connecting, paused: paused() });
   const clearTimer = () => { if (timer !== null) timers.clearTimeout(timer); timer = null; };
   const markDirty = () => {
     dirty = true;
@@ -46,7 +47,11 @@ export function startSync({
     if (success) session.update({
       lastSyncedAt: success.lastRoundAt, counts: success.counts, missingImages: success.missingImages,
     });
-    if (result.status === "confirm") {
+    if (result.status === "restore-offer") {
+      restoreOffer = { notes: result.notes };
+      session.update({ restoreOffer, error: null });
+    } else if (result.status === "confirm") {
+      checkRestore = false;
       pending = result;
       // The retry closure retains a client privately; React receives only the review data.
       session.update({ confirm: { removed: result.removed, changed: result.changed }, lastResult: { status: "confirm" }, error: null });
@@ -56,6 +61,7 @@ export function startSync({
       retryAt = timers.now() + BACKOFF_MS[Math.min(failures++, BACKOFF_MS.length - 1)];
       markDirty();
     } else if (result.status === "ok") {
+      checkRestore = false;
       failures = 0; retryAt = 0;
       session.update({ lastResult: success, error: success.historyError ? { kind: "history-blocked" } : null, confirm: null });
       if (success.historyError) {
@@ -81,7 +87,7 @@ export function startSync({
       dirty = false; firstAt = null; lastAt = null;
       session.update({ running: true });
       return retry ? retry() : round({
-        clientFactory,
+        clientFactory, offerRestore: checkRestore,
         onState: (state) => {
           if (valid()) session.update({ proposals: state.proposals ?? [], counts: state.counts, missingImages: state.missingImages ?? [] });
         },
@@ -135,6 +141,24 @@ export function startSync({
 
   const controller = {
     now,
+    declineRestore() {
+      if (!restoreOffer || restoring) return Promise.resolve({ status: "paused" });
+      checkRestore = false; restoreOffer = null;
+      session.update({ restoreOffer: null });
+      return now(); // The ordinary removal/replacement guard still applies.
+    },
+    finishRestore({ imported = false } = {}) {
+      if (!restoring) return;
+      restoring = false;
+      if (imported) {
+        dismissed = false; checkRestore = false; restoreOffer = null;
+        session.update({ restoreOffer: null });
+      }
+      syncLifecycle.invalidate(); // Also cancels a download abandoned by navigation.
+      publishPause();
+      if (imported) void now();
+      else schedule();
+    },
     async confirmReplace(confirmToken) {
       if (!pending || flight) return { status: "paused" };
       const confirmation = pending;
@@ -154,6 +178,7 @@ export function startSync({
       if (disconnecting) return { status: "paused" };
       disconnecting = true; connectionAttempt = null;
       connected = false; connecting = false; dismissed = false; pending = null;
+      restoring = false; restoreOffer = null; checkRestore = true;
       syncLifecycle.connectionChanged();
       clearTimer();
       session.reset(); publishPause();
@@ -171,6 +196,8 @@ export function startSync({
       const attempt = {};
       connectionAttempt = attempt;
       connecting = true; dismissed = false; pending = null;
+      restoring = false; restoreOffer = null; checkRestore = true;
+      session.update({ restoreOffer: null, error: null });
       syncLifecycle.connectionChanged();
       clearTimer(); publishPause();
       const operation = syncLifecycle.begin();
@@ -187,7 +214,7 @@ export function startSync({
         });
         if (stopped || connectionAttempt !== attempt || savedEpoch !== syncLifecycle.getEpoch()) return cancelled();
         connected = true;
-        session.update({ error: null, lastResult: null });
+        session.update({ error: null, lastResult: null, lastSyncedAt: null, counts: null, missingImages: [] });
       } catch {
         if (operation.controller.signal.aborted || connectionAttempt !== attempt) return cancelled();
         if (!stopped) session.update({ error: { kind: "invalid" } });
@@ -202,7 +229,11 @@ export function startSync({
       return now();
     },
     async restoreBackup() {
-      if (!connected || !canSync(notebookAccess.getSnapshot()) || syncLifecycle.isImporting()) return { ok: false, kind: "cancelled" };
+      if (!connected || restoring || !canSync(notebookAccess.getSnapshot()) || syncLifecycle.isImporting()) return { ok: false, kind: "cancelled" };
+      // Hold background pushes throughout the download and the owner's preview.
+      restoring = true;
+      syncLifecycle.invalidate();
+      clearTimer(); publishPause();
       const operation = syncLifecycle.begin();
       try {
         const config = await readSyncConfig();
@@ -246,3 +277,5 @@ export const dismissConfirm = () => active?.dismissConfirm();
 export const disconnect = () => active?.disconnect() ?? Promise.resolve({ status: "paused" });
 export const connect = (details) => active?.connect(details) ?? Promise.resolve({ status: "paused" });
 export const restoreBackup = () => active?.restoreBackup() ?? Promise.resolve({ ok: false, kind: "cancelled" });
+export const declineRestore = () => active?.declineRestore() ?? Promise.resolve({ status: "paused" });
+export const finishRestore = (options) => active?.finishRestore(options);

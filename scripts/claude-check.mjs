@@ -8,6 +8,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { chromium, devices } from "playwright";
+import { guardTailnet } from "./tailnet-guard.mjs";
 import { priceUsage } from "../src/claude/config.js";
 
 const args = process.argv.slice(2).filter((arg) => arg !== "--real");
@@ -23,6 +24,7 @@ mkdirSync(out, { recursive: true });
 
 const browser = await chromium.launch();
 const context = await browser.newContext({ ...devices["Pixel 7"], locale: "en-GB", serviceWorkers: "block" });
+const assertNoTailnet = await guardTailnet(context);
 const page = await context.newPage();
 page.setDefaultTimeout(180_000); // real answers take a while
 page.on("pageerror", (error) => console.log("pageerror:", error.message));
@@ -246,6 +248,7 @@ if (split.outcome === "proposal") {
   ]); await shot("split-undo", true);
 }
 await browser.close();
+assertNoTailnet();
 
 const messages = calls.filter((call) => call.path === "/v1/messages");
 const summary = {

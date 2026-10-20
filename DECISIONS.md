@@ -1353,3 +1353,43 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   database's notebook tables, exported preferences and the outbox. Verification: `npm test`
   (83 files, 1,904 tests), `npm run build`. Not released: the engine starts with the app but
   stays idle without a saved connection.
+
+- 2026-10-20 — Phase 4b, run E wires Settings → Sync, the connection entry and the notes-list
+  decision bar at app version 0.4.0 (schema remains 4). Connection codes stay in an uncontrolled
+  input, cleared before pairing awaits; saved addresses populate only the address input. The
+  UI uses fixed status sentences and never receives the connection token. Network operations
+  stay outside navigation's busy lock, so Back and local editing remain available.
+- 2026-10-20 — An empty phone (including Trash) checks the XPS before its first push after
+  pairing, also on reopen if the pairing or notebook generation still needs a full push.
+  If the XPS has notes, the engine pauses for Restore or Continue without
+  restoring; continuing still runs the normal removal/replacement confirmation. Failed state
+  reads retain this check. An ordinary same-generation purge of the last note still syncs its
+  tombstone. — Pairing must not push an empty notebook before the owner has seen the restore
+  offer, including when the first state read fails; intentional deletions must still reach the XPS.
+- 2026-10-20 — File import and XPS restore share BackupImport: the same preview, destructive
+  confirmation, before-import safety download, guarded import and persistence request. A restore
+  download holds background pushes through the preview; cancellation releases that hold but
+  preserves an unanswered empty-phone offer. A successful restore resumes a full push under the
+  imported generation. Android Back closes the import confirmation, then the preview, before
+  leaving the screen; Back on a copy decision has the same paused-until-reopen effect as Not now.
+- 2026-10-20 — Local checks may use HTTP only for localhost or 127.0.0.1; other HTTP hosts remain
+  refused. Screenshot, browser-check and Claude-check contexts install one fail-closed Tailscale
+  guard before navigation, covering service ports and trailing DNS dots. It aborts and records
+  requests without query strings or headers and fails the run if any were attempted. — These
+  checks must never reach the owner's service after the app gains connection controls.
+- 2026-10-20 — Run E final verification passed: `npm test` (85 files, 1,947 tests),
+  `npm run build`, `node --check scripts/*.mjs` plus an individual syntax check of every script,
+  and `git diff --check`. The build retains the existing large-chunk warning. Fixture checks
+  cover pairing and credential privacy, fixed status sentences, restore offers and pausing,
+  shared import approval and safety downloads, identical restores with images, ordinary last-note
+  deletion, copy decisions, Disconnect, entry/bar navigation and Android Back. No network,
+  sockets in the added tests, paid requests, protected owner data, live service, commit or
+  deployment; `server/`, README, dependencies and schema 4 are unchanged. Browser screenshots,
+  phone layout/keyboard and live Tailscale/permission behavior remain for run F and the owner.
+- 2026-10-20 — Claude Code reviewed run E: the screen follows the contract (fixed sentences, code
+  cleared before awaiting, address only in its input, the confirmation with up to five titles per
+  count, the empty-phone restore offer, Disconnect confirmed), Settings' file import and the XPS
+  restore share one preview and import path (now with Cancel and Back), loopback `http:`
+  addresses are accepted only for 127.0.0.1 and localhost, and the three Playwright scripts fail
+  closed on any `*.ts.net` request. `package-lock.json` changed only its version. Verification:
+  `npm test` (85 files, 1,947 tests), `npm run build`, `node --check scripts/*.mjs`.

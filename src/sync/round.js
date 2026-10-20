@@ -34,8 +34,8 @@ export function captureNotebook() {
 
 // The only write in a round is an exact acknowledgement of captured outbox entries.
 // A confirmation keeps this operation alive; invalidate() also aborts that suspended work.
-export async function runSyncRound({ clientFactory = createSyncClient, onState = () => {} } = {}) {
-  const options = { clientFactory, onState };
+export async function runSyncRound({ clientFactory = createSyncClient, onState = () => {}, offerRestore = false } = {}) {
+  const options = { clientFactory, onState, offerRestore };
   const operation = syncLifecycle.begin(), signal = operation.controller.signal;
   let retained = false, changes = 0, config;
   const mutated = (parts) => { if (affectsSync(parts)) changes++; };
@@ -132,6 +132,12 @@ export async function runSyncRound({ clientFactory = createSyncClient, onState =
       if (capture.generation !== operation.identity.generation) {
         finish();
         return runSyncRound(options);
+      }
+      // Includes Trash: an empty live list alone must never trigger this offer.
+      // Stop before image uploads or a push, and keep offering after a failed state read.
+      if (offerRestore && capture.notes.length === 0 && state.counts.notes > 0 &&
+          (state.fullPush || state.generation !== capture.generation)) {
+        return { status: "restore-offer", notes: state.counts.notes };
       }
       const all = state.generation !== capture.generation || state.fullPush;
       const present = new Set(state.files), metadata = new Set(capture.files.map(({ id }) => id)), localMissing = [];

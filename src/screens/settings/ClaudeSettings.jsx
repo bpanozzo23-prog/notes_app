@@ -64,7 +64,7 @@ export default function ClaudeSettings({ busy, readOnly, onBack, run, refresh, e
   return <section>
     <ScreenHeader title="Claude" onBack={onBack} busy={busy} />
     <div className="space-y-4 px-4 pb-8 text-sm leading-relaxed">
-      <p>Claude can answer questions about your notes and suggest tidying, when you ask. Your notes go to Anthropic only when you tap Send.</p>
+      <p>Claude can answer questions about your notes and suggest tidying, when you ask. From this app, your notes go to Anthropic only when you tap Send.</p>
       {guardMessage && <p role="alert">{guardMessage}</p>}
       {status.ready ? <>
         <p className="font-semibold">On · key saved on this phone</p>

@@ -4,8 +4,8 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { db, notebookAccess } from "../db/db.js";
 import { EXPORTED_PREFS, importBackup } from "../db/backup.js";
 import { resetDatabase, backupFixture } from "../test/fixtures.js";
-import { AT, note } from "../../server/test-support.js";
-import { startSync, syncNow, connect, disconnect, restoreBackup, confirmReplace, dismissConfirm } from "./trigger.js";
+import { AT, note, file, PNG } from "../../server/test-support.js";
+import { startSync, syncNow, connect, disconnect, restoreBackup, confirmReplace, dismissConfirm, declineRestore, finishRestore } from "./trigger.js";
 import { affectsSync } from "./changes.js";
 import { saveConnection, readSyncConfig, appendOutbox, readOutbox } from "./prefs.js";
 import { syncLifecycle } from "./lifecycle.js";
@@ -373,4 +373,93 @@ it("real outbox acknowledgement schedules at most one extra round, never a loop"
   await timers.advance(600_000);
   expect(server.requests.filter(({ path }) => path === "/v1/push")).toHaveLength(rounds);
   expect(await readOutbox()).toEqual([]);
+});
+
+async function connectToPopulatedXps(withImage = false) {
+  await db.prefs.delete("syncToken");
+  server = await syncFixture();
+  if (withImage) expect((await server.request("PUT", "/v1/files/image-1?generation=generation-A", PNG)).status).toBe(200);
+  const remote = note(withImage ? { html: '<p>Fixture</p><img data-file="image-1">' } : {});
+  expect((await server.request("POST", "/v1/push", await server.next([remote], { files: withImage ? [file()] : [] }))).status).toBe(200);
+  const pairing = await server.context.pairing.openWindow();
+  stop = startSync({ queue, session, visibility, timers, clientFactory: server.clientFactory });
+  await stop.ready;
+  return connect({ address: server.address, code: pairing.code });
+}
+
+it("offers Restore before the first push to an empty phone, and pauses until the owner decides", async () => {
+  expect(await connectToPopulatedXps()).toEqual({ status: "restore-offer", notes: 1 });
+  expect(session.getSnapshot()).toMatchObject({ connected: true, restoreOffer: { notes: 1 }, paused: true, lastSyncedAt: null });
+  fire(); show("hidden"); show("visible");
+  await timers.advance(600_000);
+  expect(await syncNow()).toMatchObject({ status: "paused" });
+  expect(server.requests.filter(({ method }) => method !== "GET")).toHaveLength(1); // Pair only.
+  expect(await declineRestore()).toMatchObject({ status: "confirm" });
+  expect(session.getSnapshot().restoreOffer).toBeNull();
+  expect(session.getSnapshot().confirm.removed).toEqual([{ id: "note-1", title: "Fixture title" }]);
+});
+
+it("does not offer an empty-phone Restore when there are notes in Trash", async () => {
+  await db.notes.put(note({ id: "phone-trash", deletedAt: AT }));
+  expect(await connectToPopulatedXps()).toMatchObject({ status: "confirm" });
+  expect(session.getSnapshot().restoreOffer).toBeNull();
+});
+
+it("retries the restore check after a failed initial state request without pushing", async () => {
+  expect(await connectToPopulatedXps()).toMatchObject({ status: "restore-offer" });
+  await disconnect();
+  const pairing = await server.context.pairing.openWindow();
+  server.before(async (request) => { if (request.path === "/v1/state") throw new Error("offline fixture"); });
+  expect(await connect({ address: server.address, code: pairing.code })).toMatchObject({ kind: "unreachable" });
+  server.before(async () => {});
+  expect(await syncNow()).toMatchObject({ status: "restore-offer" });
+  expect(server.requests.filter(({ path }) => path === "/v1/push")).toHaveLength(0);
+});
+
+it.each([false, true])("holds pushes during restore preview, then full-pushes an identical import silently in its new generation (images: %s)", async (withImage) => {
+  expect(await connectToPopulatedXps(withImage)).toMatchObject({ status: "restore-offer" });
+  const preview = await restoreBackup();
+  expect(preview.ok).toBe(true);
+  fire(); show("visible"); await timers.advance(600_000);
+  expect(await syncNow()).toMatchObject({ status: "paused" });
+  await importBackup(preview.envelope);
+  expect(server.requests.filter(({ path }) => path === "/v1/push")).toHaveLength(0);
+  finishRestore({ imported: true });
+  await vi.waitFor(() => expect(session.getSnapshot().lastSyncedAt).toBe(AT));
+  const push = server.requests.find(({ path }) => path === "/v1/push").body;
+  expect(push.rows).toHaveLength(1);
+  expect(push.generation).toBe(notebookAccess.getGeneration());
+  expect(push.generation).not.toBe("generation-A");
+  expect(push).not.toHaveProperty("confirm");
+  if (withImage) {
+    expect(Buffer.from((await db.fileData.get("image-1")).bytes)).toEqual(PNG);
+    expect(server.requests.filter(({ method }) => method === "PUT")).toHaveLength(1);
+  }
+  expect(session.getSnapshot()).toMatchObject({ restoreOffer: null, confirm: null, paused: false });
+  const syncedAt = session.getSnapshot().lastSyncedAt;
+  server.before(async () => { throw new Error("offline"); });
+  await syncNow();
+  expect(session.getSnapshot().lastSyncedAt).toBe(syncedAt);
+});
+
+it("cancelling a restore preview preserves the unanswered empty-phone offer", async () => {
+  await connectToPopulatedXps();
+  await restoreBackup();
+  finishRestore();
+  show("visible"); fire(); await timers.advance(600_000);
+  expect(session.getSnapshot()).toMatchObject({ restoreOffer: { notes: 1 }, paused: true, lastSyncedAt: null });
+  expect(server.requests.filter(({ path }) => path === "/v1/push")).toHaveLength(0);
+});
+
+it("reopening after intentionally purging the last note syncs its tombstone without a Restore offer", async () => {
+  server = await syncFixture();
+  await saveConnection({ address: server.address, token: server.token });
+  await db.notes.put(note());
+  stop = startSync({ queue, session, visibility, timers, clientFactory: server.clientFactory });
+  await stop.ready; stop();
+  await db.notes.delete("note-1");
+  await db.tombstones.put({ id: "note-1", purgedAt: AT });
+  stop = startSync({ queue, session, visibility, timers, clientFactory: server.clientFactory });
+  expect(await stop.ready).toMatchObject({ status: "ok", counts: { notes: 0 } });
+  expect(session.getSnapshot().restoreOffer).toBeNull();
 });

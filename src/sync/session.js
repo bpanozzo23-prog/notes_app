@@ -1,6 +1,6 @@
 const initial = () => ({
-  connected: false, running: false, lastResult: null, lastSyncedAt: null, counts: null,
-  missingImages: [], error: null, confirm: null, paused: false, proposals: [],
+  connected: false, connecting: false, running: false, lastResult: null, lastSyncedAt: null, counts: null,
+  missingImages: [], error: null, confirm: null, restoreOffer: null, paused: false, proposals: [],
 });
 export function createSyncSession() {
   let snapshot = initial();

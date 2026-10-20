@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { COMFORTABLE_BACKUP_BYTES, buildBackup, backupFilename, importBackup, validateBackup } from "../db/backup.js";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { COMFORTABLE_BACKUP_BYTES, buildBackup, backupFilename, validateBackup } from "../db/backup.js";
 import { fileStats } from "../db/files.js";
 import { db, setPref } from "../db/db.js";
 import { liveNotes } from "../db/notes.js";
@@ -10,25 +10,19 @@ import { nowIso } from "../lib/dates.js";
 import { saveStatusLabel } from "../lib/saveStatus.js";
 import { APP_VERSION, SCHEMA_VERSION } from "../version.js";
 import ScreenHeader from "../components/ScreenHeader.jsx";
-import { requestPersistence } from "../lib/persistence.js";
-import Confirm from "../components/Confirm.jsx";
+import BackupImport, { formatSize } from "../components/BackupImport.jsx";
+import { syncSession } from "../sync/session.js";
 import { useClaudeStatus } from "../claude/prefs.js";
 import { ChevronRight } from "lucide-react";
 
-// Small images show in KB rather than "0.0 MB"; a phone's quota reads better in GB.
-export function formatSize(bytes) {
-  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
-  if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
-  return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
-}
-const imageCount = (count) => `${count} ${count === 1 ? "image" : "images"}`;
+export { formatSize } from "../components/BackupImport.jsx";
 
 export default function Settings({ cleanupError, notebook, queue, run, busy, readOnly, onBack, onOpen, setMessage, updateState, error }) {
   const claude = useClaudeStatus(notebook.prefs);
   const [preview, setPreview] = useState(null);
   const backupInput = useRef(null);
-  const [confirmImport, setConfirmImport] = useState(false);
-  const { notes, trash, folders, prefs, persisted, refresh } = notebook;
+  const sync = useSyncExternalStore(syncSession.subscribe, syncSession.getSnapshot);
+  const { notes, trash, prefs, persisted, refresh } = notebook;
   const [images, setImages] = useState(null), [storage, setStorage] = useState(null);
   useEffect(() => {
     let alive = true;
@@ -51,18 +45,6 @@ export default function Settings({ cleanupError, notebook, queue, run, busy, rea
     downloadText(notebookToText({ notes, folders, now }), `notes-text-${now.toISOString().slice(0, 19).replaceAll(":", "-")}.md`);
     setMessage("Text download started.");
   }
-  async function replaceFromPreview() {
-    await queue.flush();
-    const before = await buildBackup();
-    downloadJson(before, `before-import-${backupFilename()}`);
-    await importBackup(preview.result.envelope);
-    // A restored notebook deserves the same eviction protection as a typed one.
-    await requestPersistence();
-    setPreview(null);
-    setConfirmImport(false);
-    await refresh();
-    setMessage("Backup imported. Your previous notebook's safety download was started first.");
-  }
   return <section>
     <ScreenHeader title="Settings" onBack={onBack} busy={busy} />
     <div className="space-y-6 px-4 pb-8">
@@ -79,6 +61,12 @@ export default function Settings({ cleanupError, notebook, queue, run, busy, rea
         <h2 className="mb-2 font-semibold">Claude</h2>
         <button className="flex min-h-11 w-full items-center justify-between py-2 text-left" aria-label={`Claude ${claude.ready ? "On" : "Off"}`} disabled={busy} onClick={() => onOpen({ screen: "settings-claude" })}>
           <span>Claude</span><span className="ml-auto mr-2 text-sm text-[var(--color-muted)]">{claude.ready ? "On" : "Off"}</span><ChevronRight size={18} aria-hidden="true" />
+        </button>
+      </section>
+      <section>
+        <h2 className="mb-2 font-semibold">Sync</h2>
+        <button className="flex min-h-11 w-full items-center justify-between py-2 text-left" aria-label={`Sync · ${sync.connected ? "Connected" : "Off"}`} disabled={busy} onClick={() => onOpen({ screen: "settings-sync" })}>
+          <span>Sync</span><span className="ml-auto mr-2 text-sm text-[var(--color-muted)]">{sync.connected ? "Connected" : "Off"}</span><ChevronRight size={18} aria-hidden="true" />
         </button>
       </section>
       <div className="space-y-2">
@@ -102,15 +90,8 @@ export default function Settings({ cleanupError, notebook, queue, run, busy, rea
               setPreview({ name: file.name, result: validateBackup(await readFileAsText(file)) });
             });
           }} />
-        {preview && <div className="space-y-2 rounded border border-[var(--color-line)] p-3 text-sm">
-          <p className="break-all">{preview.name}</p>
-          <p>{preview.result.summary.notes} notes ({preview.result.summary.trashed} in Trash), {preview.result.summary.folders} folders, {preview.result.summary.tombstones} deletion records.</p>
-          <p>{imageCount(preview.result.summary.images)} ({formatSize(preview.result.summary.imageBytes)})</p>
-          {preview.result.summary.willUpgrade && <p>This file will be upgraded to the current format.</p>}
-          {preview.result.errors.map((error, index) => <p role="alert" className="text-red-700" key={index}>{error}</p>)}
-          {preview.result.warnings.map((warning, index) => <p className="text-amber-800" key={index}>{warning}</p>)}
-          {preview.result.ok && <button className="app-button danger" disabled={busy || readOnly} onClick={() => setConfirmImport(true)}>Replace notebook</button>}
-        </div>}
+        {preview && <BackupImport preview={preview} onClose={() => setPreview(null)} notebook={notebook} queue={queue}
+          run={run} busy={busy} readOnly={readOnly} error={error} setMessage={setMessage} />}
       </div>
       <div className="space-y-2 text-sm">
         <h2 className="font-semibold">App</h2>
@@ -124,8 +105,5 @@ export default function Settings({ cleanupError, notebook, queue, run, busy, rea
         <p className={queue.status === "error" ? "font-semibold text-red-700" : "text-[var(--color-muted)]"}>Save status: {saveStatusLabel(queue.status)}{queue.status === "error" && ` — ${queue.error?.message}`}</p>
       </div>
     </div>
-    {confirmImport && <Confirm tone="danger" title="Replace notebook?" confirmLabel="Import and replace" busy={busy} error={error} onCancel={() => setConfirmImport(false)} onConfirm={() => run(replaceFromPreview)}>
-      Replace {notes.length + trash.length} notes and {folders.length} folders with {preview.result.envelope.notes.length} notes and {preview.result.envelope.folders.length} folders? A safety backup of the current notebook will download first. Your toolbar, colours and styles will be replaced by the backup's.
-    </Confirm>}
   </section>;
 }
