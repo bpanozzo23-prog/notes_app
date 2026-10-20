@@ -13,11 +13,12 @@ it("the browser guard aborts and records tailnet requests, including ports, with
   let pattern, handler, aborted = 0;
   const check = await guardTailnet({ route: async (match, callback) => { pattern = match; handler = callback; } });
   expect(check).not.toThrow();
-  for (const url of [DEFAULT_SYNC_ADDRESS + "/v1/state", "https://fixture.ts.net/v1/pair", "https://fixture.ts.net.:8443/v1/backup?secret=SENTINEL"]) {
+  for (const url of [DEFAULT_SYNC_ADDRESS + "/v1/state", "https://fixture.ts.net/v1/pair", "https://fixture.ts.net.:8443/v1/backup?secret=SENTINEL",
+    "http://fixture.ts.net:8443/v1/state"]) {
     expect(pattern.test(url)).toBe(true);
     await handler({ request: () => ({ method: () => "GET", url: () => url }), abort: async () => { aborted++; } });
   }
-  expect(aborted).toBe(3);
+  expect(aborted).toBe(4);
   expect(() => check()).toThrow("Unexpected request to Tailscale");
   try { check(); } catch (error) { expect(error.message).not.toContain("SENTINEL"); }
   for (const url of ["https://fixture.ts.net.evil.test/v1/state", "http://localhost:8790/v1/state"]) expect(pattern.test(url)).toBe(false);

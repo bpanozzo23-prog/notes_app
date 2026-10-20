@@ -151,11 +151,13 @@ LLM can read. The code may become public; the notes never are.
   `npm run sync-check`. Running on the XPS as the user service `notes-sync`, empty and unpaired;
   the lock-down passed in real sessions. No app change until 4b. Maintainer notes:
   [`server/README.md`](server/README.md).
-- **Phase 4b, run D — app engine implemented, 2026-10-20; not released.** Background capture,
-  image upload, push/retry/confirmation, outbox acknowledgements, pairing/disconnect/restore
-  methods, device-local token protection and the change/visibility scheduler. Tests use the real
-  handler in temporary folders without sockets. No Sync screens yet (run E); version remains
-  0.3.11 and schema 4. No live service or phone verification in this run.
+- **Phase 4b — the app sends, 0.4.0, released 2026-10-20.** Settings → Sync connects the
+  phone to the XPS with a code from `notes-sync pair`; after that the notebook copies itself about
+  10 seconds after edits and whenever the app opens or comes back. "Last synced" and the counts
+  show there, with Sync now, Restore from the XPS and Disconnect; problems show as plain
+  sentences. If the XPS copy would lose notes or get older versions (after an import, or on a new
+  phone), the app asks first. Verified with 1,948 tests, a 17-step end-to-end check and 190
+  screenshots. Owner phone check pending; **export a backup before connecting.**
 
 ## Running it
 

@@ -7,9 +7,17 @@
 // the app's own Settings → Import flow. Nothing from the owner's notes is involved.
 import { makePng } from "./image-fixture.mjs";
 import { mkdirSync, writeFileSync, unlinkSync } from "node:fs";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
 import { chromium, devices } from "playwright";
 import { guardTailnet } from "./tailnet-guard.mjs";
+import { initStore } from "../server/store.mjs";
+import { createContext, createHandler } from "../server/handler.mjs";
+import { DEFAULT_SYNC_ADDRESS } from "../src/sync/config.js";
+import { acceptImport, backFromScreen, changedSample, checkPreview, confirmation, importNotebook, until, unreachable, waitSynced } from "./sync-browser-fixtures.mjs";
 import { notebookAnswer, followupAnswer, noteAnswer, refusalAnswer, cutAnswer, overloadedAnswer, fallbackAnswer } from "../src/claude/fixtures/ask.js";
 import { tidyClass, tidyImage, tidyMalformed, tidyCut, tidyRefusal, tidyUnknown } from "../src/claude/fixtures/tidy.js";
 import { reorganiseNotebook } from "../src/claude/fixtures/reorganise.js";
@@ -29,11 +37,41 @@ const viewport = {
 const sample = fileURLToPath(new URL("../public/sample-notebook.json", import.meta.url));
 mkdirSync(out, { recursive: true });
 
-const browser = await chromium.launch();
+const syncRoot = await fs.mkdtemp(path.join(os.tmpdir(), "notes-sync-shots-"));
+let browser, assertNoTailnet, closing = false;
+const routedJobs = new Set(), routeErrors = [], unexpectedAnthropic = [];
+try {
+const syncConfig = { origin: new URL(url).origin, hosts: [new URL(DEFAULT_SYNC_ADDRESS).host],
+  listen: "127.0.0.1", port: 8790, home: syncRoot, libDir: path.join(syncRoot, "lib"),
+  storeDir: path.join(syncRoot, "private"), configDir: path.join(syncRoot, "config"), viewDir: path.join(syncRoot, "view") };
+await fs.mkdir(syncConfig.configDir, { mode: 0o700 });
+const syncStore = await initStore(syncConfig.storeDir);
+const syncContext = await createContext(syncConfig, { store: syncStore });
+const handleSync = createHandler(syncContext);
+let abortNextSync = false;
+browser = await chromium.launch();
 // Pixel 7 is the closest built-in profile to the owner's S25 Ultra: 412 px wide, 2.6x, touch.
 const context = await browser.newContext({ ...devices["Pixel 7"], viewport, locale: "en-GB", serviceWorkers: "block" });
-const assertNoTailnet = await guardTailnet(context);
-const unexpectedAnthropic = [];
+assertNoTailnet = await guardTailnet(context);
+// Playwright tries the last registered matching route first. Only this exact default address
+// is exempted from the guard, and it is always handled here, never continued to the network.
+await context.route(`${DEFAULT_SYNC_ADDRESS}/**`, async (route) => {
+  const job = (async () => {
+    if (abortNextSync) { abortNextSync = false; await route.abort(); return; }
+    const request = route.request(), target = new URL(request.url());
+    const headers = await request.allHeaders();
+    headers.host ??= target.host;
+    const response = await handleSync({ method: request.method(), path: target.pathname + target.search,
+      headers, readBody: async () => request.postDataBuffer() ?? Buffer.alloc(0) });
+    await route.fulfill({ status: response.status, headers: { "Content-Type": "application/json", ...response.headers },
+      body: response.body == null ? "" : Buffer.isBuffer(response.body) ? response.body : JSON.stringify(response.body) });
+  })();
+  routedJobs.add(job);
+  try { await job; }
+  catch { if (!closing) routeErrors.push("in-process sync route failed"); await route.abort().catch(() => {}); }
+  finally { routedJobs.delete(job); }
+});
+await context.grantPermissions(["local-network-access"], { origin: syncConfig.origin });
 await context.route("https://api.anthropic.com/**", async (route) => {
   const request = route.request();
   const path = new URL(request.url()).pathname;
@@ -700,8 +738,88 @@ await back();
 await button("Vocabulario — comida (conflict copy)").waitFor();
 await shot("162-conflict-copy-in-list");
 await otherWindow.close();
+// Phase 4b: only real UI actions against the real handler and this script's temporary store.
+// Reset the notebook after the earlier editing/Claude/conflict fixtures.
+await button("Settings").click();
+await importNotebook(page, sample);
+await button("Sync · Off").scrollIntoViewIfNeeded(); await shot("163-settings-sync-off");
+await button("Sync · Off").click(); await shot("164-sync-not-connected");
+const pairWindow = await syncContext.pairing.openWindow();
+const wrongCode = String((Number(pairWindow.code) + 1) % 1_000_000).padStart(6, "0");
+await page.getByLabel("Code", { exact: true }).fill(wrongCode); await button("Connect").click();
+await page.getByText("That code didn't work. Run notes-sync pair on the XPS for a new one.", { exact: true }).waitFor();
+await shot("165-sync-wrong-code");
+const pairFixture = async () => {
+  const { code } = await syncContext.enqueue(() => syncContext.pairing.openWindow());
+  await page.getByLabel("Code", { exact: true }).fill(code);
+  await button("Connect").click();
+};
+const sampleData = JSON.parse(await fs.readFile(sample, "utf8"));
+await pairFixture(); await waitSynced(page, sampleData);
+assert.ok(syncStore.state().round >= 1);
+await shot("166-sync-connected");
+await backFromScreen(page); await button("Sync · Connected").scrollIntoViewIfNeeded(); await shot("167-settings-sync-connected");
+await button("Sync · Connected").click();
+abortNextSync = true; await button("Sync now").click();
+await page.getByText(unreachable, { exact: true }).waitFor(); await shot("168-sync-unreachable");
+await syncContext.enqueue(() => syncContext.pairing.unpair());
+await button("Sync now").click();
+await page.getByText("The XPS no longer recognises this phone. Connect again with a new code.", { exact: true }).waitFor();
+await shot("169-sync-unauthorized");
+await pairFixture(); await waitSynced(page, sampleData);
+// Fail precisely the next commit, keeping all other store/history behavior real.
+const commit = syncStore.git.commit;
+syncStore.git.commit = async () => {
+  syncStore.git.commit = commit;
+  throw new Error("screenshot-history-failure");
+};
+await button("Sync now").click();
+await page.getByText("The XPS couldn't record history, so syncing is paused. Your notes are safe on this phone.", { exact: true }).waitFor();
+await shot("170-sync-history-blocked");
+await button("Sync now").click(); await waitSynced(page, sampleData);
+await page.getByText("The XPS couldn't record history, so syncing is paused. Your notes are safe on this phone.", { exact: true }).waitFor({ state: "hidden" });
+
+// A valid backup can retain image references while its file bytes are missing.
+const missingSample = { ...structuredClone(sampleData), files: [] };
+await backFromScreen(page); await importNotebook(page, missingSample); await button("Sync · Connected").click();
+await confirmation(page).waitFor();
+await button("Replace the XPS copy").click(); await waitSynced(page, missingSample);
+await page.getByText("1 picture used in your notes is missing on this phone, so the XPS can't back it up.", { exact: true }).waitFor();
+await shot("171-sync-missing-pictures");
+// Put the healthy sample back, so Restore will have the complete original picture.
+await backFromScreen(page); await importNotebook(page, sample); await button("Sync · Connected").click();
+await confirmation(page).waitFor(); await button("Replace the XPS copy").click(); await waitSynced(page, sampleData);
+await until("healthy sample restored to temporary store", () => syncStore.state().missingImages.length, (n) => n === 0);
+const { backup: modifiedSample } = changedSample(sampleData);
+await backFromScreen(page); await importNotebook(page, modifiedSample); await backFromScreen(page);
+// Let the import-triggered round ask for a decision while the list is open. Back from the
+// decision screen itself would dismiss it, exactly like Android Back.
+await button("The XPS copy needs your decision · Review").waitFor(); await shot("174-sync-list-bar");
+await button("The XPS copy needs your decision · Review").click();
+await confirmation(page).waitFor();
+await page.getByRole("heading", { name: "1 note would be removed", exact: true }).waitFor();
+await page.getByRole("heading", { name: "1 note would be replaced", exact: true }).waitFor();
+await confirmation(page).evaluate((element) => element.scrollIntoView({ block: "start" }));
+await shot("172-sync-confirm");
+await page.setViewportSize({ width: 375, height: viewport.height });
+await confirmation(page).evaluate((element) => element.scrollIntoView({ block: "start" }));
+await shot("173-sync-confirm-375");
+await page.setViewportSize(viewport);
+await button("Restore from the XPS instead").click();
+await checkPreview(page, sampleData);
+await page.getByLabel("Import preview", { exact: true }).scrollIntoViewIfNeeded(); await shot("175-sync-restore-preview");
+const roundBeforeRestore = syncStore.state().round;
+await acceptImport(page);
+await until("restore full push", () => syncStore.state().round, (n) => n > roundBeforeRestore);
+await waitSynced(page, sampleData);
+await page.evaluate(() => window.scrollTo(0, 0)); await shot("176-sync-after-restore");
+await button("Disconnect").click(); await page.getByRole("dialog", { name: "Disconnect from the XPS?" }).waitFor();
+await shot("177-sync-disconnect-confirm");
+await page.getByRole("dialog", { name: "Disconnect from the XPS?" }).getByRole("button", { name: "Disconnect", exact: true }).click();
+await button("Connect").waitFor();
+await backFromScreen(page);
 // Leave a note open for the existing database guards and reload checks.
-await button("Vocabulario — comida (conflict copy)").click();
+await button("Vocabulario — comida").click();
 await page.getByLabel("Note body").waitFor();
 // Only this fresh browser context's fixture notebook is involved in the guard screenshots.
 await page.evaluate(() => {
@@ -727,6 +845,14 @@ await back();
 await button("Settings").click();
 await shot("19-read-only-settings");
 
-await browser.close();
-assertNoTailnet();
-if (unexpectedAnthropic.length) throw new Error(`Unexpected request to Anthropic: ${unexpectedAnthropic.join(", ")}`);
+} finally {
+  closing = true;
+  try { await browser?.close(); }
+  finally {
+    await Promise.allSettled([...routedJobs]);
+    await fs.rm(syncRoot, { recursive: true, force: true });
+  }
+  assertNoTailnet?.();
+  if (routeErrors.length) throw new Error(routeErrors.join(", "));
+  if (unexpectedAnthropic.length) throw new Error(`Unexpected request to Anthropic: ${unexpectedAnthropic.join(", ")}`);
+}

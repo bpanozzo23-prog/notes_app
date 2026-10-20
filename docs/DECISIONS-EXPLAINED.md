@@ -5,7 +5,7 @@ this one is for the owner: what was chosen, why, what it means for the app, what
 and how hard it would be to reverse ("lock-in"). Ordered by lock-in, hardest first. Updated whenever
 `DECISIONS.md` gains an entry with consequences for how the app behaves.
 
-Last updated 2026-10-20, at step 4b (§75).
+Last updated 2026-10-20, at step 4b (§76).
 
 ---
 
@@ -1298,3 +1298,27 @@ preventing the notes themselves from being backed up.
 
 Tests call the real server logic with made-up notebooks in temporary folders, without a
 network connection. Phone behavior and the controls remain for run E.
+
+### 76. Step 4b: your phone sends its notes to the XPS (0.4.0)
+
+**What you'll see:**
+- **Settings → Sync.** Run `notes-sync pair` on the XPS (or ask me) and type the 6-digit code it
+  shows. Chrome asks once to let the site reach devices on your local network; tap Allow.
+- **After that, syncing is automatic.** It runs about 10 seconds after you stop editing, and when
+  you open the app or come back to it. Typing never waits for it. Settings → Sync shows "last
+  synced …" and how many notes and pictures the XPS holds, with Sync now, Restore from the XPS
+  and Disconnect.
+- **Problems show as one plain sentence there,** never as a pop-up while you type. Examples:
+  Tailscale is off, Chrome is blocking the connection, or the XPS no longer recognises the phone.
+- **A question before anything is lost.** If a sync would remove notes from the XPS copy or
+  replace them with different versions, a bar on the notes list says "The XPS copy needs your
+  decision". Settings → Sync then lists the notes, with Restore from the XPS instead, Replace the
+  XPS copy, or Not now. This happens after you import a backup, or on a new phone.
+- **A new or wiped phone** is offered "The XPS has 43 notes. Restore them?" before it sends
+  anything.
+
+**Unchanged:** importing a file works as before (it now has a Cancel button, and Back closes the
+preview). The "Your notes go to Anthropic" sentence in Claude settings now begins "From this
+app", because Claude Code on the XPS is a separate path.
+
+**Lock-in: low.** Disconnect stops it. The XPS keeps its copy and history until deleted.

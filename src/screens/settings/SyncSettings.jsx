@@ -10,9 +10,11 @@ import { syncSession } from "../../sync/session.js";
 import { connect, disconnect, syncNow, confirmReplace, dismissConfirm, restoreBackup, declineRestore, finishRestore } from "../../sync/trigger.js";
 import { lastSyncedLabel, syncStatusMessage } from "../../sync/status.js";
 
+const count = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
 function Titles({ label, rows }) {
   return <div className="space-y-1">
-    <h3 className="font-semibold">{rows.length} {label}</h3>
+    <h3 className="font-semibold">{count(rows.length, "note", "notes")} {label}</h3>
     <ul className="list-disc space-y-1 pl-5">{rows.slice(0, 5).map(({ id, title }) => <li className="break-words" key={id}>{title || "Untitled note"}</li>)}</ul>
     {rows.length > 5 && <details>
       <summary className="min-h-11 cursor-pointer py-2 underline">Show all</summary>
@@ -88,7 +90,7 @@ export default function SyncSettings({ busy, readOnly, onBack, notebook, queue, 
       {guardMessage && <p role="alert">{guardMessage}</p>}
       {status.connected && <>
         <p className="font-semibold">{lastSyncedLabel(status.lastSyncedAt, now)}</p>
-        {status.counts && <p>On the XPS: {status.counts.notes} notes, {status.counts.images} pictures</p>}
+        {status.counts && <p>On the XPS: {count(status.counts.notes, "note", "notes")}, {count(status.counts.images, "picture", "pictures")}</p>}
         <div className="flex flex-wrap gap-2">
           <button className="app-button primary" disabled={disabled || working || status.running || status.paused} onClick={() => perform(syncNow)}>{status.running ? "Syncing…" : "Sync now"}</button>
           <button className="app-button" disabled={disabled || working || !!preview} onClick={() => perform(restore)}>Restore from the XPS…</button>
@@ -104,12 +106,14 @@ export default function SyncSettings({ busy, readOnly, onBack, notebook, queue, 
         <input ref={codeInput} id="sync-code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} pattern="[0-9]{6}" aria-describedby="sync-code-hint"
           className="min-h-11 w-full rounded border border-[var(--color-line)] px-3" disabled={disabled || working || status.connecting}
           onChange={(event) => setValidCode(/^\d{6}$/.test(event.target.value))} />
-        <p id="sync-code-hint">run "notes-sync pair" on the XPS</p>
+        <p id="sync-code-hint">Get a code by running notes-sync pair on the XPS.</p>
         <p>Chrome will ask to let this site reach devices on your local network: tap Allow.</p>
         <button type="submit" className="app-button primary" disabled={disabled || working || status.connecting || !validCode}>{status.connecting ? "Connecting…" : "Connect"}</button>
       </form>}
       {sentence && <p role="status">{sentence}</p>}
-      {status.missingImages.length > 0 && <p role="status">{status.missingImages.length} pictures referenced by notes are missing on this phone, so the XPS can't back them up.</p>}
+      {status.missingImages.length > 0 && <p role="status">{status.missingImages.length === 1
+        ? "1 picture used in your notes is missing on this phone, so the XPS can't back it up."
+        : `${status.missingImages.length} pictures used in your notes are missing on this phone, so the XPS can't back them up.`}</p>}
       {status.restoreOffer && !preview && <div className="space-y-3 rounded border border-[var(--color-line)] p-3">
         <p className="font-semibold">The XPS has {status.restoreOffer.notes} notes. Restore them?</p>
         <div className="flex flex-wrap gap-2">
@@ -119,9 +123,9 @@ export default function SyncSettings({ busy, readOnly, onBack, notebook, queue, 
       </div>}
       {status.confirm && !preview && <div className="space-y-3 rounded border border-[var(--color-line)] p-3">
         <h2 className="font-semibold">The XPS copy has notes this phone doesn't</h2>
-        <p>{status.confirm.removed.length} notes would be removed from the XPS copy and {status.confirm.changed.length} would be replaced with this phone's versions. The XPS keeps every earlier version in its history.</p>
-        <Titles label="notes would be removed" rows={status.confirm.removed} />
-        <Titles label="notes would be replaced" rows={status.confirm.changed} />
+        <p>{count(status.confirm.removed.length, "note", "notes")} would be removed from the XPS copy and {status.confirm.changed.length} would be replaced with this phone's versions. The XPS keeps every earlier version in its history.</p>
+        <Titles label="would be removed" rows={status.confirm.removed} />
+        <Titles label="would be replaced" rows={status.confirm.changed} />
         <div className="flex flex-wrap gap-2">
           <button className="app-button" disabled={disabled || working} onClick={() => perform(restore)}>Restore from the XPS instead</button>
           <button className="app-button danger" disabled={disabled || working} onClick={() => perform(confirmReplace)}>Replace the XPS copy</button>

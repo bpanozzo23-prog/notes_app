@@ -1,4 +1,4 @@
-# Sync service — Phase 4a, runs A–C
+# Sync service — Phase 4a and the Phase 4b checks
 
 The runtime imports only Node built-ins and other `.mjs` files here. Nothing imports the app
 at runtime. `compatibility.test.js` compares the copied constants and image-reference parser
@@ -71,6 +71,52 @@ Run `npm test` for the entire app and service suite. Run `node --check` on each 
 Real sockets, Tailscale forwarding, service installation and Claude Code policy enforcement
 remain Claude's checks. No phone changes ship in 4a.
 
+### Temporary service and browser checks
+
+From the repository root, with the existing dependencies and Playwright Chromium installed:
+
+```sh
+npm run sync-check                 # server checks, then browser end-to-end checks
+npm run sync-check -- --server-only # just the original server checks
+npm run shots                     # existing dev app, default phone viewport
+npm run shots -- private-data/shots http://localhost:5174/notes_app/
+```
+
+The server part checks pairing, uploads, store/view counts and hashes, incremental pushes,
+timer ingestion of proposal file pairs, outcomes, stale refusals, superseding, import
+confirmation, backup contents, and crash recovery after apply/publication.
+Its optional `--origin http://127.0.0.1:5174` changes only that part's allowed Origin.
+
+The browser part builds with Vite into a temporary `dist/`, serves `/notes_app/` on an
+automatically chosen loopback port, and starts `server/main.mjs serve` on another loopback
+port. Its temporary config allows that app origin and its own service host. Both
+`NOTES_SYNC_TEST=1` and `NOTES_SYNC_SKIP_TAILSCALE=1` are set; `pair` and `status` use that
+same config. A child-only temporary `tailscale` stub prevents `status` from probing the
+machine's real Serve/Funnel configuration.
+
+Playwright uses the Pixel 7 profile, blocks service workers, grants local-network access,
+and aborts/fails on any Tailscale or Anthropic request. Through the UI it imports the sample,
+connects, types and waits up to 75 seconds for autosync, approves exactly one changed and one
+removed note, restores through the normal preview, and proves the restore sends every row
+without confirmation. It then disconnects with a real response held, imports during an image
+upload with different bytes for the same image id, and crashes the service after commit.
+Checks read only the temporary keyed note files, image objects, view and journal. They verify
+old/new notebook isolation and a successful browser round after recovery. Expect several
+minutes; each stage prints PASS or FAIL, and any failure exits non-zero. Children, browser
+contexts and temporary directories are cleaned up on success or failure.
+
+Shots 163–177 cover the Sync entry, pairing, connected counts/time, wrong code, unreachable,
+unpaired, history failure, missing pictures, copy confirmation (also at 375 px), notes-list
+bar, restore preview/result and Disconnect confirmation. The default sync address is intercepted
+and passed to the **real in-process handler on a temporary store**; no sync socket is opened.
+Every other `*.ts.net` request is aborted and fails the run. The temporary store is removed
+even if a shot fails. The existing app server must already be running for shots.
+
+These scripts cost nothing and never use the owner's notebook, configuration or live service.
+Codex wrote the browser/socket steps without running them in its sandbox. Claude must run
+both scripts and inspect the PNGs; phone keyboard and real Tailscale permission behavior remain
+owner checks at `http://brent-dell-system-xps-l502x:5174/notes_app/`.
+
 ## View and proposals
 
 `view-fs.mjs` uses Linux directory descriptors (`/proc/self/fd`) to pin directories after
@@ -137,13 +183,9 @@ the store, rebuilds the view, enables linger/the unit and configures private Ser
 removes only the unit, launcher and Serve mapping. Policies, launcher and unit are rendered from
 the selected release on deploy and rollback as well as install.
 
-`npm run sync-check` is an explicit, socket-based script for Claude to run. It uses a new
-temporary store/view/config, the made-up sample notebook and loopback only; it checks pairing,
-image uploads, pushes, file-pair ingestion by the timer, outcomes, stale refusals, superseding,
-import confirmation, backup counts/hashes and process exits after apply/publication followed
-by recovery. Its Markdown
-projection is fixture-only; the app's view export belongs to 4b. It does not verify Tailscale
-forwarding or browser behavior.
+`npm run sync-check` now includes both server and browser checks described above. The server
+part retains its fixture-only Markdown projection; the browser part exercises the app's real
+view export. Neither part verifies real Tailscale forwarding.
 
 Run C does not repeat live installation, Tailscale or Claude Code sessions. The prior live
 checks and the AppArmor sandbox failure are recorded in `DECISIONS.md`. Before using this

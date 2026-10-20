@@ -1393,3 +1393,32 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   addresses are accepted only for 127.0.0.1 and localhost, and the three Playwright scripts fail
   closed on any `*.ts.net` request. `package-lock.json` changed only its version. Verification:
   `npm test` (85 files, 1,947 tests), `npm run build`, `node --check scripts/*.mjs`.
+
+- 2026-10-20 — Phase 4b, run F adds Sync shots 163–177 and the browser half of `sync-check`.
+  Screenshots route only the exact default sync address to the real handler on a temporary
+  store, with local-network permission granted; every other HTTP(S) Tailscale request aborts
+  and fails the run. The browser check builds/serves a temporary app and service on loopback,
+  imports only sample-derived notebooks through the UI, and checks pairing, typed autosave,
+  one-change/one-removal confirmation, full-push restore, Disconnect with a response held,
+  import during a held image upload, and recovery after a commit crash. Store/view/image
+  assertions distinguish a published notebook from an upload that never reached a round.
+  `status` runs with a temporary child-only Tailscale stub because its CLI probes Serve even
+  in test mode; no real machine configuration is needed. Shared script helpers keep the import
+  approval/safety download and fixture edits consistent. `--server-only` retains the original
+  checks for diagnosis. No app or server runtime logic, dependencies, schema or version change;
+  no owner data, live service, commit or deployment. Browser/socket checks and PNG/phone
+  inspection remain for Claude and the owner; Codex cannot run them in this sandbox.
+  Verification passed: `npm test -- --pool=threads --reporter=verbose` (85 files, 1,947 tests),
+  `npm run build`, syntax checks of all four changed/new scripts and `git diff --check`.
+  The full suite took about five minutes; earlier interrupted/time-limited attempts had no
+  result. The build retains its existing large-chunk warning.
+- 2026-10-20 — Claude Code ran run F's checks and looked at the shots: `npm run sync-check` 17/17
+  (10 server, 7 browser), `npm run shots` (190 PNGs; sync shots 163–177 read at phone width and
+  375 px), `npm run browser-checks` 15/15, `npm test` (85 files, 1,948 tests), `npm run build`.
+  Fixed from the shots: plurals ("1 note", "1 picture", "1 picture used in your notes is
+  missing … back it up") and the code hint ("Get a code by running notes-sync pair on the
+  XPS."), with a test; the browser fixture now expects the same wording. The dev server was
+  restarted in its tmux restart loop (it hadn't come back after the 2026-10-19 freeze).
+- 2026-10-20 — **4b released as 0.4.0** (schema 4). Nothing syncs until the owner connects in
+  Settings → Sync; the live XPS service is unchanged (no server code changed in 4b). Owner's
+  phone check pending; before connecting, the owner exports a backup on the published app.

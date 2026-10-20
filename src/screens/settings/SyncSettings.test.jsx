@@ -79,7 +79,7 @@ it("renders the connection form and enables Connect only for six digits, keeping
   expect(address.inputMode).toBe("url");
   expect(input.getAttribute("value")).toBeNull();
   expect(input.inputMode).toBe("numeric"); expect(input.autocomplete).toBe("one-time-code");
-  expect(screen.getByText('run "notes-sync pair" on the XPS')).toBeTruthy();
+  expect(screen.getByText("Get a code by running notes-sync pair on the XPS.")).toBeTruthy();
   expect(screen.getByText("Chrome will ask to let this site reach devices on your local network: tap Allow.")).toBeTruthy();
   for (const value of ["", "12345", "1234567", "12345a", "123 45"]) {
     fireEvent.change(input, { target: { value } }); expect(button("Connect").disabled).toBe(true);
@@ -96,7 +96,7 @@ it("renders the connection form and enables Connect only for six digits, keeping
   expect(input.value).toBe(""); expect(button("Connecting…").disabled).toBe(true);
   expect(button("Back").disabled).toBe(false);
   await act(async () => { gate.resolve(); });
-  await screen.findByText("On the XPS: 1 notes, 0 pictures");
+  await screen.findByText("On the XPS: 1 note, 0 pictures");
   const token = (await readSyncConfig()).token;
   expect(token).toBeTruthy();
   const section = screen.getByRole("heading", { name: "Sync with the XPS" }).closest("section");
@@ -144,7 +144,7 @@ it("shows session last-sync time, XPS counts and missing pictures", () => {
   render(<SyncSettings {...props()} />);
   expect(screen.getByText("Connected · last synced 2 minutes ago")).toBeTruthy();
   expect(screen.getByText("On the XPS: 43 notes, 12 pictures")).toBeTruthy();
-  expect(screen.getByText("3 pictures referenced by notes are missing on this phone, so the XPS can't back them up.")).toBeTruthy();
+  expect(screen.getByText("3 pictures used in your notes are missing on this phone, so the XPS can't back them up.")).toBeTruthy();
 });
 
 it("renders confirmation counts with five initial titles and disclosures, safely as text", () => {
@@ -290,4 +290,17 @@ it("SyncBar ignores errors and proposals until Phase 4c", () => {
   syncSession.update({ error: { kind: "blocked" }, proposals: [{ id: "fixture" }] });
   const { container } = render(<SyncBar onOpen={vi.fn()} />);
   expect(container.textContent).toBe("");
+});
+
+it("uses the singular for one note, one picture and one missing picture", async () => {
+  const { syncSession } = await import("../../sync/session.js");
+  syncSession.update({ connected: true, counts: { notes: 1, images: 1 }, missingImages: ["a"],
+    confirm: { removed: [{ id: "r", title: "Removed" }], changed: [{ id: "c", title: "Changed" }] } });
+  render(<SyncSettings {...props()} />);
+  expect(screen.getByText("On the XPS: 1 note, 1 picture")).toBeTruthy();
+  expect(screen.getByText("1 picture used in your notes is missing on this phone, so the XPS can't back it up.")).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "1 note would be removed" })).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "1 note would be replaced" })).toBeTruthy();
+  expect(screen.getByText(/^1 note would be removed from the XPS copy and 1 would be replaced/)).toBeTruthy();
+  syncSession.reset();
 });
