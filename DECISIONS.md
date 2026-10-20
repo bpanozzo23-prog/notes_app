@@ -1092,3 +1092,13 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   `local-network-access`, `local-network` and `loopback-network`. — On the phone, Chrome should
   ask once; the app must read the permission state to explain a refusal, which otherwise looks
   like a network failure. Phone results follow.
+- 2026-10-19 — Spike passed on the owner's phone (Chrome 155, browser tab, published site): the
+  local-network permission is granted; on Wi-Fi and on mobile data a simple request, a JSON
+  request with a token (CORS preflight) and 1 MB and 8 MB uploads all succeeded (8 MB in 1.1 s on
+  Wi-Fi and 0.9 s on mobile data; a run's first request 1.3–2.5 s, later ones under 0.1 s); with
+  Tailscale off every request failed in 0.25–0.5 s as "Failed to fetch". Chrome sent no
+  `Access-Control-Request-Private-Network` header (it uses the permission, not the older
+  preflight). Not run: the installed app (the permission belongs to the site, so the app shares
+  it) and the frozen-device timing (the client uses timeouts regardless). — The published app can
+  reach the XPS, so the fallback of serving the app from the XPS is not needed. The test page, the
+  endpoint and the :8443 Serve entry are removed; step 4a adds the real service.
