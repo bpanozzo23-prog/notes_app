@@ -175,6 +175,10 @@ LLM can read. The code may become public; the notes never are.
   new notes to Trash, trashed notes back, nothing changed since overwritten. Contract in
   `docs/PHASE-4-DIRECTION.md` "4d" (Codex-reviewed twice); plain-language summary in
   `docs/DECISIONS-EXPLAINED.md` §78. Owner phone check pending.
+- **Indent and outdent buttons, 0.4.3, 2026-10-22.** Two toolbar buttons after the list buttons
+  nest a bullet, numbered or checklist line under the one above, or bring it back out; greyed
+  out outside a list. No change to how notes are stored. Owner-verified on the phone (dev server);
+  `docs/DECISIONS-EXPLAINED.md` §79.
 
 ## Running it
 

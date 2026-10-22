@@ -1394,3 +1394,22 @@ add pictures.
 
 **Lock-in: none.** No change to how notes are stored; the XPS keeps every suggestion in its
 history.
+
+### 79. Indent and outdent buttons (0.4.3, 2026-10-22)
+
+You asked for a "tab" button for sub-bullets, since the phone keyboard has no Tab key.
+
+- **Indent** moves the bullet, numbered or checklist line you're on in under the one above it.
+  **Outdent** moves it back out; on a line that's already all the way left, it turns it into a
+  plain line, like Shift+Tab on a computer.
+- **Lists only.** Elsewhere both buttons are greyed out, and tapping them doesn't close the
+  keyboard.
+- **Where they are:** after the list buttons. If you had already customised your toolbar, add
+  them in Settings → Toolbar.
+- **Not done: indenting plain lines.** A typed tab disappears when a note is reopened, so the
+  proper way would be a new "indent level" stored in notes, which permanently changes the note
+  format. Left until you need it.
+- **Discussed, not planned: collapsible sub-bullets** (OneNote's +/−). Feasible, medium-sized,
+  and it also adds something new to the note format.
+
+**Lock-in: none.** Nested lists were already part of what notes can hold.
