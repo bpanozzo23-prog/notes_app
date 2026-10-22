@@ -78,7 +78,7 @@ export function validateOutcomes(body) {
       typeof item.hash === "string" && HASH.test(item.hash) &&
       OUTCOMES.includes(item.outcome) && isDate(item.at) &&
       (item.applied === undefined || item.applied === null ||
-        Array.isArray(item.applied) && item.applied.length <= 500 && item.applied.every((tick) => isSafeId(tick) && tick.length <= 200)),
+        Array.isArray(item.applied) && item.applied.every((tick) => isSafeId(tick) && tick.length <= 200)),
       "invalid-outcome");
   }
   return body;

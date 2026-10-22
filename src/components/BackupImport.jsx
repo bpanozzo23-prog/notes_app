@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { buildBackup, backupFilename, importBackup } from "../db/backup.js";
+import { buildSafetyBackup, backupFilename, importBackup } from "../db/backup.js";
 import { downloadJson } from "../lib/file.js";
 import { requestPersistence } from "../lib/persistence.js";
 import { useOverlay } from "../lib/overlays.jsx";
@@ -21,9 +21,9 @@ export default function BackupImport({ preview, onClose, onImported, notebook, q
   async function replaceFromPreview() {
     if (readOnly || busy || !result.ok) return;
     await queue.flush();
-    const before = await buildBackup();
-    downloadJson(before, `before-import-${backupFilename()}`);
-    await importBackup(result.envelope);
+    const { envelope, fingerprint } = await buildSafetyBackup();
+    downloadJson(envelope, `before-import-${backupFilename()}`);
+    await importBackup(result.envelope, { expected: fingerprint });
     // A restored notebook deserves the same eviction protection as a typed one.
     await requestPersistence();
     setConfirmImport(false);

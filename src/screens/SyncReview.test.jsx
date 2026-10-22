@@ -6,6 +6,8 @@ import SyncSettings from "./settings/SyncSettings.jsx";
 import SyncBar from "../components/SyncBar.jsx";
 import { db, notebookAccess, writeTransaction } from "../db/db.js";
 import { createNote, updateNote } from "../db/notes.js";
+import { createFolder, deleteFolder } from "../db/folders.js";
+import * as syncTrigger from "../sync/trigger.js";
 import { resetDatabase } from "../test/fixtures.js";
 import { proposalFixture, newProposalFixture, trashProposalFixture } from "../sync/inbox-fixtures.js";
 import { syncSession } from "../sync/session.js";
@@ -163,7 +165,10 @@ it("Settings → Sync offers the shared Undo and its confirmation with the xps l
   expect((await db.notes.get(a.id)).html).toBe(a.html);
 });
 it("routes through App and Android Back closes the formatted preview and title edit before leaving", async () => {
+  const started = vi.spyOn(syncTrigger, "startSync");
   render(<App />); await idle();
+  // App starts sync after boot; that reset must finish before the fixture state arrives.
+  await waitFor(() => expect(started).toHaveBeenCalled());
   act(() => syncSession.update({ proposals: [versions[0]] }));
   fireEvent.click(await screen.findByRole("button", { name: "Claude Code has 1 suggestion · Review" }));
   await screen.findByRole("heading", { name: "Claude Code's suggestions" }); await idle();
@@ -220,6 +225,45 @@ it("Keep both shows the fresh copy, saves it and offers Undo", async () => {
   expect(screen.queryByRole("dialog")).toBeNull(); expect(await db.notes.filter((n) => n.title === "Clear title (from Claude Code)").count()).toBe(1);
   expect((await readHandled())[0].outcome).toBe("kept"); expect((await db.notes.get(a.id)).title).toBe("Local");
 });
+it("offers Keep both once an unreadable card goes stale while the review is open", async () => {
+  const home = await createFolder("Home"), target = await createFolder("Target");
+  a = await updateNote(a.id, { folderId: home.id });
+  const version = proposalFixture(a, { title: "Proposed", body: "<p>Proposed body</p>", folderId: target.id });
+  await deleteFolder(target.id);
+  syncSession.update({ proposals: [version] });
+  render(<SyncReview {...props()} />);
+  await screen.findByText(/This suggestion can't be read safely/);
+  expect(screen.queryByRole("button", { name: "Keep both" })).toBeNull();
+  await updateNote(a.id, { title: "Owner" });
+  const keep = await screen.findByRole("button", { name: "Keep both" });
+  expect(screen.queryByText(/This suggestion can't be read safely/)).toBeNull();
+  fireEvent.click(keep);
+  const dialog = await screen.findByRole("dialog", { name: "Keep both" });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Add as a new note" }));
+  await screen.findByText("Added “Proposed (from Claude Code)”.");
+  expect((await db.notes.filter((note) => note.title === "Proposed (from Claude Code)").first()).folderId).toBe(home.id);
+});
+it.each(["deleted", "ambiguous"])("offers Keep both for a stale edit with a %s folder", async (kind) => {
+  const folder = await createFolder("Before");
+  a = await updateNote(a.id, { folderId: folder.id });
+  const version = proposalFixture(a, { title: "Proposed", body: "<p>Proposed body</p>",
+    ...(kind === "ambiguous" ? { folderId: null, newFolder: "Recipes" } : {}) });
+  if (kind === "ambiguous") { await createFolder("Recipes"); await createFolder("recipes"); await updateNote(a.id, { title: "Owner" }); }
+  else await deleteFolder(folder.id);
+  syncSession.update({ proposals: [version] });
+  render(<SyncReview {...props()} />);
+  const keep = await screen.findByRole("button", { name: "Keep both" });
+  expect(keep.disabled).toBe(false);
+  expect(screen.queryByText(/This suggestion can't be read safely/)).toBeNull();
+  expect(screen.queryByRole("button", { name: /^Apply/ })).toBeNull();
+  fireEvent.click(keep);
+  const dialog = await screen.findByRole("dialog", { name: "Keep both" });
+  expect(within(dialog).getByText(kind === "deleted" ? "No folder" : "Before")).toBeTruthy();
+  fireEvent.click(within(dialog).getByRole("button", { name: "Add as a new note" }));
+  await screen.findByText("Added “Proposed (from Claude Code)”.");
+  const copy = await db.notes.filter((note) => note.title === "Proposed (from Claude Code)").first();
+  expect(copy.folderId).toBe(kind === "deleted" ? null : folder.id);
+});
 it.each(["title", "folder"])("closes Keep both on a %s race and requires opening and confirming the sheet again", async (field) => {
   syncSession.update({ proposals: [versions[0]] }); await updateNote(a.id, { title: "Local" });
   await db.folders.put({ id: "folder", name: "Folder", position: 0 });
@@ -266,7 +310,9 @@ it("mixed Undo names its decisions without treating a new note as an edited sour
   expect((await db.notes.get(a.id)).title).toBe("My later edit");
 });
 it("Android Back closes Show the note and Keep both before leaving the review", async () => {
+  const started = vi.spyOn(syncTrigger, "startSync");
   await updateNote(a.id, { title: "Local" }); render(<App />); await idle();
+  await waitFor(() => expect(started).toHaveBeenCalled());
   act(() => syncSession.update({ proposals: [versions[0], trashProposalFixture(b)] }));
   fireEvent.click(await screen.findByRole("button", { name: "Claude Code has 2 suggestions · Review" }));
   await screen.findByRole("heading", { name: "Claude Code's suggestions" }); await idle();

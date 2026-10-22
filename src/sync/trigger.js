@@ -23,10 +23,10 @@ export function startSync({
   let stopped = false, connected = false, dismissed = false, connecting = false, disconnecting = false, connectionAttempt = null;
   let checkRestore = true, restoreOffer = null, restoring = false;
   let dirty = false, firstAt = null, lastAt = null, timer = null, retryAt = 0, failures = 0;
-  let flight = null, pending = null, revision = 0;
+  let flight = null, pending = null, revision = 0, connectionRead = 0, deferredConnection = false;
   const visible = () => visibility.visibilityState !== "hidden";
-  const paused = () => stopped || !connected || connecting || dismissed || !!pending || !!restoreOffer || restoring ||
-    !canSync(notebookAccess.getSnapshot()) || syncLifecycle.isImporting();
+  const paused = () => stopped || !connected || connecting || disconnecting || dismissed || !!pending || !!restoreOffer || restoring ||
+    !canSync(notebookAccess.getSnapshot()) || syncLifecycle.isImporting() || syncLifecycle.isUpdating();
   const publishPause = () => session.update({ connected, connecting, paused: paused() });
   const clearTimer = () => { if (timer !== null) timers.clearTimeout(timer); timer = null; };
   const markDirty = () => {
@@ -129,15 +129,47 @@ export function startSync({
       if (dirty) void run();
     }
   }
+  async function adoptConnection() {
+    const started = ++connectionRead;
+    const current = () => !stopped && !connecting && !disconnecting && started === connectionRead;
+    try {
+      const config = await readSyncConfig();
+      if (!current()) return cancelled();
+      connected = !!config.token;
+      publishPause();
+      // Let an invalidated request release its single-flight slot before starting again.
+      await flight;
+      return current() ? now() : cancelled();
+    } catch {
+      if (current()) session.update({ error: { kind: "invalid" } });
+      return { status: "error", kind: "invalid" };
+    }
+  }
+  // Another window's change that arrives during this window's own Connect or Disconnect is
+  // read once that finishes, so the committed connection always wins.
+  function adoptDeferred() {
+    if (!deferredConnection || stopped || connecting || disconnecting) return;
+    deferredConnection = false;
+    void adoptConnection();
+  }
   const stopAccess = notebookAccess.subscribe(() => { publishPause(); schedule(); });
   const stopLifecycle = syncLifecycle.subscribe((event) => {
+    if (stopped) return;
+    if (event === "connection-changed" && (connecting || disconnecting)) { deferredConnection = true; return; }
     revision++;
     pending = null;
+    if (event === "connection-changed") {
+      connected = false; dismissed = false; restoring = false; restoreOffer = null; checkRestore = true;
+      failures = 0; retryAt = 0;
+      clearTimer(); session.reset(); publishPause();
+      void adoptConnection();
+      return;
+    }
     session.update({ confirm: null, proposals: [] });
     markDirty();
     publishPause();
     schedule();
-    if (event === "import-ended" && !flight && !paused()) void now();
+    if ((event === "import-ended" || event === "update-ended") && !flight && !paused()) void now();
   });
   Dexie.on("storagemutated", mutation);
   visibility.addEventListener("visibilitychange", visibilityChanged);
@@ -179,10 +211,10 @@ export function startSync({
     },
     async disconnect() {
       if (disconnecting) return { status: "paused" };
-      disconnecting = true; connectionAttempt = null;
+      disconnecting = true; connectionAttempt = null; connectionRead++;
       connected = false; connecting = false; dismissed = false; pending = null;
       restoring = false; restoreOffer = null; checkRestore = true;
-      syncLifecycle.connectionChanged();
+      syncLifecycle.invalidate();
       clearTimer();
       session.reset(); publishPause();
       try {
@@ -192,16 +224,16 @@ export function startSync({
         if (config.token) await clientFactory(config).unpair();
         return { status: "disconnected" };
       } catch { return { status: "error", kind: "invalid" }; }
-      finally { disconnecting = false; }
+      finally { disconnecting = false; adoptDeferred(); }
     },
     async connect({ address, code }) {
-      if (connecting || disconnecting || !canSync(notebookAccess.getSnapshot()) || syncLifecycle.isImporting()) return { status: "paused" };
+      if (connecting || disconnecting || !canSync(notebookAccess.getSnapshot()) || syncLifecycle.isImporting() || syncLifecycle.isUpdating()) return { status: "paused" };
       const attempt = {};
-      connectionAttempt = attempt;
+      connectionAttempt = attempt; connectionRead++;
       connecting = true; dismissed = false; pending = null;
       restoring = false; restoreOffer = null; checkRestore = true;
       session.update({ restoreOffer: null, error: null });
-      syncLifecycle.connectionChanged();
+      syncLifecycle.invalidate();
       clearTimer(); publishPause();
       const operation = syncLifecycle.begin();
       try {
@@ -226,13 +258,14 @@ export function startSync({
         syncLifecycle.finish(operation);
         if (connectionAttempt === attempt) { connecting = false; connectionAttempt = null; }
         if (!stopped) publishPause();
+        adoptDeferred();
       }
       // An aborted older round must leave its single-flight slot before the new one.
       await flight;
       return now();
     },
     async restoreBackup() {
-      if (!connected || restoring || !canSync(notebookAccess.getSnapshot()) || syncLifecycle.isImporting()) return { ok: false, kind: "cancelled" };
+      if (!connected || restoring || !canSync(notebookAccess.getSnapshot()) || syncLifecycle.isImporting() || syncLifecycle.isUpdating()) return { ok: false, kind: "cancelled" };
       // Hold background pushes throughout the download and the owner's preview.
       restoring = true;
       syncLifecycle.invalidate();
@@ -260,16 +293,7 @@ export function startSync({
     },
   };
   active = controller;
-  const started = revision;
-  const ready = readSyncConfig().then((config) => {
-    if (stopped || started !== revision) return cancelled();
-    connected = !!config.token;
-    publishPause();
-    return now();
-  }).catch(() => {
-    if (!stopped) session.update({ error: { kind: "invalid" } });
-    return { status: "error", kind: "invalid" };
-  });
+  const ready = adoptConnection();
   // React uses the function as an effect cleanup; tests can await the initial round.
   return Object.assign(controller.stop, { ready });
 }

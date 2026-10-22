@@ -6,7 +6,7 @@ import { nowIso } from "../lib/dates.js";
 import { noteTitle } from "../lib/notebookView.js";
 import { extractNoteLinks, extractFileIds, neutralizeNoteLinks } from "../lib/text.js";
 import { addedNoteLinks } from "../claude/diff.js";
-import { appendOutboxInTransaction, appendHandledInTransaction, readHandled, outboxId } from "../sync/prefs.js";
+import { appendOutboxInTransaction, appendHandledInTransaction, readHandled, outboxId, isReportable } from "../sync/prefs.js";
 
 export const STALE_PROPOSAL = "This note changed since Claude read it. Ask again.";
 const stale = () => { throw new Error(STALE_PROPOSAL); };
@@ -31,7 +31,7 @@ async function checkPlan(plan) {
   if (linked.some((note) => !note || plan.kind === "xps" && note.deletedAt !== null)) stale();
   if (plan.kind === "xps") {
     const handled = await readHandled(), identities = new Set(handled.map(outboxId));
-    if ((plan.outbox ?? []).some((entry) => identities.has(outboxId(entry))) || (plan.handled ?? []).some((entry) =>
+    if ((plan.outbox ?? []).some((entry) => !isReportable(entry) || identities.has(outboxId(entry))) || (plan.handled ?? []).some((entry) =>
       identities.has(outboxId(entry)) || entry.pid && handled.some((old) => old.pid === entry.pid && old.generation === plan.generation))) stale();
     if (plan.notes.some((item) => item.role === "trashed" && targets.has(item.id))) stale();
     const pictures = [...new Set((plan.createNotes ?? []).flatMap((note) => extractFileIds(note.html)))];

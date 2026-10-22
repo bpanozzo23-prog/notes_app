@@ -4,7 +4,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { AT, fixture, push } from "./test-support.js";
 import { loadConfig, validateConfig } from "./config.mjs";
-import { main, serve, startupChecks, status, createTailscale, startInboxTimer } from "./main.mjs";
+import { main, serve, startupChecks, status, createTailscale, startInboxTimer, serveState } from "./main.mjs";
 import { createServer } from "./http.mjs";
 import { TEMP_PREFIX, writeJson } from "./fsutil.mjs";
 import { enqueueInboxScan } from "./inbox.mjs";
@@ -14,6 +14,56 @@ let f;
 beforeEach(async () => { f = await fixture(); });
 afterEach(async () => { await f?.clean(); });
 const tailscale = () => ({ funnelStatus: vi.fn(async () => ({})), serveStatus: vi.fn(async () => ({})) });
+const serveConfig = { origin: "https://fixture-app.invalid", hosts: ["example-host.tail0000.ts.net:8443"], port: 8790 };
+const serveMapping = () => ({ TCP: { "443": { HTTPS: true }, "8443": { HTTPS: true } }, Web: {
+  "example-host.tail0000.ts.net:443": { Handlers: { "/": { Proxy: "http://127.0.0.1:8787" } } },
+  "example-host.tail0000.ts.net:8443": { Handlers: { "/": { Proxy: "http://127.0.0.1:8790" } } },
+} });
+it.each(["", "/"])("requires the notes HTTPS listener and exact root proxy (trailing %j)", (suffix) => {
+  const mapping = serveMapping();
+  mapping.Web[serveConfig.hosts[0]].Handlers["/"].Proxy += suffix;
+  expect(serveState(mapping, serveConfig)).toBe("configured");
+});
+it.each([
+  ["only the unrelated health mapping", (mapping) => { delete mapping.TCP[8443]; delete mapping.Web[serveConfig.hosts[0]]; }],
+  ["no TCP listener", (mapping) => { delete mapping.TCP[8443]; }],
+  ["HTTPS disabled", (mapping) => { mapping.TCP[8443].HTTPS = false; }],
+  ["nonboolean HTTPS", (mapping) => { mapping.TCP[8443].HTTPS = "true"; }],
+  ["another proxy port", (mapping) => { mapping.Web[serveConfig.hosts[0]].Handlers["/"].Proxy = "http://127.0.0.1:8787"; }],
+  ["a different proxy host", (mapping) => { mapping.Web[serveConfig.hosts[0]].Handlers["/"].Proxy = "http://localhost:8790"; }],
+  ["a proxy subpath", (mapping) => { mapping.Web[serveConfig.hosts[0]].Handlers["/"].Proxy += "/notes"; }],
+  ["no root handler", (mapping) => { mapping.Web[serveConfig.hosts[0]].Handlers["/notes"] = mapping.Web[serveConfig.hosts[0]].Handlers["/"]; delete mapping.Web[serveConfig.hosts[0]].Handlers["/"]; }],
+  ["another public host", (mapping) => { mapping.Web["another-host.tail0000.ts.net:8443"] = mapping.Web[serveConfig.hosts[0]]; delete mapping.Web[serveConfig.hosts[0]]; }],
+])("reports a missing notes mapping for %s", (_, mutate) => {
+  const mapping = serveMapping(); mutate(mapping);
+  expect(serveState(mapping, serveConfig)).toBe("missing");
+});
+it.each([{}, null, undefined])("reports no Serve configuration as off: %j", (mapping) => {
+  expect(serveState(mapping, serveConfig)).toBe("off");
+});
+it.each([[], "unexpected", { TCP: {}, Web: {} }])("does not count an incomplete or malformed mapping as configured: %j", (mapping) => {
+  expect(serveState(mapping, serveConfig)).toBe("missing");
+});
+it.each(["https://origin.invalid", "https://origin.invalid:8443"])("uses origin host and port as fallback: %s", (origin) => {
+  const port = new URL(origin).port || "443";
+  const mapping = { TCP: { [port]: { HTTPS: true } }, Web: {
+    [`origin.invalid:${port}`]: { Handlers: { "/": { Proxy: "http://127.0.0.1:8790" } } },
+  } };
+  expect(serveState(mapping, { ...serveConfig, origin })).toBe("configured");
+  expect(serveState(mapping, { ...serveConfig, origin, hosts: ["origin.invalid"] })).toBe("configured");
+  mapping.Web[`other.invalid:${port}`] = mapping.Web[`origin.invalid:${port}`];
+  delete mapping.Web[`origin.invalid:${port}`];
+  expect(serveState(mapping, { ...serveConfig, origin, hosts: ["other.invalid"] })).toBe("configured");
+});
+it.each(["configured", "missing", "off", "unreadable"])("status reports Serve as %s using an injected read", async (state) => {
+  const ts = tailscale(), mapping = serveMapping();
+  if (state === "missing") { delete mapping.TCP[8443]; delete mapping.Web[serveConfig.hosts[0]]; }
+  if (state === "unreadable") ts.serveStatus.mockRejectedValue(new Error("PRIVATE STDERR"));
+  else ts.serveStatus.mockResolvedValue(state === "off" ? {} : mapping);
+  const output = await status({ ...f.config, ...serveConfig }, { git: f.git, tailscale: ts });
+  expect(output.serve).toBe(state);
+  expect(JSON.stringify(output)).not.toContain("PRIVATE STDERR");
+});
 it("loads config only from the explicit fixture path", async () => {
   const filename = path.join(f.root, "fixture-config.json");
   await writeJson(filename, f.config);

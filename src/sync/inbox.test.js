@@ -4,11 +4,12 @@ import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { db, notebookAccess } from "../db/db.js";
 import { createNote, updateNote, trashNote } from "../db/notes.js";
-import { applyClaudeChanges, isClaudeChange, STALE_PROPOSAL, undoClaudeChange } from "../db/claudeChanges.js";
+import { applyClaudeChanges, claudePlanIsCurrent, isClaudeChange, STALE_PROPOSAL, undoClaudeChange } from "../db/claudeChanges.js";
+import { createFolder, deleteFolder } from "../db/folders.js";
 import { resetDatabase, AT, noteFixture } from "../test/fixtures.js";
-import { buildInbox, readInboxSnapshot, dismissProposal, pendingProposals } from "./inbox.js";
-import { inboxPlan } from "./plan.js";
-import { readOutbox, appendOutbox, saveConnection } from "./prefs.js";
+import { buildInbox, readInboxSnapshot, dismissProposal, pendingProposals, keepBothModel } from "./inbox.js";
+import { inboxPlan, keepBothPlan } from "./plan.js";
+import { readOutbox, readHandled, appendOutbox, saveConnection, isReportable } from "./prefs.js";
 import { proposalFixture } from "./inbox-fixtures.js";
 import { runSyncRound } from "./round.js";
 import { syncSession } from "./session.js";
@@ -19,6 +20,58 @@ beforeEach(async () => { await resetDatabase(); syncSession.reset(); });
 afterEach(() => { vi.restoreAllMocks(); syncSession.reset(); });
 const build = async (versions) => buildInbox(versions, await readInboxSnapshot());
 const allTicks = (cards) => cards.flatMap((card) => card.ids);
+it.each(["proposal", "hash", "note"])("refuses an array-wrapped %s on the card", async (field) => {
+  const source = await createNote(), version = proposalFixture(source);
+  version[field] = [version[field]];
+  const [card] = await build([version]);
+  expect(card.invalid).toBe(true);
+  expect(card.ids).toEqual([]);
+});
+it.each([{ hash: "bad" }, { hash: ["a".repeat(64)] }, { proposal: ["p-abc"] }, { proposal: "x".repeat(129) }])("Dismiss hides an unreportable identity only on the phone: %j", async (patch) => {
+  const source = await createNote(), version = proposalFixture(source, patch);
+  syncSession.update({ proposals: [version] });
+  const [card] = await build([version]);
+  expect(card.invalid).toBe(true); expect(isReportable(version)).toBe(false);
+  await dismissProposal(card);
+  expect(await readOutbox()).toEqual([]);
+  expect(await db.prefs.get("syncOutbox")).toBeUndefined();
+  expect(await readHandled()).toEqual([{ proposal: version.proposal, hash: version.hash, generation: null, outcome: "dismissed" }]);
+  expect(syncSession.getSnapshot().proposals).toEqual([]);
+  syncSession.reset(); syncSession.update({ proposals: [version] });
+  expect(await build(syncSession.getSnapshot().proposals)).toEqual([]);
+});
+it.each([{ hash: "bad" }, { hash: ["a".repeat(64)] }, { proposal: ["p-abc"] }, { proposal: "bad identity" }])("refuses unreportable outbox entries in an xps plan: %j", async (patch) => {
+  const source = await createNote(), cards = await build([proposalFixture(source, { title: "Changed" })]);
+  const plan = inboxPlan(cards, allTicks(cards), null);
+  Object.assign(plan.outbox[0], patch);
+  expect(await claudePlanIsCurrent(plan)).toBe(false);
+  await expect(applyClaudeChanges(plan)).rejects.toThrow(STALE_PROPOSAL);
+  expect(await db.notes.toArray()).toEqual([source]);
+  expect(await readOutbox()).toEqual([]); expect(await readHandled()).toEqual([]);
+  expect(await db.prefs.get("claudeLastChange")).toBeUndefined();
+});
+it.each(["deleted", "deleted then moved", "ambiguous"])("keeps a stale edit readable when its proposed folder is %s, and saves Keep both in the current folder", async (kind) => {
+  const folder = await createFolder("Before"), source = await createNote({ folderId: folder.id, title: "Before", html: "<p>Before</p>" });
+  const version = proposalFixture(source, { title: "After", tags: ["changed"], body: "<p>After</p><script>bad()</script>",
+    ...(kind === "ambiguous" ? { folderId: null, newFolder: "Recipes" } : {}) });
+  if (kind === "ambiguous") { await createFolder("Recipes"); await createFolder("recipes"); await updateNote(source.id, { title: "Owner" }); }
+  else await deleteFolder(folder.id);
+  if (kind === "deleted then moved") await updateNote(source.id, { folderId: (await createFolder("Now")).id });
+  const [card] = await build([version]);
+  expect(card).toMatchObject({ stale: true, folder: { action: "keep" }, title: "After", tags: ["changed"], audit: ["1 script"] });
+  expect(card.invalid).toBeUndefined(); expect(card).not.toHaveProperty("resolvedFolder");
+  expect(card.changes.some(({ id }) => id)).toBe(true);
+  expect(inboxPlan([card], card.ids, null)).toMatchObject({ notes: [], createNotes: [], outbox: [] });
+  const current = await db.notes.get(source.id), model = keepBothModel(version, await readInboxSnapshot());
+  const { created } = await applyClaudeChanges(keepBothPlan(model));
+  expect(await db.notes.get(created[0])).toMatchObject({ title: "After (from Claude Code)", folderId: current.folderId, tags: ["changed"], html: model.html });
+  expect(await db.notes.get(source.id)).toEqual(current);
+});
+it.each([{ title: "\nBad" }, { tags: [null] }, { body: null }, { extra: true }, { folderId: ["missing"] }])("a stale edit's unresolved folder never excuses other invalid data: %j", async (patch) => {
+  const source = await createNote(), version = proposalFixture(source, { folderId: "missing", ...patch });
+  await updateNote(source.id, { title: "Owner" });
+  expect((await build([version]))[0].invalid).toBe(true);
+});
 it.each(["revision", "generation", "Trash", "deletion"])("marks a proposal stale after %s", async (kind) => {
   const note = await createNote({ title: "Old", html: "<p>Old body</p>" }), proposal = proposalFixture(note, { title: "New", body: "<p>New body</p>" });
   if (kind === "revision") await updateNote(note.id, { title: "Local edit" });
@@ -131,6 +184,7 @@ it.each([false, true])("Dismiss records the outcome and hides the version even a
   const [card] = await build([proposal]);
   await dismissProposal(card);
   expect(await readOutbox()).toEqual([{ proposal: proposal.proposal, hash: proposal.hash, outcome: stale ? "stale" : "dismissed", applied: [], at: expect.any(String) }]);
+  expect(await readHandled()).toEqual([{ proposal: proposal.proposal, hash: proposal.hash, generation: null, outcome: stale ? "stale" : "dismissed" }]);
   expect(syncSession.getSnapshot().proposals).toEqual([]);
   syncSession.update({ proposals: [proposal] });
   expect(syncSession.getSnapshot().proposals).toEqual([]);

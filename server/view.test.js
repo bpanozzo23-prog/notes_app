@@ -2,8 +2,10 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 import { AT, PNG, fixture, note, file, push } from "./test-support.js";
-import { keyFor, readJson, sha256 } from "./fsutil.mjs";
+import { keyFor, readJson, sha256, TEMP_PREFIX, writeJson } from "./fsutil.mjs";
+import { proposalFilename } from "./proposals.mjs";
 import { buildBackup } from "./backup.mjs";
 import { rebuildView } from "./view.mjs";
 import { withDirectory, writeInDirectory } from "./view-fs.mjs";
@@ -39,11 +41,73 @@ it("rebuilds exact live HTML, projection, image copies and metadata with explici
     expect((await fs.stat(view(name))).mode & 0o777).toBe(0o444);
   }
   for (const name of ["", "notebook", "notebook/notes", "notebook/images", ".claude", "inbox"]) {
-    expect((await fs.stat(view(name))).mode & 0o777).toBe(0o755);
+    expect((await fs.stat(view(name))).mode & 0o777).toBe(0o700);
   }
   expect(await fs.readdir(view("notebook/notes"))).toEqual([`${keyFor("note-1")}.html`]);
   expect(await fs.readdir(view("inbox"))).toEqual([]);
   expect(await fs.readdir(view(""))).not.toContain("propose");
+});
+it("tightens every existing view directory, including inbox, from 0755 to 0700", async () => {
+  await seed();
+  const directories = ["", "notebook", "notebook/notes", "notebook/images", ".claude", "inbox"];
+  for (const name of directories) await fs.chmod(view(name), 0o755);
+  await rebuild();
+  for (const name of directories) expect((await fs.stat(view(name))).mode & 0o777).toBe(0o700);
+});
+it("creates pinned directories with a default mode of 0700", async () => {
+  await withDirectory(f.config.viewDir, "notebook/notes", async () => {}, { create: true });
+  for (const name of ["", "notebook", "notebook/notes"]) expect((await fs.stat(view(name))).mode & 0o777).toBe(0o700);
+});
+it("cleans interrupted view writes before writing, without following links, recursing or touching inbox", async () => {
+  await seed();
+  const directories = ["", "notebook", "notebook/notes", "notebook/images", ".claude"];
+  const temporary = `${TEMP_PREFIX}${randomUUID()}`, link = `${TEMP_PREFIX}${randomUUID()}`;
+  const nested = `${TEMP_PREFIX}${randomUUID()}`, sentinel = path.join(f.root, "sentinel.txt");
+  await fs.writeFile(sentinel, "KEEP TARGET");
+  for (const name of directories) {
+    await fs.writeFile(view(path.join(name, temporary)), "INTERRUPTED NOTE TEXT");
+    await fs.symlink(sentinel, view(path.join(name, link)));
+    await fs.mkdir(view(path.join(name, nested)));
+    await fs.writeFile(view(path.join(name, nested, temporary)), "KEEP NESTED");
+    await fs.writeFile(view(path.join(name, "unexpected.txt")), "KEEP UNEXPECTED");
+  }
+  await fs.writeFile(view(`inbox/${temporary}`), "KEEP INBOX");
+  await fs.symlink(sentinel, view(`inbox/${link}`));
+  await fs.unlink(view("notebook/index.json"));
+  const open = fs.open;
+  vi.spyOn(fs, "open").mockImplementation(async (filename, ...args) => {
+    if (path.basename(filename).startsWith(TEMP_PREFIX)) {
+      for (const name of directories) {
+        await expect(fs.lstat(view(path.join(name, temporary)))).rejects.toHaveProperty("code", "ENOENT");
+        await expect(fs.lstat(view(path.join(name, link)))).rejects.toHaveProperty("code", "ENOENT");
+      }
+    }
+    return open(filename, ...args);
+  });
+  await rebuild();
+  for (const name of directories) {
+    expect(await fs.readFile(view(path.join(name, nested, temporary)), "utf8")).toBe("KEEP NESTED");
+    expect(await fs.readFile(view(path.join(name, "unexpected.txt")), "utf8")).toBe("KEEP UNEXPECTED");
+  }
+  expect(await fs.readFile(sentinel, "utf8")).toBe("KEEP TARGET");
+  expect(await fs.readFile(view(`inbox/${temporary}`), "utf8")).toBe("KEEP INBOX");
+  expect((await fs.lstat(view(`inbox/${link}`))).isSymbolicLink()).toBe(true);
+});
+it("repairs and logs permission-only file damage, then keeps the intact file on another rebuild", async () => {
+  await seed();
+  const relative = "notebook/notebook.md", target = view(relative), before = await fs.readFile(target);
+  await fs.chmod(target, 0o666);
+  const damaged = await fs.lstat(target);
+  await rebuild();
+  const repaired = await fs.lstat(target);
+  expect(repaired.mode & 0o777).toBe(0o444);
+  expect(repaired.ino).not.toBe(damaged.ino);
+  expect(await fs.readFile(target)).toEqual(before);
+  const log = await fs.readFile(path.join(f.config.storeDir, "view-log.jsonl"), "utf8");
+  expect(log.trim().split("\n").map(JSON.parse)).toContainEqual({ event: "tampered", path: relative, at: AT });
+  await rebuild();
+  expect((await fs.lstat(target)).ino).toBe(repaired.ino);
+  expect(await fs.readFile(path.join(f.config.storeDir, "view-log.jsonl"), "utf8")).toBe(log);
 });
 it("rebuilds a deleted view from the store alone on serve start, before listening", async () => {
   await seed();
@@ -146,8 +210,6 @@ it("removes the retired helper without following a link and recreates a missing 
 });
 
 it("projects kinds and safe titles for every status, with no proposed body in the index or log", async () => {
-  const { writeJson } = await import("./fsutil.mjs");
-  const { proposalFilename } = await import("./proposals.mjs");
   await seed();
   const versions = [
     ...["pending", "applied", "kept", "dismissed", "stale", "refused", "superseded"].map((status) => ({ status })),
@@ -171,6 +233,18 @@ it("projects kinds and safe titles for every status, with no proposed body in th
   expect(log).toContain("to Trash: Fixture title · dismissed");
   expect(log).toContain("to Trash: (note unavailable) · dismissed");
   expect(log).not.toContain("PRIVATE PROPOSED");
+});
+it.each([0, 50, 51, 501])("shows at most 50 of %i applied ticks in the readable log, keeping all ticks in the index", async (count) => {
+  await seed();
+  const applied = Array.from({ length: count }, (_, i) => `tick-${i + 1}`);
+  const record = { proposal: "p-log-fixture", hash: "a".repeat(64), note: "note-1", status: "applied",
+    ingestedAt: AT, sequence: 1, outcome: { outcome: "applied", applied, at: AT } };
+  await writeJson(f.context.store.file(`proposals/${proposalFilename(record.proposal, record.hash)}`), record);
+  await rebuild();
+  const ticks = applied.slice(0, 50).join(", ") || "none";
+  expect(await fs.readFile(view("notebook/proposals-log.md"), "utf8")).toBe(
+    `# Proposal outcomes\n\n- ${AT} · Fixture title · applied · applied: ${ticks}${count > 50 ? `, and ${count - 50} more` : ""}\n`);
+  expect((await readJson(view("notebook/proposals.json")))[0].outcome.applied).toEqual(applied);
 });
 it("hides handled new-note titles through Apply, Trash and purge, including a competing revision", async () => {
   await seed();

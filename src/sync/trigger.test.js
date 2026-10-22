@@ -8,10 +8,15 @@ import { AT, note, file, PNG } from "../../server/test-support.js";
 import { startSync, syncNow, connect, disconnect, restoreBackup, confirmReplace, dismissConfirm, declineRestore, finishRestore } from "./trigger.js";
 import { affectsSync } from "./changes.js";
 import { saveConnection, readSyncConfig, appendOutbox, readOutbox } from "./prefs.js";
-import { syncLifecycle } from "./lifecycle.js";
+import { syncLifecycle, testChannel } from "./lifecycle.js";
 import { createSyncSession } from "./session.js";
 import { deferred, syncFixture } from "./test-support.js";
 
+vi.mock("./lifecycle.js", async (importOriginal) => {
+  const original = await importOriginal(), testChannel = { postMessage: vi.fn(), close: vi.fn() };
+  return { ...original, syncLifecycle: original.createSyncLifecycle(undefined, testChannel), testChannel };
+});
+const connectionBroadcast = () => testChannel.onmessage({ data: { type: "sync-connection-changed" } });
 let stop, session, visibility, timers, queue, server;
 const ok = () => ({ status: "ok", round: 1, counts: { notes: 1 }, missingImages: [], lastRoundAt: AT, historyError: false });
 const settle = async () => { for (let i = 0; i < 20; i++) await setImmediate(); };
@@ -52,6 +57,7 @@ beforeEach(async () => {
 });
 afterEach(async () => {
   stop?.(); stop = null;
+  syncLifecycle.endUpdate();
   syncLifecycle.invalidate();
   await settle();
   vi.restoreAllMocks();
@@ -69,6 +75,108 @@ it("syncs on start, visibility and Sync now, flushing without a navigation lock"
   expect(await syncNow()).toMatchObject({ status: "ok" });
   expect(round).toHaveBeenCalledTimes(3);
   expect(session.getSnapshot()).toMatchObject({ connected: true, running: false, lastSyncedAt: AT, error: null });
+});
+it("a disconnected window adopts another window's committed connection and checks Restore before pushing", async () => {
+  await db.prefs.delete("syncToken");
+  const round = await start(vi.fn(async () => ({ status: "restore-offer", notes: 3 })));
+  expect(round).not.toHaveBeenCalled();
+  await db.prefs.put({ key: "syncToken", value: "FIXTURE-OTHER-WINDOW" });
+  connectionBroadcast();
+  await vi.waitFor(() => expect(round).toHaveBeenCalledTimes(1));
+  expect(round).toHaveBeenCalledWith(expect.objectContaining({ offerRestore: true }));
+  expect(session.getSnapshot()).toMatchObject({ connected: true, paused: true, restoreOffer: { notes: 3 } });
+  fire(); await timers.advance(60_000);
+  expect(round).toHaveBeenCalledTimes(1);
+});
+it("another window's disconnect pauses immediately and cancels an outstanding round", async () => {
+  const gate = deferred(), started = deferred();
+  let operation;
+  const round = vi.fn(async () => {
+    if (round.mock.calls.length === 2) { operation = syncLifecycle.begin(); started.resolve(); await gate.promise; syncLifecycle.finish(operation); }
+    return ok();
+  });
+  await start(round);
+  const pending = syncNow(); await started.promise;
+  await db.prefs.delete("syncToken"); connectionBroadcast();
+  expect(operation.controller.signal.aborted).toBe(true);
+  expect(session.getSnapshot()).toMatchObject({ connected: false, paused: true });
+  gate.resolve(); expect(await pending).toEqual({ status: "cancelled" });
+  fire(); show("visible"); await timers.advance(60_000);
+  expect(round).toHaveBeenCalledTimes(2);
+  expect(session.getSnapshot()).toMatchObject({ connected: false, paused: true, lastSyncedAt: null });
+});
+it("rechecks Restore and clears a dismissed confirmation after another window reconnects", async () => {
+  const round = await start(vi.fn(async () => ({ status: "confirm", removed: [], changed: [], retry: vi.fn() })));
+  dismissConfirm();
+  expect(session.getSnapshot().paused).toBe(true);
+  round.mockResolvedValueOnce({ status: "restore-offer", notes: 2 });
+  await db.prefs.put({ key: "syncToken", value: "NEW-FIXTURE-TOKEN" }); connectionBroadcast();
+  await vi.waitFor(() => expect(session.getSnapshot().restoreOffer).toEqual({ notes: 2 }));
+  expect(round.mock.calls[1][0].offerRestore).toBe(true);
+});
+it("a stopped scheduler ignores connection broadcasts", async () => {
+  const round = await start(); stop();
+  const snapshot = session.getSnapshot();
+  await db.prefs.delete("syncToken"); connectionBroadcast();
+  await db.prefs.put({ key: "syncToken", value: "FIXTURE-RECONNECTED" }); connectionBroadcast();
+  await settle(); await timers.advance(60_000);
+  expect(session.getSnapshot()).toBe(snapshot);
+  expect(round).toHaveBeenCalledTimes(1); expect(timers.size).toBe(0);
+});
+it("broadcasts Disconnect only after the saved connection is gone", async () => {
+  const reads = [];
+  await start(undefined, { clientFactory: () => ({ unpair: async () => ({ ok: true }) }) });
+  vi.spyOn(testChannel, "postMessage").mockImplementation(({ type }) => {
+    if (type === "sync-connection-changed") reads.push(readSyncConfig());
+  });
+  await disconnect();
+  expect(reads).toHaveLength(1);
+  expect((await reads[0]).token).toBe("");
+});
+it("ignores connection adoption during this window's own pairing or disconnection", async () => {
+  const pair = deferred(), unpair = deferred();
+  const client = { pair: vi.fn(() => pair.promise), unpair: vi.fn(() => unpair.promise) };
+  const round = await start(undefined, { clientFactory: () => client });
+  const pairing = connect({ address: "https://fixture.invalid", code: "fixture" });
+  expect(client.pair).toHaveBeenCalled();
+  connectionBroadcast(); await settle();
+  expect(session.getSnapshot().connecting).toBe(true);
+  expect(round).toHaveBeenCalledTimes(1);
+  pair.resolve({ ok: true, body: { token: "FIXTURE-LATE-TOKEN" } }); await pairing;
+  const disconnecting = disconnect();
+  await vi.waitFor(() => expect(client.unpair).toHaveBeenCalled());
+  await db.prefs.put({ key: "syncToken", value: "FIXTURE-OTHER" }); connectionBroadcast(); await settle();
+  expect(session.getSnapshot()).toMatchObject({ connected: false, paused: true });
+  expect(round).toHaveBeenCalledTimes(1);
+  unpair.resolve({ ok: true }); await disconnecting;
+  // The other window's connection, committed meanwhile, is adopted once Disconnect finishes.
+  await vi.waitFor(() => expect(round).toHaveBeenCalledTimes(2));
+  expect(session.getSnapshot()).toMatchObject({ connected: true });
+});
+it("beginUpdate aborts a round and holds later edits until a failed update is released", async () => {
+  let operation;
+  const started = deferred();
+  const round = vi.fn(async () => {
+    if (round.mock.calls.length === 2) {
+      operation = syncLifecycle.begin(); started.resolve();
+      await new Promise((resolve) => operation.controller.signal.addEventListener("abort", resolve, { once: true }));
+      syncLifecycle.finish(operation);
+    }
+    return ok();
+  });
+  await start(round);
+  const pending = syncNow(); await started.promise;
+  syncLifecycle.beginUpdate();
+  expect(operation.controller.signal.aborted).toBe(true);
+  expect(syncLifecycle.isCurrent(operation)).toBe(false);
+  expect(await pending).toEqual({ status: "cancelled" });
+  expect(session.getSnapshot().paused).toBe(true);
+  fire(); show("visible"); await timers.advance(600_000);
+  expect(await syncNow()).toEqual({ status: "paused" });
+  expect(round).toHaveBeenCalledTimes(2);
+  syncLifecycle.endUpdate();
+  await vi.waitFor(() => expect(round).toHaveBeenCalledTimes(3));
+  expect(session.getSnapshot().paused).toBe(false);
 });
 
 it("retires acknowledged proposal versions even when no review or list bar is mounted", async () => {

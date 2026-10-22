@@ -8,6 +8,10 @@ export const syncToken = "syncToken";
 export const syncOutbox = "syncOutbox";
 export const syncHandled = "syncHandled";
 export const SYNC_PREFS = Object.freeze([syncAddress, syncToken, syncOutbox, syncHandled]);
+export const PROPOSAL_ID = /^[A-Za-z0-9_-]{1,128}$/;
+export const HASH = /^[a-f0-9]{64}$/;
+export const isReportable = (version) => typeof version?.proposal === "string" && PROPOSAL_ID.test(version.proposal) &&
+  typeof version.hash === "string" && HASH.test(version.hash);
 
 // Call only at the point of use. Neither value belongs in a UI snapshot.
 export function readSyncConfig() {
@@ -44,8 +48,9 @@ export async function saveConnection({ address, token }, { check, signal } = {})
   return syncLifecycle.connectionChanged();
 }
 export async function forgetToken() {
-  syncLifecycle.connectionChanged();
+  syncLifecycle.invalidate();
   await writeTransaction([db.prefs], () => db.prefs.delete(syncToken));
+  syncLifecycle.connectionChanged(); // Other windows must read the committed connection.
 }
 export const outboxId = ({ proposal, hash }) => JSON.stringify([proposal, hash]);
 export async function readOutbox() {

@@ -4,6 +4,9 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import App from "./App.jsx";
 import { claudeSession } from "./claude/session.js";
+import { syncLifecycle } from "./sync/lifecycle.js";
+import { syncSession } from "./sync/session.js";
+import { syncNow } from "./sync/trigger.js";
 import { SaveQueue } from "./lib/saveQueue.js";
 import { db, getPref, setPref, DATABASE_UPDATED } from "./db/db.js";
 import * as filesDb from "./db/files.js";
@@ -43,6 +46,7 @@ beforeEach(async () => {
 });
 afterEach(async () => {
   cleanup();
+  syncLifecycle.endUpdate();
   claudeSession.clearSession();
   // Let unmount's flush finish before the next test deletes the database.
   await act(async () => { await new Promise((resolve) => setTimeout(resolve, 10)); });
@@ -147,6 +151,26 @@ it("shows invalid-file errors without offering replacement, and aborts if the sa
   fireEvent.click(screen.getByRole("button", { name: "Import and replace" }));
   await within(screen.getByRole("dialog")).findByText("Download failed");
   expect(await db.notes.toArray()).toEqual([original]);
+});
+it("keeps the import dialog usable after another window saves, and downloads a fresh safety copy on retry", async () => {
+  const original = await createNote({ title: "Original" });
+  await start(); await settings(); await upload(backupFixture());
+  let saved;
+  downloadJson.mockImplementationOnce(() => { saved = db.notes.update(original.id, { title: "Other window's save" }); });
+  fireEvent.click(screen.getByRole("button", { name: "Replace notebook" }));
+  fireEvent.click(screen.getByRole("button", { name: "Import and replace" }));
+  const dialog = within(screen.getByRole("dialog"));
+  await dialog.findByText("Your notebook changed in another window while the safety backup was made. Nothing was replaced. Tap Import and replace again.");
+  await saved;
+  expect((await getNote(original.id)).title).toBe("Other window's save");
+  expect(await getPref("notebookGeneration")).toBeUndefined();
+  await waitFor(() => expect(dialog.getByRole("button", { name: "Import and replace" }).disabled).toBe(false));
+  fireEvent.click(dialog.getByRole("button", { name: "Import and replace" }));
+  await screen.findByText(/Backup imported/);
+  expect(downloadJson).toHaveBeenCalledTimes(2);
+  expect(downloadJson.mock.calls[0][0].notes[0].title).toBe("Original");
+  expect(downloadJson.mock.calls[1][0].notes[0].title).toBe("Other window's save");
+  expect(await db.notes.toArray()).toEqual(backupFixture().notes);
 });
 it("shows persistent save failure, keeps the editor open, and retries before navigation", async () => {
   const original = await createNote({ title: "Original" });
@@ -329,6 +353,7 @@ it("disables update Reload while pending, saving or failed; requests activation 
   await waitFor(() => expect(reload.disabled).toBe(false));
   fireEvent.click(reload);
   await waitFor(() => expect(pwa.update).toHaveBeenCalledWith(true));
+  expect(syncLifecycle.isUpdating()).toBe(true);
   expect((await db.notes.toArray())[0].title).toBe("Unsaved");
 });
 
@@ -355,13 +380,33 @@ it("guards an externally activated update with a flush and keeps unsaved text af
   await openNote("External update");
   const write = vi.spyOn(db.notes, "put").mockRejectedValue(new Error("Disk full"));
   fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Keep unsaved" } });
+  const operation = syncLifecycle.begin();
   act(() => pwa.options.onNeedReload());
+  expect(syncLifecycle.isUpdating()).toBe(true);
+  expect(operation.controller.signal.aborted).toBe(true);
+  expect(syncLifecycle.isCurrent(operation)).toBe(false);
+  expect(syncSession.getSnapshot().paused).toBe(true);
+  expect(await syncNow()).toEqual({ status: "paused" });
   await screen.findByText("Not saved");
   await waitFor(() => expect(screen.getByRole("button", { name: "Retry save" }).disabled).toBe(false));
   expect(screen.getByLabelText("Title").value).toBe("Keep unsaved");
   expect(screen.getByRole("button", { name: "Reload" }).disabled).toBe(true);
   expect(write).toHaveBeenCalledTimes(1);
   write.mockRestore();
+});
+it("a waiting worker leaves sync available; a failed explicit update releases the update pause", async () => {
+  pwa.needRefresh = true;
+  pwa.update.mockImplementationOnce(async () => {
+    expect(syncLifecycle.isUpdating()).toBe(true);
+    expect(syncSession.getSnapshot().paused).toBe(true);
+    throw new Error("Update failed");
+  });
+  await start();
+  expect(syncLifecycle.isUpdating()).toBe(false);
+  fireEvent.click(screen.getByRole("button", { name: "Reload" }));
+  await screen.findByText("Update failed");
+  expect(syncLifecycle.isUpdating()).toBe(false);
+  expect(screen.getByRole("button", { name: "Reload" }).disabled).toBe(false);
 });
 
 it("restores a root list's scroll after boot has loaded its rows", async () => {

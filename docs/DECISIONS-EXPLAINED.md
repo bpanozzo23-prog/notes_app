@@ -1413,3 +1413,39 @@ You asked for a "tab" button for sub-bullets, since the phone keyboard has no Ta
   and it also adds something new to the note format.
 
 **Lock-in: none.** Nested lists were already part of what notes can hold.
+
+### 80. Step 4e: the Phase 4 closeout (0.4.4, 2026-10-22)
+
+Codex read everything Phase 4 changed (128 files) against the contract, as three reviews at once:
+the XPS service, the app's syncing, and Claude Code's suggestions on the phone. Claude checked
+each finding in the code. All 11 were real; none had happened to your notes, and most need an
+unusual moment.
+
+**Fixed:**
+- **Import or Restore with two windows open.** If another window saved a note in the second
+  between the safety download and the replacement, that note was in neither. Now the replacement
+  checks the notebook hasn't changed since the safety download; if it has, nothing is replaced
+  and you're asked to tap again (a fresh safety download comes first). This one was older than
+  Phase 4.
+- **Claude Code's results reaching the XPS.** A suggestion with more than 500 changes, or a
+  malformed one you dismissed, made the XPS refuse every later "applied/dismissed" report. Both
+  are fixed, and a new test runs the phone's real reports through the XPS's own checker so the
+  two sides can't disagree again.
+- **Keep both after deleting a folder.** If you deleted the folder a note was in, its stale card
+  showed as unreadable. It now offers Keep both, and the copy goes beside your note.
+- **Several windows.** A window now notices when another window connects or disconnects, and
+  stops syncing once a new app version is activated anywhere, until it reloads.
+- **On the XPS:** a crash in the middle of writing could leave a temporary file with note text in
+  `~/notes`; rebuilds now remove those. The `~/notes` folders are private to your account (0700).
+  A file whose permissions were changed is repaired. And `notes-sync status` checks for the notes
+  mapping itself, not just any Tailscale mapping (the health tracker's always existed).
+
+**Accepted, not fixed:** if Claude Code rewrote a suggestion file in the exact instant the XPS
+was deleting it after reading it, the rewrite would be lost. Linux can't "delete only if
+unchanged", so any fix would only narrow the instant; the worst case is a lost revision of a
+suggestion, never a note, and Claude Code is already told not to touch files it has submitted.
+
+**Noted:** a suggestion that changes 500 paragraphs takes a few seconds to show (3.3 s in Chromium
+on this XPS). Fine for now; nothing realistic comes near it.
+
+**Lock-in: none.** No change to how notes are stored.

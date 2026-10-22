@@ -168,7 +168,10 @@ Trash and deleted notes are not in the view, and rebuilds remove files for notes
 (Phase 3: Trash never goes to Claude). The service writes the view only into directories it has
 just checked with `lstat` are real directories owned by the user (not symlinks), and before each
 rebuild compares every 0444 file's hash with what it last wrote: a difference is rewritten and
-logged in the store, never read. The view is not a git repository.
+logged in the store, never read. The view is not a git repository. *(4e)* A file whose mode is
+no longer 0444 counts as damaged too; the view's directories are 0700; and each rebuild first
+removes the service's own temporary files (`.notes-sync-tmp-*`, left by a crash between write and
+rename) from every view directory except `inbox/`.
 
 ### The service
 
@@ -323,7 +326,9 @@ XPS are never deleted by anything the phone does.
   `navigator.locks` where available (the published app is HTTPS); the XPS's 409 `changed` covers
   the rest.
 - **Paused** while the notebook is read-only, replaced, mid-update or mid-import, while a
-  confirmation is waiting, and while disconnected.
+  confirmation is waiting, and while disconnected. *(4e)* Mid-update includes a new app version
+  activated from any window: this window stays paused until it reloads. Connect and Disconnect
+  reach other windows once the change is saved; each rereads the connection and resumes or pauses.
 - **Failures back off** (30 s, 2 min, 10 min) while visible; every request has a timeout
   (`AbortSignal.timeout`: 20 s for state, push and outcomes, 60 s per image, 180 s for a backup).
 
@@ -371,7 +376,10 @@ On the XPS: 43 notes, 12 pictures
   either way.
 - **Restore from the XPS…** downloads `GET /v1/backup`, runs `validateBackup`, and hands the
   result to the existing Import preview and import flow (including the before-import safety
-  download). Also offered by the confirmation, and on Connect when this phone has no notes and the
+  download). *(4e)* The replacement checks, inside its transaction, that the notebook still matches
+  what the safety download captured; otherwise nothing is replaced ("Your notebook changed in
+  another window while the safety backup was made. Nothing was replaced. Tap Import and replace
+  again."). File import works the same way. Also offered by the confirmation, and on Connect when this phone has no notes and the
   XPS has some ("The XPS has 43 notes. Restore them?").
 - Settings' entry row reads "Sync · Connected" / "Sync · Off".
 
@@ -434,7 +442,10 @@ stored versions.
   `{ proposal, hash, outcome: "applied" | "dismissed" | "stale", applied: [tick ids], at }` to
   `syncOutbox`, so an outcome is recorded exactly when the change lands, even if reporting it
   waits. The XPS journals each outcome batch, updates the stored versions, and rebuilds
-  `notebook/proposals.json` and `proposals-log.md`.
+  `notebook/proposals.json` and `proposals-log.md`. *(4e)* `applied` may hold any number of tick
+  ids (each a safe id of at most 200 characters), bounded only by the request size; the log shows
+  at most 50 per line, then "and N more". The phone queues only identities that pass the XPS's own
+  rules; Dismiss of a version whose identity doesn't is recorded on the phone alone.
 - Code changes in `src/db/claudeChanges.js`: `isClaudeChange` accepts kind `"xps"` with the same
   rules as kind `undefined` (no created or trashed notes in 4c; 4d widens this, below); `checkPlan` gains the live-target
   rule for kind `"xps"`; the outbox entry is written in the same transaction.
@@ -579,7 +590,8 @@ stale and `isClaudeChange` clauses).
   Trash) and note handles = live notes; title, tags and folder as in 4d.5. It records what it
   depends on: the source note's `rev` (or that it is gone), each folder, link target and
   picture. Offered on a stale edit card that is readable and whose generation is the phone's
-  current one.
+  current one. *(4e)* A folder that no longer resolves doesn't make a stale edit unreadable: its
+  copy goes in the source note's current folder anyway.
 
 #### 4d.4 On the phone — the review (`src/components/review/`, `src/screens/SyncReview.jsx`)
 
@@ -799,7 +811,9 @@ nothing. A Vitest test asserts both templates' rules and the launcher's flags.
   the unit, the launcher and the Serve entry and leaves the store and view in place.
 - `notes-sync status` prints the round, counts, missing images, last round time, paired or not,
   Serve and Funnel state, history state and recent errors — never note content — so the agent can
-  check the XPS copy "by counts and dates only".
+  check the XPS copy "by counts and dates only". *(4e)* Serve is "configured" only when the
+  `:8443` HTTPS listener proxies to `http://127.0.0.1:8790` (the health tracker's own mapping
+  doesn't count); otherwise "missing", "off" or "unreadable". The deploy requires "configured".
 
 ### Backups on the XPS
 
@@ -943,6 +957,11 @@ published app.**
 5. **4e — closeout.** Codex reviews `git diff phase-4-base...HEAD` read-only (xhigh) against
    this document (`phase-4-base` = a local tag on the commit that adds this file); fixes; README;
    `DECISIONS-EXPLAINED.md`; BRIEF amendments checked; the owner's full phone check.
+   *Done 2026-10-22:* three parallel read-only runs (the XPS service; the app's sync engine;
+   Claude Code's suggestions on the phone) found 11 issues, all confirmed; 10 fixed in run K (XPS)
+   and run L (app, 0.4.4), then a Codex second pass over the fixes. Accepted: inbox cleanup can
+   delete a file Claude Code replaces in the instant between the last check and the delete (Linux
+   has no delete-if-unchanged; the worst case is a lost revision of a suggestion, never a note).
 
 ## BRIEF and AGENTS.md amendments (in the commit that adds this file)
 

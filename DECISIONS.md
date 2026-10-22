@@ -1669,6 +1669,10 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   `npm run sync-check` 26/26 (15 server, 11 browser, including a mixed Apply, its Undo and Keep
   both through real files), `npm run shots` (207; shots 185–193 read), `npm run browser-checks`
   15/15. `server/README.md` describes the three kinds.
+- 2026-10-22 — Owner's 4d phone check (published app, the checklist at the end of
+  `docs/PHASE-4-DIRECTION.md` "4d"): "Checks pass." Then 4c's remaining item, Apply in one
+  window with another open and Undo from the other window's Settings → Sync: "The remaining 4c
+  checks passed." — 4c and 4d are owner-verified; the owner asked for 4e.
 
 ## Indent and outdent buttons (2026-10-22)
 
@@ -1696,3 +1700,151 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   only once the owner needs it.
 - Verification: `npm test` (92 files, 2,280 tests), `npm run build`, `npm run shots` (209; shots
   07c and 07d read). Owner checked Indent on the phone, 2026-10-22.
+
+## Phase 4e — closeout (2026-10-22)
+
+- 2026-10-22 — Codex reviewed `git diff phase-4-base...HEAD` read-only (xhigh) against the
+  contract, as three parallel runs: the XPS service and Claude Code's lock-down; the app's sync
+  engine and Settings → Sync; Claude Code's suggestions on the phone. The indent/outdent commits
+  were out of scope. — One run across 128 changed files would have spread too thin.
+- 2026-10-22 — Claude Code checked every finding against the code; all 11 distinct findings hold:
+  (1) an edit with more than 500 ticked changes makes the XPS refuse every later outcome report
+  (the server caps a tick list at 500, the phone doesn't), found by all three runs; (2) a stale
+  edit naming a folder the owner has since deleted is shown as unreadable, so Keep both isn't
+  offered; (3) a malformed proposal identity from the XPS reaches the outbox on Dismiss and blocks
+  outcome reports the same way; (4) an import or Restore can lose a note another window saves
+  between the safety download and the replacement (older than Phase 4); (5) a window opened while
+  Sync was off doesn't notice another window connecting; (6) an app update from another window
+  doesn't pause or invalidate sync, as the contract says it should; (7) a crash in the middle of
+  writing a view file leaves a temporary file with note text in `~/notes`, never cleaned;
+  (8) view directories are 0755, the contract says 0700; (9) `notes-sync status` counts any
+  Tailscale Serve mapping (the health tracker's) as the notes mapping; (10) a view file whose
+  mode changed but whose bytes didn't is never repaired; (11) inbox cleanup can delete a file
+  Claude Code replaced in the instant between the last check and the delete. Fix plan for the
+  owner's approval next.
+- 2026-10-22 — The owner approved the 4e fix plan: fixes for findings 1–10 (the XPS: no count
+  cap on an outcome's tick list, the readable log showing at most 50 ticks; temporary files
+  cleaned from the view; 0700 view directories; the exact Serve mapping in `notes-sync status`;
+  mode-only damage repaired. The phone: the import/Restore replacement refused if the notebook
+  changed after the safety download; identities checked before anything is queued for the XPS,
+  an unreportable Dismiss kept on the phone; Keep both on a stale edit whose folder is gone;
+  windows adopting another window's connection; sync paused once an app update is activated),
+  a round-trip test of the phone's real results through the XPS's checker, version 0.4.4, a
+  Codex second pass over the fixes, and the final phone check. Finding 11 is accepted: Linux has
+  no delete-if-unchanged, every fix only narrows the instant, never deleting captured files would
+  change rule 4 and fill the inbox, the worst case is a lost revision of a suggestion (never a
+  note), and `CLAUDE.md` already tells Claude Code not to touch submitted files.
+- 2026-10-22 — Phase 4e, run K uses the shared temporary-file prefix for view writes and
+  rebuild cleanup. Cleanup checks only immediate regular files and symlinks in the five
+  managed directories outside inbox, through pinned directories, before new files are written.
+  Temporary-named directories and their contents remain untouched. — Recover interrupted
+  writes without following links, recursing into unexpected entries or changing inbox cleanup.
+- 2026-10-22 — Phase 4e, run K checks a view file's 0444 mode on its opened no-follow file
+  descriptor, alongside the existing regular-file and identity checks. A mode mismatch takes
+  the same tampered-log and replacement path as changed bytes; managed directories are
+  tightened to 0700 on every rebuild. — Permission-only damage must not pass the manifest's
+  content check, while intact pictures still avoid unnecessary rewrites.
+- 2026-10-22 — Phase 4e, run K retains every validated outcome tick in the store and JSON
+  index, shortening only the readable log to 50 ticks plus the omitted count. The phone's real
+  inbox and Keep both plan builders supply compatibility-test outcomes; Dismiss entries use
+  its exact shape without a database write. — The request-size limit bounds long lists, and
+  a readable summary must not discard the durable record of what the owner applied.
+- 2026-10-22 — Phase 4e, run K resolves explicit public ports from `config.hosts`, falling
+  back to the origin's port for hosts without one and also checking the origin's host. This
+  corrects the task's origin-only port wording: the existing config's origin is GitHub Pages,
+  while its service Host names :8443. — An origin-only check would falsely reject the deployed
+  notes mapping. Readiness requires that listener's HTTPS flag and exact root proxy to the
+  configured loopback port (one trailing slash allowed); other mappings report missing. Empty
+  or absent configuration is off, distinct from a failed read, which is unreadable.
+- 2026-10-22 — Phase 4e, run K verification: `npx vitest run server/ --reporter=dot` passed
+  (10 files, 647 tests, including deployment tests; 40 net additional tests). New regressions
+  reproduced the view and outcome defects before the fixes. The real 501-paragraph app diff
+  exceeds both the default five-second test limit and 30 seconds under jsdom here; that one
+  compatibility test has a 90-second limit and passed without replacing the app's code.
+  One full `npm test -- --pool=threads` completed (92 files: 91 passed, 1 failed; 2,320 tests:
+  2,319 passed, 1 failed). The unchanged `src/screens/SyncReview.test.jsx` navigation test
+  could not find the suggestions Review button at line 168, before its Android Back checks.
+  A separate `npx vitest run src/screens/SyncReview.test.jsx --pool=threads --reporter=dot`
+  passed all 24 tests in that file. — The full run is not green; this intermittent app-test
+  failure remains for Claude's review/run L, and the full suite was not repeated.
+  `node --check` passed on all four changed `.mjs` files; `git diff --check` passed. No build,
+  `sync-check`, shots, browser checks, live-service check or deployment was run; no phone,
+  browser layout or live Claude Code session was seen. Checks used generated fixtures and
+  temporary folders, with no network, listening sockets, Tailscale command, protected owner
+  data, keys, paid requests, new dependencies or repository commit. No `src/`, `docs/` or
+  scripts changed; the pre-existing root README and decision-log edits were preserved.
+- 2026-10-22 — Phase 4e, run L captures the safety backup and its fingerprint in the same
+  read transaction. The fingerprint is synchronously sorted-key JSON of every note field,
+  all folder and tombstone rows, only `EXPORTED_PREFS`, and referenced picture ids, exported
+  metadata and byte lengths (including missing halves). Picture bytes are immutable under
+  their ids; unused-picture clocks, unreferenced pictures and device-local preferences are
+  excluded. Pictures are encoded one at a time, without retaining all their byte buffers.
+  Import compares the same capture inside its write transaction before any clear; every UI
+  path supplies the fingerprint, while fixture/script imports may omit it. — A committed
+  save or housekeeping change in another window must survive, with a fresh safety download
+  before the owner retries; no asynchronous digest can end the checking transaction early.
+- 2026-10-22 — Phase 4e, run L shares the service's reportable proposal/hash rules in sync
+  preferences, with explicit string checks and a compatibility assertion against the service.
+  The inbox retains its narrower proposal-name rule; note ids already use the typed `isSafeId`
+  helper. An unreadable, unreportable Dismiss writes only `syncHandled`, never an outbox entry;
+  xps Apply checks reportability again. A stale edit may ignore only a folder-resolution
+  failure, keeping its other reviewed changes and audit; Keep both still uses the source's
+  current folder. — A bad suggestion must neither block later reports nor hide a valid copy.
+- 2026-10-22 — Phase 4e, run L distinguishes received `connection-changed` from ordinary
+  `invalidated` lifecycle events. The scheduler pauses immediately, rereads the saved connection,
+  resets its Restore check as on startup, and waits for an aborted round to leave before
+  resuming. Adoption is ignored during local Connect/Disconnect and after stop; overlapping
+  reads cannot adopt an older connection. Connection notifications now follow the credential
+  commit (including Disconnect), while starting a local operation invalidates locally.
+  — Other windows must read the committed state, not the credentials about to be removed.
+- 2026-10-22 — Phase 4e, run L calls `beginUpdate` from the activated-worker `onNeedReload`
+  callback and immediately before an explicit `updateServiceWorker(true)`. The lifecycle aborts
+  outstanding work and keeps both direct rounds and the scheduler paused until reload;
+  `needRefresh` alone does not pause. A failed explicit activation calls `endUpdate`, emitting
+  `update-ended` to resume, unless a worker has already activated meanwhile. — Loaded code may
+  sync while an update merely waits, but activation invalidates even a schema-4-to-schema-4
+  round. The navigation regression now waits for sync startup before supplying its suggestions;
+  startup's session reset could otherwise erase the fixture state (run K's intermittent failure).
+- 2026-10-22 — Phase 4e, run L verification passed: targeted runs of four files / 231 tests,
+  five files / 273 tests, then the final backup/App/scheduler checks (three files / 226 tests)
+  and review/picture-backup checks (two files / 88 tests). One full
+  `npm test -- --pool=threads` passed all 92 files and 2,380 tests in 397.44 seconds
+  (60 added over run K's 2,320-test baseline). `npm run build` passed with the existing
+  large-chunk warning; `git diff --check` passed. Regressions cover a second Dexie connection's
+  save, all note fields and exported preferences, referenced picture changes, unchanged/local-only
+  changes, the usable Import retry dialog and its new safety download, malformed identities and
+  local Dismiss, the Apply guard, stale missing/ambiguous folders with rendered Keep both and
+  saved copies, received connection changes, notification-after-commit, stopped/local-operation
+  schedulers, and update invalidation, pause and failure recovery. Version is 0.4.4 in all three
+  package entries; no schema or dependency change. Existing run K and README edits were preserved;
+  the only server edit in run L adds the requested identity-rule compatibility assertions.
+  No network, sockets, protected owner data or keys, paid calls, deployment or commit were used.
+  `sync-check`, shots and browser checks were not run; no browser layout, phone keyboard,
+  real service or live Claude Code session was seen. — Claude Code reviews this step and runs
+  those checks; the owner still needs the phone check at
+  `http://brent-dell-system-xps-l502x:5174/`.
+- 2026-10-22 — Claude Code reviewed runs K and L (each fix against its finding, the tests, the
+  contract around it) and ran what Codex couldn't. Checked the new Serve test against the live
+  `tailscale serve status --json` with the deployed host list: "configured", and "missing" with
+  only the health tracker's mapping. Timed the review diff for a big suggestion in headless
+  Chromium on the XPS: 0.45 s for 50 changed paragraphs, 1.5 s for 200, 3.3 s for 501, growing
+  in step with the size. — Shared with Tidy since Phase 3; acceptable, and nothing realistic comes
+  near 500; noted, not changed.
+- 2026-10-22 — Codex's second pass (read-only, xhigh) over the fixes: findings 1, 3, 4 and 6–10
+  (the numbering of the findings entry above) fixed; two partly fixed, both now completed by
+  Claude Code with a test each that fails without the fix: (a) a connection change from another
+  window arriving during this window's own Connect or Disconnect was dropped, so this window
+  could stay disconnected with valid saved credentials; it is now read once that operation
+  finishes (`adoptDeferred` in `src/sync/trigger.js`). (b) The review kept an unreadable card as
+  first built, so a card going stale while the review was open still hid Keep both; unreadable
+  cards, which have nothing tickable to keep, are now rebuilt on every snapshot
+  (`src/screens/SyncReview.jsx`). — Both need two windows or a change while the review is open;
+  the rest of the second pass found nothing new.
+- 2026-10-22 — 4e verification before release: `npm test` (92 files, 2,381 tests), `npm run
+  build`, `npm run sync-check` 26/26 (15 server, 11 browser, including import, Restore, Keep both
+  and the mixed Apply/Undo through real files), `npm run shots` (208 PNGs; Restore, the stale
+  Keep both card and Sync connected read; a first run timed out at the wrong-code shot while
+  the dev server was reloading for a test edit, and the rerun passed), `npm run browser-checks`
+  15/15 (including an update activated from another tab). The phone, Samsung Keyboard and a
+  real Claude Code session were not seen. Contract, BRIEF §7, README and
+  `DECISIONS-EXPLAINED.md` §80 updated.

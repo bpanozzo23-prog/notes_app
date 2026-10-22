@@ -9,6 +9,11 @@ import { extractFileIds, extractNoteLinks } from "../src/lib/text.js";
 import { FORMATTING_KEYS } from "../src/editor/formatting.js";
 import { SUPPORTED_HTML_SAMPLES } from "../src/editor/extensions.js";
 import { SCHEMA_VERSION } from "../src/version.js";
+import { buildInbox, keepBothModel } from "../src/sync/inbox.js";
+import { proposalFixture } from "../src/sync/inbox-fixtures.js";
+import { inboxPlan, keepBothPlan } from "../src/sync/plan.js";
+import { validateOutcomes, PROPOSAL_ID, HASH } from "./validate.mjs";
+import { PROPOSAL_ID as APP_PROPOSAL_ID, HASH as APP_HASH } from "../src/sync/prefs.js";
 import * as copied from "./constants.mjs";
 import { buildBackup, dailyBackup, localDay } from "./backup.mjs";
 import { mkdir, readJson } from "./fsutil.mjs";
@@ -16,7 +21,36 @@ import { AT, PNG, file, fixture, note, push } from "./test-support.js";
 
 let f;
 afterEach(async () => { await f?.clean(); f = null; });
+it("accepts the phone's real Apply outcome for 501 changed paragraphs", () => {
+  const body = (word) => Array.from({ length: 501 }, (_, i) => `<p>${word} ${i}</p>`).join("");
+  const original = note({ html: body("Before") });
+  const version = proposalFixture(original, { body: body("After") });
+  const cards = buildInbox([version], { notes: [original], folders: [], generation: null });
+  expect(cards[0].invalid).not.toBe(true);
+  expect(cards[0].ids).toHaveLength(501);
+  const plan = inboxPlan(cards, cards[0].ids, null, {}, AT), item = plan.outbox[0];
+  expect(item).toMatchObject({ proposal: version.proposal, hash: version.hash, outcome: "applied", at: AT });
+  expect(item.applied).toHaveLength(501);
+  expect(validateOutcomes([item])).toEqual([item]);
+}, 90000);
+it("accepts the phone's real Keep both outcome for a stale edit", () => {
+  const original = note(), version = proposalFixture(original, { body: "<p>Proposed words</p>" });
+  const snapshot = { notes: [{ ...original, rev: 2 }], folders: [], generation: null };
+  expect(buildInbox([version], snapshot)[0].stale).toBe(true);
+  const item = keepBothPlan(keepBothModel(version, snapshot), AT).outbox[0];
+  expect(item).toEqual({ proposal: version.proposal, hash: version.hash, outcome: "kept", applied: [], at: AT });
+  expect(validateOutcomes([item])).toEqual([item]);
+});
+it.each(["dismissed", "stale"])("accepts the phone's Dismiss entry with outcome %s", (outcome) => {
+  const version = proposalFixture(note());
+  const item = { proposal: version.proposal, hash: version.hash, outcome, applied: [], at: AT };
+  expect(validateOutcomes([item])).toEqual([item]);
+});
 it("keeps every copied constant equal to the app contract", () => {
+  expect(APP_PROPOSAL_ID.source).toBe(PROPOSAL_ID.source);
+  expect(APP_PROPOSAL_ID.flags).toBe(PROPOSAL_ID.flags);
+  expect(APP_HASH.source).toBe(HASH.source);
+  expect(APP_HASH.flags).toBe(HASH.flags);
   expect(copied.EXPORTED_PREFS).toEqual(EXPORTED_PREFS);
   expect(copied.FORMATTING_KEYS).toEqual(FORMATTING_KEYS);
   expect(copied.IMAGE_TYPES).toEqual(IMAGE_TYPES);

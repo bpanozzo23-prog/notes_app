@@ -3,7 +3,7 @@ import { constants as C } from "node:fs";
 import path from "node:path";
 import { Store } from "./store.mjs";
 import { extractFileIds } from "./constants.mjs";
-import { keyFor, sha256, readJson, stableStringify, writeJson } from "./fsutil.mjs";
+import { keyFor, sha256, readJson, stableStringify, writeJson, TEMP_PREFIX } from "./fsutil.mjs";
 import { recordKind, readProposals } from "./proposals.mjs";
 import { loadViewTemplates } from "./templates.mjs";
 import { withDirectory, readViewFile, writeViewFile, unlinkInDirectory } from "./view-fs.mjs";
@@ -26,6 +26,8 @@ export async function viewLog(storeDir, event, relative, now = new Date()) {
 }
 const json = (value) => `${stableStringify(value)}\n`;
 const oneLine = (value) => String(value ?? "").replace(/[\u0000-\u001f\u007f-\u009f]/g, " ").replace(/[\\`*_<>[\]]/g, "\\$&");
+const appliedLine = (ticks = []) => (ticks.slice(0, 50).map(oneLine).join(", ") || "none") +
+  (ticks.length > 50 ? `, and ${ticks.length - 50} more` : "");
 
 export async function rebuildView({ storeDir, viewDir, templates, now = new Date() }) {
   // Read only the trusted store. No content from the view is ever used as input.
@@ -69,11 +71,20 @@ export async function rebuildView({ storeDir, viewDir, templates, now = new Date
     `- ${oneLine(p.outcome?.at ?? p.handledAt ?? p.ingestedAt)} · ${p.kind === "new" ? "new note: " : p.kind === "trash" ? "to Trash: " : ""}` +
     `${oneLine(p.title || "(note unavailable)")} · ${oneLine(p.status)}` +
     (p.reason ? ` · reason: ${oneLine(p.reason)}` : "") +
-    ` · applied: ${(p.outcome?.applied ?? []).map(oneLine).join(", ") || "none"}\n`).join(""));
+    ` · applied: ${appliedLine(p.outcome?.applied ?? [])}\n`).join(""));
 
   for (const directory of DIRECTORIES) {
-    try { await withDirectory(viewDir, directory, async () => {}, { create: true, mode: 0o755 }); }
+    try { await withDirectory(viewDir, directory, async () => {}, { create: true, mode: 0o700 }); }
     catch (error) { await viewLog(storeDir, "unsafe-directory", directory || ".", now); throw error; }
+  }
+  for (const directory of DIRECTORIES.filter((name) => name !== "inbox")) {
+    await withDirectory(viewDir, directory, async (dir) => {
+      for (const entry of await fs.readdir(dir.directory, { withFileTypes: true })) {
+        if (entry.name.startsWith(TEMP_PREFIX) && (entry.isFile() || entry.isSymbolicLink())) {
+          await unlinkInDirectory(dir, entry.name);
+        }
+      }
+    });
   }
   const manifest = await readJson(path.join(storeDir, "view-manifest.json"), {});
   const intact = new Set();
@@ -81,7 +92,7 @@ export async function rebuildView({ storeDir, viewDir, templates, now = new Date
     if (!expected(name)) continue; // Even a damaged manifest cannot point outside the view.
     let matches = false;
     try { matches = sha256(await readViewFile(viewDir, name, 64 * 1024 * 1024)) === hash; }
-    catch { /* Missing, symlinked and oversized files are also damage. */ }
+    catch { /* Missing, nonregular, oversized and wrong-mode files are also damage. */ }
     if (matches) intact.add(name);
     else await viewLog(storeDir, "tampered", name, now);
   }

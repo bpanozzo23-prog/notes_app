@@ -2,7 +2,8 @@
 
 The runtime imports only Node built-ins and other `.mjs` files here. Nothing imports the app
 at runtime. `compatibility.test.js` compares the copied constants and image-reference parser
-against the app and validates generated backups with the app's validator.
+against the app, validates generated backups with the app's validator, and checks the phone's
+real Apply and Keep both outcomes plus Dismiss entries with the server's validator.
 
 `main.mjs` exposes `serve`, `pair`, `status` and `init-store`. The configuration path comes
 from `NOTES_SYNC_CONFIG`; its default is the owner's private configuration, so **tests must
@@ -37,7 +38,9 @@ The full contract remains [`docs/PHASE-4-DIRECTION.md`](../docs/PHASE-4-DIRECTIO
   wire retain the full SHA-256, checked before an outcome can update a record. Run A's full-hash
   filenames remain readable. Outcomes are `applied`, `kept` (4d's Keep both), `dismissed` or
   `stale`. An owner outcome on a new-note version also retires (`superseded`) any other pending
-  new-note version under the same pid, in the same journalled batch.
+  new-note version under the same pid, in the same journalled batch. `applied` may be absent,
+  null or an array of safe tick ids, each at most 200 characters. There is no tick-count cap;
+  the whole request remains bounded by `MAX_JSON_BYTES` (32 MiB).
 
 ## Recovery and history
 
@@ -61,6 +64,15 @@ Backups are derived from the published snapshot and immutable objects, never fro
 configuration or git-remote checks. Funnel checks inspect the public listener's proxy mapping,
 not just the loopback port. An enabled listener with an unknown mapping is refused. Prior
 live forwarding checks are recorded in `DECISIONS.md`; this run uses injected fixtures.
+
+`notes-sync status` reports `serve: "configured"` only when the notes mapping itself has an
+HTTPS TCP listener and a matching Web root handler proxying to `http://127.0.0.1:<port>`
+(an optional trailing slash is accepted). Explicit ports in `config.hosts` identify public
+listeners; hosts without a port use `config.origin`'s port (443 for HTTPS by default), and
+the origin's host is also checked. The origin normally belongs to the phone app, so its port
+does not override an explicit service Host port. `missing` means Serve has configuration but
+no matching notes listener/proxy; `off` means empty or absent configuration; `unreadable` means
+the status read failed. An unrelated service's mapping cannot satisfy deployment readiness.
 
 ## Verification
 
@@ -126,13 +138,20 @@ checking every ancestor from the view root with `lstat`, ownership, `O_DIRECTORY
 `O_NOFOLLOW`. Before mutations it checks the ancestry again. File reads require a regular
 file before and after open and use bounded reads even if a file grows during the read.
 Writes use exclusive no-follow temporary files, file fsync, same-directory rename and
-directory fsync. The view removes only expected stale note/image filenames, never directories.
+directory fsync. Before writing new files, every rebuild removes regular files and symlinks
+whose names start with `.notes-sync-tmp-` from the view root, `notebook/`, `notebook/notes/`,
+`notebook/images/` and `.claude/`. This clears interrupted writes without following links or
+recursing; `inbox/` is excluded. Other unexpected entries stay untouched. Stale expected
+note/image files or symlinks are also removed, never directories.
 
-`view-manifest.json` maps relative view filenames to hashes. Rebuilds hash previous files,
-log damage as path/time only in `view-log.jsonl`, then replace them from the store. Missing
-directories are created; symlinked or foreign-owned directories are refused. Rebuilds create
-only `inbox/`, leave its contents alone, and retire the old root helper file without following
-links. Legacy inbox subdirectories, if present, are unrelated entries and are left alone.
+`view-manifest.json` maps relative view filenames to hashes. Rebuilds check previous files'
+bytes, regular-file type and mode 0444 through pinned directories without following links.
+Damage, including a changed mode with identical bytes, is logged as path/time only in
+`view-log.jsonl`, then replaced from the store with a fresh 0444 file. Missing directories are
+created at 0700; every rebuild also tightens existing managed directories to 0700, including
+the view root and `inbox/`. Symlinked or foreign-owned directories are refused. Rebuilds leave
+inbox contents alone and retire the old root helper file without following links. Legacy inbox
+subdirectories, if present, are unrelated entries and are left alone.
 
 Claude Code writes `inbox/<pid>.html` first (complete raw UTF-8 HTML, at most 512 KiB), then
 `inbox/<pid>.json` (at most 16 KiB). Three kinds, told apart by shape (`proposalKind`): an edit
@@ -176,6 +195,9 @@ both view status files before pinned unlink removes the pair. If a crash leaves 
 the next stable scan finds the stored hash, repairs the view and repeats cleanup without
 another version. History failure retains files until repaired. The proposal index contains
 metadata/status/reason/outcomes, not bodies; titles come only from currently live notes.
+The readable `proposals-log.md` lists at most 50 applied tick ids per outcome line, then
+`and N more` for the remainder (`none` for an empty list). The store and `proposals.json`
+keep every tick.
 
 `server/view/CLAUDE.md` documents the precise field limits and every refusal reason with its
 next step. Writing a fresh pair requires no helper or command-line tool.

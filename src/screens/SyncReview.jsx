@@ -36,7 +36,9 @@ export default function SyncReview({ run, queue, busy, onBack, refresh }) {
       next(snapshot) {
         syncSession.hideProposals([...snapshot.outbox, ...snapshot.handled]);
         setReview((previous) => {
-          const cached = revision === previous?.revision ? new Map(previous.cards.map((card) => [card.key, card])) : new Map();
+          // An unreadable card has nothing tickable to keep, so it is rebuilt each time: a
+          // folder failure, for one, no longer hides Keep both once the card goes stale.
+          const cached = revision === previous?.revision ? new Map(previous.cards.filter((card) => !card.invalid).map((card) => [card.key, card])) : new Map();
           const pending = pendingProposals(proposals, snapshot.outbox, snapshot.handled);
           const fresh = new Map(buildInbox(pending.filter((version) => !cached.has(outboxId(version))), snapshot).map((card) => [card.key, card]));
           const cards = pending.map((version) => {

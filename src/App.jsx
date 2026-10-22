@@ -31,6 +31,7 @@ import { claudeSession } from "./claude/session.js";
 import { getClaudeStatus, useClaudeStatus } from "./claude/prefs.js";
 import { loadClaudeSdk } from "./claude/client.js";
 import { startSync } from "./sync/trigger.js";
+import { syncLifecycle } from "./sync/lifecycle.js";
 
 export default function App() {
   const [queue] = useState(() => new SaveQueue({ save: updateNote, resolveConflict: (error, id, patch) => {
@@ -74,7 +75,7 @@ export default function App() {
   }));
   const { needRefresh: [needRefresh], offlineReady: [offlineReady, setOfflineReady], updateServiceWorker } = useRegisterSW({
     // Guard the final controller-change reload too: activation can come from another tab.
-    onNeedReload: () => { activatedWorker.current = true; setWorkerReady(true); },
+    onNeedReload: () => { syncLifecycle.beginUpdate(); activatedWorker.current = true; setWorkerReady(true); },
     onRegisterError: (error) => setRegistrationError(error.message || "Offline setup failed. Reopen the app to try again."),
   });
 
@@ -189,8 +190,12 @@ export default function App() {
       if (activatedWorker.current) { window.location.reload(); return; }
       explicitReload.current = true;
       setWaitingForReload(true);
+      syncLifecycle.beginUpdate();
       try { await updateServiceWorker(true); }
-      catch (error) { explicitReload.current = false; setWaitingForReload(false); throw error; }
+      catch (error) {
+        if (!activatedWorker.current) syncLifecycle.endUpdate();
+        explicitReload.current = false; setWaitingForReload(false); throw error;
+      }
     });
   }
   const locked = busy || !ready || waitingForReload || (workerReady && !claudeHasContent && !claudeBusy) || !!access.versionChange || access.replaced;

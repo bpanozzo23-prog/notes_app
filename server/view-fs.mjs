@@ -4,6 +4,7 @@ import fs from "node:fs/promises";
 import { constants as C } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
+import { TEMP_PREFIX } from "./fsutil.mjs";
 
 export function refuse(reason) { throw Object.assign(new Error(reason), { reason }); }
 function parts(relative) {
@@ -31,7 +32,7 @@ export async function withDirectory(root, relative, operation, { create = false,
       catch (error) {
         if (!create || error.code !== "ENOENT") throw error;
         await verify();
-        try { await fs.mkdir(filename, { mode: mode ?? 0o755 }); }
+        try { await fs.mkdir(filename, { mode: mode ?? 0o700 }); }
         catch (error) { if (error.code !== "EEXIST") throw error; }
         stat = await fs.lstat(filename);
       }
@@ -51,7 +52,7 @@ export async function withDirectory(root, relative, operation, { create = false,
 }
 export const sameFileStat = (a, b) => Boolean(a && b && a.size === b.size && a.mtimeMs === b.mtimeMs && a.ino === b.ino);
 
-export async function readRegular(filename, limit, expected) {
+export async function readRegular(filename, limit, expected, mode) {
   const stat = await fs.lstat(filename);
   if (!stat.isFile()) refuse("not-regular");
   if (expected && !sameFileStat(stat, expected)) refuse("file-changed");
@@ -59,6 +60,7 @@ export async function readRegular(filename, limit, expected) {
   try {
     const opened = await handle.stat();
     if (!opened.isFile() || opened.dev !== stat.dev || opened.ino !== stat.ino) refuse("not-regular");
+    if (mode !== undefined && (opened.mode & 0o777) !== mode) refuse("unexpected-mode");
     if (expected && !sameFileStat(opened, expected)) refuse("file-changed");
     if (opened.size > limit) refuse("too-large");
     // readFile alone could grow without bound if a writer extends the file after fstat.
@@ -77,12 +79,12 @@ export async function readRegular(filename, limit, expected) {
   } finally { await handle.close(); }
 }
 export const readViewFile = (root, relative, limit) => withDirectory(root, path.dirname(relative),
-  ({ directory }) => readRegular(path.join(directory, path.basename(relative)), limit));
+  ({ directory }) => readRegular(path.join(directory, path.basename(relative)), limit, undefined, 0o444));
 
 export async function writeInDirectory(dir, name, data, mode = 0o600) {
   if (parts(name).length !== 1 || path.basename(name) !== name) refuse("unsafe-path");
   await dir.verify();
-  const temporary = path.join(dir.directory, `.notes-sync-tmp-${randomUUID()}`);
+  const temporary = path.join(dir.directory, `${TEMP_PREFIX}${randomUUID()}`);
   const handle = await fs.open(temporary, C.O_WRONLY | C.O_CREAT | C.O_EXCL | C.O_NOFOLLOW, mode);
   try {
     try {

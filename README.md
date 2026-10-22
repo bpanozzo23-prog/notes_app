@@ -142,7 +142,7 @@ LLM can read. The code may become public; the notes never are.
   edits the owner reviews and applies on the phone. The spike passed on the phone 2026-10-19.
   Contract: `docs/PHASE-4-DIRECTION.md` (Codex-reviewed); plain-language review in
   `docs/DECISIONS-EXPLAINED.md` §63–73. Steps: 4a the XPS service, 4b the app sends (0.4.0), 4c
-  the inbox for edits (0.4.1), 4d new notes and Trash (optional), 4e closeout.
+  the inbox for edits (0.4.1), 4d new notes, Trash and Keep both (0.4.2), 4e closeout (0.4.4).
 - **Phase 4a — the XPS service, installed 2026-10-20.** `server/` (request handler, pairing,
   private store with git history, crash-safe rounds, the generation-aware guard, images by
   content, daily backups, the read-only `~/notes` view, the inbox scan for proposal file pairs),
@@ -166,7 +166,7 @@ LLM can read. The code may become public; the notes never are.
   changes to N notes · Review": one card per note with its reason and Dismiss; Apply changes the
   ticked ones together, with Undo (also in Settings → Sync); outcomes go back to the XPS.
   Owner-verified on the phone 2026-10-20 (partial Apply, Undo, a stale card, Dismiss, the new
-  look); the two-window Undo is left for 4e.
+  look; the two-window Undo on 2026-10-22).
 - **Phase 4d — new notes, Trash and Keep both from Claude Code, 0.4.2, 2026-10-20.** Claude Code
   can also suggest a new note (with its folder, which can be a new one, and pictures already in
   your notes), moving a note to Trash, and a new folder by name; the notes list says "Claude
@@ -174,11 +174,20 @@ LLM can read. The code may become public; the notes never are.
   shows the copy and adds it beside your note as "… (from Claude Code)". Undo works as split's:
   new notes to Trash, trashed notes back, nothing changed since overwritten. Contract in
   `docs/PHASE-4-DIRECTION.md` "4d" (Codex-reviewed twice); plain-language summary in
-  `docs/DECISIONS-EXPLAINED.md` §78. Owner phone check pending.
+  `docs/DECISIONS-EXPLAINED.md` §78. Owner-verified on the phone 2026-10-22.
 - **Indent and outdent buttons, 0.4.3, 2026-10-22.** Two toolbar buttons after the list buttons
   nest a bullet, numbered or checklist line under the one above, or bring it back out; greyed
   out outside a list. No change to how notes are stored. Owner-verified on the phone (dev server);
   `docs/DECISIONS-EXPLAINED.md` §79.
+- **Phase 4e — closeout, 0.4.4, 2026-10-22.** Codex reviewed the whole Phase 4 diff against its
+  contract (three read-only runs); all 11 findings were confirmed, 10 fixed (runs K on the XPS,
+  L in the app) and checked again by Codex, one accepted. Fixes: an import or Restore can no
+  longer lose a note saved in another window at that moment; a suggestion with over 500 changes
+  or a malformed one can no longer block Claude Code's results from reaching the XPS; Keep both
+  works after the note's folder is deleted; windows notice each other's Connect/Disconnect and
+  pause sync once an update activates; the XPS cleans crash leftovers from `~/notes`, keeps its
+  folders private (0700), repairs changed permissions, and `notes-sync status` checks the notes
+  mapping itself. `docs/DECISIONS-EXPLAINED.md` §80. Owner's final phone check pending.
 
 ## Running it
 

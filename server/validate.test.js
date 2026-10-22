@@ -90,9 +90,16 @@ it.each([
 
 it.each([
   [{ outcome: "deleted" }], [{ outcome: "APPLIED" }], [{ applied: "title" }], [{ applied: [""] }],
-  [{ applied: Array.from({ length: 501 }, (_, i) => `t${i}`) }], [{ applied: ["x".repeat(201)] }],
+  [{ applied: ["x".repeat(201)] }], [{ applied: ["bad\ntick"] }], [{ applied: [1] }], [{ applied: {} }],
 ])("rejects outcome words and tick lists outside the contract %j", (extra) => {
   expect(() => validateOutcomes([{ proposal: "p", hash: "a".repeat(64), outcome: "applied", at: AT, ...extra }])).toThrow();
+});
+it.each([501, 5000])("accepts %i ticks and still checks every tick", (count) => {
+  const item = { proposal: "p", hash: "a".repeat(64), outcome: "applied", at: AT,
+    applied: Array.from({ length: count }, (_, i) => `tick-${i}`) };
+  expect(validateOutcomes([item])).toEqual([item]);
+  item.applied[count - 1] = "bad\ntick";
+  expect(() => validateOutcomes([item])).toThrow("invalid-outcome");
 });
 it.each(["applied", "kept", "dismissed", "stale"])("accepts the outcome %s with or without ticks", (outcome) => {
   for (const applied of [undefined, null, [], ["title", "body-1"]]) {

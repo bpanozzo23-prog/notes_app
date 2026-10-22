@@ -108,7 +108,7 @@ request from the app, and to the owner's XPS while sync is connected (2026-10-19
 encrypted, readable by programs running as the owner; a Claude Code session in `~/notes` sends
 what it reads to Anthropic under the owner's Claude account terms (not the API terms the app
 uses), and Claude Code keeps transcripts with note text in `~/.claude/projects/`; the XPS history
-keeps notes deleted for good on the phone; nothing goes to any cloud from there. The published
+keeps notes deleted for good on the phone; nothing else goes to any cloud from there. The published
 app shares its web origin with mi-cuaderno (true since Phase 1b), so each app's code could read
 the other's stored data.
 

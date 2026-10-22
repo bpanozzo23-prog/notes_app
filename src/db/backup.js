@@ -1,4 +1,4 @@
-import { db, allPrefs, notebookAccess, writeTransaction, announceReplacement } from "./db.js";
+import { db, notebookAccess, writeTransaction, announceReplacement } from "./db.js";
 import { APP_VERSION, SCHEMA_VERSION } from "../version.js";
 import { nowIso } from "../lib/dates.js";
 import { extractFileIds, extractNoteLinks, htmlToText } from "../lib/text.js";
@@ -22,32 +22,42 @@ export const EXPORTED_PREFS = Object.freeze(["lastBackupAt", ...FORMATTING_KEYS]
 export const IGNORED_PREFS = Object.freeze(["storagePersisted", claudeEnabled, claudeSpend, claudeLastChange, syncAddress, syncOutbox, syncHandled]);
 export const BACKUP_FORMAT = "notes_app-backup";
 
-export async function buildBackup() {
+async function readBackupRows(includeData = false) {
+  const [notes, folders, tombstones, prefs] = await Promise.all([
+    db.notes.toArray(), db.folders.toArray(), db.tombstones.toArray(), db.prefs.bulkGet(EXPORTED_PREFS),
+  ]);
+  const files = [];
+  for (const id of [...new Set(notes.flatMap((note) => extractFileIds(note.html)))].sort()) {
+    const file = await db.files.get(id), data = await db.fileData.get(id);
+    const metadata = file ? Object.fromEntries(["id", "type", "size", "width", "height", "createdAt"].map((key) => [key, file[key]])) : null;
+    files.push({ id, metadata, size: data?.bytes?.byteLength ?? null,
+      ...(includeData && file && data ? { data: toBase64(data.bytes) } : {}) });
+  }
+  return { notes, folders, tombstones, files, preferences: Object.fromEntries(prefs.filter(Boolean).map(({ key, value }) => [key, value])) };
+}
+function backupFingerprint({ files, ...rows }) {
+  // Picture bytes are immutable under an id. Include missing halves and sizes, but not
+  // unused-image clocks or device-local preferences. No asynchronous hash inside Dexie.
+  return JSON.stringify({ ...rows, files: files.map(({ id, metadata, size }) => ({ id, metadata, size })) },
+    (_key, value) => value && typeof value === "object" && !Array.isArray(value)
+      ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, value[key]])) : value);
+}
+export async function buildSafetyBackup() {
   return db.transaction("r", db.notes, db.folders, db.tombstones, db.prefs, db.files, db.fileData, async () => {
     await notebookAccess.check();
-    const [notes, folders, tombstones, prefs] = await Promise.all([
-      db.notes.toArray(), db.folders.toArray(), db.tombstones.toArray(), allPrefs(),
-    ]);
-    const referenced = new Set(notes.flatMap((note) => extractFileIds(note.html)));
-    const files = [];
-    for (const fileId of referenced) {
-      const file = await db.files.get(fileId);
-      const data = file && await db.fileData.get(fileId);
-      // Keep the note's reference so validation reports either missing half alike.
-      if (!file || !data) continue;
-      const { id, type, size, width, height, createdAt } = file;
-      files.push({ id, type, size, width, height, createdAt, data: toBase64(data.bytes) });
-    }
+    const rows = await readBackupRows(true), fingerprint = backupFingerprint(rows);
+    // Keep missing references in the notes so validation can report either missing half.
+    const files = rows.files.filter(({ data }) => data !== undefined).map(({ metadata, data }) => ({ ...metadata, data }));
     const envelope = {
       format: BACKUP_FORMAT, schemaVersion: SCHEMA_VERSION, exportedAt: nowIso(), appVersion: APP_VERSION,
-      notes, folders, tombstones, files,
-      preferences: Object.fromEntries(EXPORTED_PREFS.filter((key) => Object.hasOwn(prefs, key)).map((key) => [key, prefs[key]])),
+      ...rows, files,
     };
     const result = validateBackup(envelope);
     if (!result.ok) throw new Error(`Could not back up notebook: ${result.errors.join(" ")}`);
-    return result.envelope;
+    return { envelope: result.envelope, fingerprint };
   });
 }
+export async function buildBackup() { return (await buildSafetyBackup()).envelope; }
 
 export function backupFilename() {
   return `notes-backup-${nowIso().slice(0, 19).replaceAll(":", "-")}.json`;
@@ -233,7 +243,8 @@ export function validateBackup(raw) {
   }
 }
 
-export async function importBackup(envelope) {
+// Every UI path passes expected from its safety backup; fixture scripts may omit it.
+export async function importBackup(envelope, { expected } = {}) {
   const checked = validateBackup(envelope);
   if (!checked.ok) throw new Error(`Refusing to import: ${checked.errors.join(" ")}`);
   const clean = checked.envelope;
@@ -243,6 +254,9 @@ export async function importBackup(envelope) {
   syncLifecycle.beginImport();
   try {
     await writeTransaction([db.notes, db.folders, db.tombstones, db.prefs, db.files, db.fileData], async () => {
+      if (expected !== undefined && backupFingerprint(await readBackupRows()) !== expected) {
+        throw new Error("Your notebook changed in another window while the safety backup was made. Nothing was replaced. Tap Import and replace again.");
+      }
       // Only exported preferences and the old Undo slot are replaced. Device-local
       // connection credentials, outbox entries and Claude settings survive a restore.
       await Promise.all([db.files.clear(), db.fileData.clear(), db.notes.clear(), db.folders.clear(), db.tombstones.clear(), db.prefs.bulkDelete([...EXPORTED_PREFS, claudeLastChange])]);

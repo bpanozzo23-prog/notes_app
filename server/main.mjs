@@ -15,6 +15,20 @@ export function createTailscale(run = execute) {
   const read = async (name) => JSON.parse((await run("tailscale", [name, "status", "--json"], { maxBuffer: 1024 * 1024 })).stdout);
   return { funnelStatus: () => read("funnel"), serveStatus: () => read("serve") };
 }
+export function serveState(status, config) {
+  if (status == null) return "off";
+  if (typeof status !== "object" || Array.isArray(status)) return "missing";
+  if (!Object.keys(status).length) return "off";
+  const origin = new URL(config.origin), port = origin.port || (origin.protocol === "https:" ? "443" : "80");
+  // Origin is the phone app's origin; an explicit Host port identifies the service listener.
+  const listeners = [...(config.hosts ?? []).map((host) => host.includes(":") ? host : `${host}:${port}`),
+    `${origin.hostname}:${port}`];
+  const target = `http://127.0.0.1:${config.port}`;
+  return listeners.some((listener) => {
+    const proxy = status.Web?.[listener]?.Handlers?.["/"]?.Proxy;
+    return status.TCP?.[listener.split(":").at(-1)]?.HTTPS === true && (proxy === target || proxy === `${target}/`);
+  }) ? "configured" : "missing";
+}
 export function checkFunnel(status, config) {
   if (!status || typeof status !== "object" || Array.isArray(status)) throw new Error("funnel-unreadable");
   // AllowFunnel keys name the public listener (normally :8443), not the loopback port.
@@ -100,7 +114,8 @@ export async function status(config, overrides = {}) {
   const device = await context.pairing.device();
   const tailscale = overrides.tailscale ?? createTailscale();
   const read = async (fn) => { try { return await fn(); } catch { return null; } };
-  const [funnel, serving] = await Promise.all([read(() => tailscale.funnelStatus()), read(() => tailscale.serveStatus())]);
+  const [funnel, serving] = await Promise.all([read(() => tailscale.funnelStatus()),
+    (async () => { try { return serveState(await tailscale.serveStatus(), config); } catch { return "unreadable"; } })()]);
   let funnelState = "unreadable";
   if (funnel) {
     try { checkFunnel(funnel, config); funnelState = "off"; } catch { funnelState = "on"; }
@@ -110,7 +125,7 @@ export async function status(config, overrides = {}) {
     missingImages: s.missingImages.length, historyError: s.historyError,
     paired: device ? { label: device.label, pairedAt: device.pairedAt } : null,
     journalPending: Boolean(await context.store.readJournal()),
-    serve: serving === null ? "unreadable" : Object.keys(serving).length ? "configured" : "off", funnel: funnelState };
+    serve: serving, funnel: funnelState };
 }
 export async function main(args = process.argv.slice(2), overrides = {}) {
   const env = overrides.env ?? process.env;

@@ -9,6 +9,7 @@ import { keyFor, readJson, sha256, writeJson } from "./fsutil.mjs";
 import { createConfirmations, pushHash } from "./guard.mjs";
 import { ROUND_STEPS, OUTCOME_STEPS } from "./round.mjs";
 import { uploadKey } from "./store.mjs";
+import { proposalFilename } from "./proposals.mjs";
 
 let f;
 beforeEach(async () => { f = await fixture(); });
@@ -303,6 +304,20 @@ it("outcomes are journalled and idempotent by proposal/hash, with unknown versio
   expect((await readJson(f.context.store.file(`proposals/${filename}`))).outcome).toEqual({ outcome: "applied", applied: ["title"], at: AT });
   expect(f.git.commit).toHaveBeenCalledTimes(1);
   expect(await f.context.store.readJournal()).toBeNull();
+});
+it("records all 501 ticks through the handler and recordOutcomes, with an idempotent retry", async () => {
+  const proposal = "p-many-ticks", hash = "a".repeat(64);
+  const filename = f.context.store.file(`proposals/${proposalFilename(proposal, hash)}`);
+  await writeJson(filename, { proposal, hash, note: "note-1", status: "pending", ingestedAt: AT, sequence: 1 });
+  const applied = Array.from({ length: 501 }, (_, i) => `body-${i + 1}`);
+  const item = { proposal, hash, outcome: "applied", applied, at: AT };
+  const response = await f.request("POST", "/v1/outcomes", [item]);
+  expect(response.status).toBe(200);
+  expect(response.body).toEqual({ recorded: [{ proposal, hash }] });
+  expect((await readJson(filename)).outcome).toEqual({ outcome: "applied", applied, at: AT });
+  expect(await f.context.store.readJournal()).toBeNull();
+  expect((await f.request("POST", "/v1/outcomes", [item])).body).toEqual(response.body);
+  expect(f.git.commit).toHaveBeenCalledTimes(1);
 });
 it.each(OUTCOME_STEPS)("recovers outcomes interrupted after %s", async (step) => {
   const hash = "a".repeat(64), filename = `p-${hash}.json`;

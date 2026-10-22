@@ -8,7 +8,7 @@ import { noteTitle } from "../lib/notebookView.js";
 import { isSafeId } from "../lib/ids.js";
 import { nowIso } from "../lib/dates.js";
 import { auditBody, auditList } from "./audit.js";
-import { appendOutboxInTransaction, appendHandledInTransaction, outboxId, readOutbox, readHandled } from "./prefs.js";
+import { appendOutboxInTransaction, appendHandledInTransaction, outboxId, readOutbox, readHandled, isReportable } from "./prefs.js";
 import { syncSession } from "./session.js";
 
 export const STALE_XPS = "You edited this note after Claude Code read it, so this suggestion can't be applied. Claude Code's version is kept on the XPS.";
@@ -26,7 +26,7 @@ const bytes = (text) => new TextEncoder().encode(text).length;
 function checkShape(version) {
   const kind = proposalKind(version), required = [...fields[kind], ...envelope];
   if (required.some((key) => !Object.hasOwn(version, key)) || Object.keys(version).some((key) => !required.includes(key) && !(kind !== "trash" && key === "newFolder")) ||
-      !/^p-[a-z0-9-]{3,80}$/.test(version.proposal) || !/^[a-f0-9]{64}$/.test(version.hash) ||
+      !isReportable(version) || !/^p-[a-z0-9-]{3,80}$/.test(version.proposal) ||
       version.status !== "pending" || typeof version.ingestedAt !== "string" || !Number.isFinite(Date.parse(version.ingestedAt)) ||
       !Number.isSafeInteger(version.sequence) || version.sequence < 1 ||
       version.generation !== null && typeof version.generation !== "string" || typeof version.why !== "string" || version.why.length > 300) throw new Error();
@@ -101,10 +101,15 @@ export function buildInbox(proposals, { notes, folders, generation, outbox = [],
         const title = validateTitle(version.title);
         if (title !== before.title) model.title = title;
         if (JSON.stringify([...version.tags].sort()) !== JSON.stringify([...before.tags].sort())) model.tags = [...version.tags];
-        const folder = resolveFolder(version, folders);
-        if (folder.action === "create" || (folder.id ?? null) !== before.folderId) model.folder = folder;
-        // Even a name resolving back to the source folder must stay unambiguous at Apply.
-        model.resolvedFolder = folder;
+        try {
+          const folder = resolveFolder(version, folders);
+          if (folder.action === "create" || (folder.id ?? null) !== before.folderId) model.folder = folder;
+          // Even a name resolving back to the source folder must stay unambiguous at Apply.
+          model.resolvedFolder = folder;
+        } catch (error) {
+          // A stale edit can only be kept as a copy, in the source note's current folder.
+          if (!model.stale) throw error;
+        }
         const prefix = `${version.proposal}:${version.hash}:`;
         model.ticks = { title: `${prefix}title`, tags: `${prefix}tags`, folder: `${prefix}folder` };
         model.changes = diffNoteBodies(normalizeBody(before.html), model.html).map((change) => change.id ? { ...change, id: prefix + change.id } : change);
@@ -149,7 +154,7 @@ export async function dismissProposal(card) {
     const generation = (await db.prefs.get("notebookGeneration"))?.value ?? null, note = isSafeId(card.version.note) ? await db.notes.get(card.version.note) : undefined;
     const outcome = proposalIsStale(card.version, note, generation) ? "stale" : "dismissed";
     entry = { proposal: card.version.proposal, hash: card.version.hash, outcome, applied: [], at: nowIso() };
-    await appendOutboxInTransaction(entry);
+    if (isReportable(entry)) await appendOutboxInTransaction(entry);
     await appendHandledInTransaction([handledEntry(card.version, generation, outcome)]);
   });
   syncSession.hideProposals([entry ?? card.version]);

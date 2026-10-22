@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { db, allPrefs, setPref } from "./db.js";
-import { buildBackup, validateBackup, importBackup, backupFilename, upgradeEnvelope, EXPORTED_PREFS } from "./backup.js";
+import Dexie from "dexie";
+import { db, allPrefs, setPref, notebookAccess } from "./db.js";
+import { buildBackup, buildSafetyBackup, validateBackup, importBackup, backupFilename, upgradeEnvelope, EXPORTED_PREFS } from "./backup.js";
 import { createFolder } from "./folders.js";
 import { createNote, updateNote, trashNote } from "./notes.js";
 import { DEFAULT_FORMATTING } from "../editor/formatting.js";
@@ -8,6 +9,83 @@ import { AT, backupFixture, noteFixture, resetDatabase } from "../test/fixtures.
 
 beforeEach(resetDatabase);
 afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); });
+
+const changedDuringBackup = "Your notebook changed in another window while the safety backup was made. Nothing was replaced. Tap Import and replace again.";
+const storedNotebook = async () => Object.fromEntries(await Promise.all(db.tables.map(async (table) => [table.name, await table.toArray()])));
+it("refuses a save from another connection after the safety backup without clearing any table or changing generation", async () => {
+  await importBackup(backupFixture({ notes: [noteFixture({ folderId: "folder" })], folders: [{ id: "folder", name: "Keep", position: 0 }] }));
+  const generation = notebookAccess.getGeneration(), { envelope, fingerprint } = await buildSafetyBackup();
+  const other = new Dexie(db.name);
+  try {
+    await other.open();
+    await other.table("notes").put(noteFixture({ id: "late-save", title: "Other window" }));
+    const before = await storedNotebook();
+    const clears = [db.notes, db.folders, db.tombstones, db.files, db.fileData].map((table) => vi.spyOn(table, "clear"));
+    await expect(importBackup(backupFixture(), { expected: fingerprint })).rejects.toThrow(changedDuringBackup);
+    expect(await storedNotebook()).toEqual(before);
+    expect(notebookAccess.getGeneration()).toBe(generation);
+    expect(clears.every((clear) => !clear.mock.calls.length)).toBe(true);
+    expect(envelope.notes.some((note) => note.id === "late-save")).toBe(false);
+  } finally { other.close(); }
+});
+it.each([
+  ["title", "Changed"], ["html", "<p>Changed</p>"], ["text", "Changed projection"], ["folderId", "folder"],
+  ["tags", ["changed"]], ["linkedIds", ["changed"]], ["pinned", true], ["rev", 2],
+  ["createdAt", "2026-10-22T00:00:00.000Z"], ["updatedAt", "2026-10-22T00:00:00.000Z"], ["deletedAt", AT], ["extra", "carried by backup"],
+])("detects a changed note field %s even when housekeeping leaves other fields alone", async (field, value) => {
+  await db.notes.put(noteFixture());
+  const { fingerprint } = await buildSafetyBackup();
+  await db.notes.update(noteFixture().id, { [field]: value });
+  const before = await storedNotebook();
+  await expect(importBackup(backupFixture(), { expected: fingerprint })).rejects.toThrow(changedDuringBackup);
+  expect(await storedNotebook()).toEqual(before);
+});
+it.each(["folder", "tombstone", ...EXPORTED_PREFS])("detects changed backup data: %s", async (kind) => {
+  const { fingerprint } = await buildSafetyBackup();
+  if (kind === "folder") await createFolder("Added later");
+  else if (kind === "tombstone") await db.tombstones.put({ id: "gone", purgedAt: AT });
+  else await setPref(kind, kind === "lastBackupAt" ? AT : DEFAULT_FORMATTING[kind]);
+  const before = await storedNotebook();
+  await expect(importBackup(backupFixture(), { expected: fingerprint })).rejects.toThrow(changedDuringBackup);
+  expect(await storedNotebook()).toEqual(before);
+});
+it.each(["metadata", "bytes", "size", "width", "restored bytes"])("detects referenced picture changes: %s", async (kind) => {
+  await db.notes.put(noteFixture({ html: '<p>Picture</p><img data-file="picture">' }));
+  await db.files.put({ id: "picture", type: "image/png", size: 1, width: 1, height: 1, createdAt: AT, unusedSince: null });
+  if (kind !== "restored bytes") await db.fileData.put({ id: "picture", bytes: new Uint8Array([1]).buffer });
+  const { fingerprint } = await buildSafetyBackup();
+  if (kind === "metadata") await db.files.delete("picture");
+  if (kind === "bytes") await db.fileData.delete("picture");
+  if (kind === "size") await db.files.update("picture", { size: 2 });
+  if (kind === "width") await db.files.update("picture", { width: 2 });
+  if (kind === "restored bytes") await db.fileData.put({ id: "picture", bytes: new Uint8Array([1]).buffer });
+  const before = await storedNotebook();
+  await expect(importBackup(backupFixture(), { expected: fingerprint })).rejects.toThrow(changedDuringBackup);
+  expect(await storedNotebook()).toEqual(before);
+});
+it("imports with a matching fingerprint despite local preferences, picture clocks and row key order changing", async () => {
+  await db.notes.put(noteFixture({ html: '<p>Picture</p><img data-file="picture">' }));
+  await db.files.put({ id: "picture", type: "image/png", size: 1, width: 1, height: 1, createdAt: AT, unusedSince: null });
+  await db.fileData.put({ id: "picture", bytes: new Uint8Array([1]).buffer });
+  const { envelope, fingerprint } = await buildSafetyBackup();
+  const preferences = { syncToken: "LOCAL-ONLY", syncAddress: "https://fixture.invalid", syncOutbox: [], syncHandled: [], claudeApiKey: "LOCAL-ONLY", claudeEnabled: true, claudeSpend: {}, claudeLastChange: {}, storagePersisted: true };
+  await db.prefs.bulkPut(Object.entries(preferences).map(([key, value]) => ({ key, value })));
+  await db.files.update("picture", { unusedSince: AT });
+  await db.files.put({ id: "unreferenced", size: 123 });
+  await db.notes.put(Object.fromEntries(Object.entries(envelope.notes[0]).reverse()));
+  expect((await buildSafetyBackup()).fingerprint).toBe(fingerprint);
+  expect(fingerprint).not.toContain("LOCAL-ONLY");
+  await importBackup(backupFixture(), { expected: fingerprint });
+  expect(await db.notes.toArray()).toEqual(backupFixture().notes);
+  expect(notebookAccess.getGeneration()).toEqual(expect.any(String));
+  expect((await allPrefs()).syncToken).toBe("LOCAL-ONLY");
+});
+it("imports an unchanged notebook with the safety fingerprint", async () => {
+  await createNote({ title: "Before" });
+  const { fingerprint } = await buildSafetyBackup();
+  await importBackup(backupFixture(), { expected: fingerprint });
+  expect(await db.notes.toArray()).toEqual(backupFixture().notes);
+});
 
 it("exports, validates and imports identical rows including trash, tombstones and allowed prefs", async () => {
   const folder = await createFolder("Folder");
