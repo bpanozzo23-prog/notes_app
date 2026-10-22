@@ -194,6 +194,23 @@ await page.getByRole("dialog", { name: "Note options", exact: true }).getByRole(
 await page.getByText("Copied as text.", { exact: true }).waitFor();
 await shot("108-note-copied-as-text");
 await page.evaluate(() => { delete navigator.clipboard; });
+// Indent nests the second bullet under the first; Outdent puts the note back as it was.
+{
+  const vocabToolbar = page.getByRole("toolbar", { name: "Formatting", exact: true });
+  const html = () => page.evaluate(() => document.querySelector(".ProseMirror").innerHTML);
+  await page.getByLabel("Note body").getByText("el plátano", { exact: true }).click();
+  const before = await html();
+  await vocabToolbar.getByRole("button", { name: "Indent", exact: true }).scrollIntoViewIfNeeded();
+  await vocabToolbar.getByRole("button", { name: "Indent", exact: true }).click();
+  if (!/la manzana<\/strong> — apple<\/p><ul><li><p><strong>el plátano/.test(await html())) throw new Error("Indent did not nest the bullet");
+  await shot("07c-note-indented-bullet");
+  await vocabToolbar.getByRole("button", { name: "Outdent", exact: true }).click();
+  if (await html() !== before) throw new Error("Outdent did not restore the list");
+  await page.getByLabel("Note body").getByText("Frutas y verduras", { exact: true }).click();
+  await page.waitForFunction(() => document.querySelector('[aria-label="Formatting"] button[aria-label="Indent"]')?.getAttribute("aria-disabled") === "true");
+  await shot("07d-note-indent-unavailable");
+  await vocabToolbar.evaluate((node) => { node.querySelector(".toolbar-inner").scrollLeft = 0; });
+}
 await page.getByLabel("Note body").click();
 await page.keyboard.press("Control+A");
 await shot("08-selection-menu");

@@ -31,7 +31,7 @@ export function ActionIcon({ action, size = 20 }) {
     style={{ background: action.color ?? "linear-gradient(135deg,#fff 45%,#999 50%,#fff 55%)" }} /> : <Icon size={size} aria-hidden="true" />;
 }
 
-export default function ActionButton({ label, children, onAction, disabled, pressed, expanded, compact = true }) {
+export default function ActionButton({ label, children, onAction, disabled, unavailable, pressed, expanded, compact = true }) {
   const button = useRef(null);
   const timer = useRef(null), expiry = useRef(null), pointer = useRef(null), suppress = useRef(false);
   const [anchor, setAnchor] = useState(null);
@@ -45,7 +45,7 @@ export default function ActionButton({ label, children, onAction, disabled, pres
   useEffect(() => () => { clearTimeout(timer.current); clearTimeout(expiry.current); }, []);
   return <>
     <button ref={button} type="button" title={label} aria-label={label} disabled={disabled}
-      aria-pressed={pressed} aria-expanded={expanded}
+      aria-disabled={unavailable && !disabled ? true : undefined} aria-pressed={pressed} aria-expanded={expanded}
       className={compact ? "icon-button formatting-button" : "formatting-button-text"}
       onContextMenu={(event) => event.preventDefault()}
       onPointerDown={(event) => {

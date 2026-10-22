@@ -175,6 +175,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--color-accen
 .formatting-button-text { min-height: 40px; border-radius: 6px; padding: 0 8px; font-size: 14px; }
 .formatting-button, .formatting-button-text { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .formatting-button:active, .formatting-button-text:active { background: #e5e7eb; }
+.formatting-button[aria-disabled="true"] { opacity: 0.35; }
+.formatting-button[aria-disabled="true"]:active { background: transparent; }
 .formatting-button[aria-expanded="true"] { background: #dbeafe; color: #1d4ed8; }
 .toolbar-preview button:disabled { opacity: 1; }
 .action-label { position: fixed; z-index: 70; max-width: min(240px, calc(100vw - 16px)); pointer-events: none; border-radius: 6px; background: #1f2328; color: white; padding: 5px 9px; font-size: 13px; }

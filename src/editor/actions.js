@@ -1,6 +1,6 @@
 import {
   ImagePlus, Bold, Italic, Underline, Strikethrough, Highlighter, Heading, Heading1, Heading2, Heading3, List,
-  ListOrdered, ListChecks, Quote, Minus, Undo2, Redo2, Eraser, Link, Circle,
+  ListOrdered, ListChecks, ListIndentIncrease, ListIndentDecrease, Quote, Minus, Undo2, Redo2, Eraser, Link, Circle,
   Paintbrush, PaintRoller, Baseline, ALargeSmall, CaseSensitive, ListCollapse, MessageSquare, Info, Lightbulb, TriangleAlert, CircleAlert, SeparatorHorizontal,
 } from "lucide-react";
 
@@ -34,6 +34,23 @@ function highlightAction(color, label, id = `highlight:${color ?? "none"}`) {
       const chain = editor.chain().focus();
       return (remove ? chain.unsetHighlight() : chain.setHighlight({ color })).run();
     },
+  };
+}
+// Indent and outdent move the innermost list line under the cursor (bullet, numbered or
+// checklist). Outside a list there is nothing to move, so the button shows as unavailable.
+function listItemType(editor) {
+  const { $from } = editor.state.selection;
+  for (let depth = $from.depth; depth > 0; depth--) {
+    const name = $from.node(depth).type.name;
+    if (name === "listItem" || name === "taskItem") return name;
+  }
+  return null;
+}
+function listAction(id, label, icon, command) {
+  const canRun = (editor) => { const type = listItemType(editor); return !!type && editor.can()[command](type); };
+  return {
+    id, label, icon, group: "Lines & blocks", kind: "command", canRun,
+    run: ({ editor }) => canRun(editor) && editor.chain().focus()[command](listItemType(editor)).run(),
   };
 }
 const picker = (id, label, icon, group) => ({
@@ -79,6 +96,8 @@ export const actions = [
   mark("bulletList", "Bullet list", List, (chain) => chain.toggleBulletList()),
   mark("orderedList", "Numbered list", ListOrdered, (chain) => chain.toggleOrderedList()),
   mark("taskList", "Checklist", ListChecks, (chain) => chain.toggleTaskList()),
+  listAction("indent", "Indent", ListIndentIncrease, "sinkListItem"),
+  listAction("outdent", "Outdent", ListIndentDecrease, "liftListItem"),
   mark("blockquote", "Quote", Quote, (chain) => chain.toggleBlockquote()),
   action("hr", "Divider", Minus, (chain) => chain.setDivider("thin")),
   action("clearFormatting", "Clear formatting", Eraser, (chain) => chain.unsetAllMarks().clearNodes()),
@@ -127,7 +146,7 @@ export function availableActions(formatting) {
     ...(formatting?.highlightColors ?? []).filter((entry) => !entry.hidden).map((entry) => `highlight:${entry.color}`),
     "color:none", ...(formatting?.textColors ?? []).filter((entry) => !entry.hidden).map((entry) => `color:${entry.color}`),
     "fontSize", "fontFamily",
-    "heading", "h1", "h2", "h3", "bulletList", "orderedList", "taskList", "blockquote", "callout",
+    "heading", "h1", "h2", "h3", "bulletList", "orderedList", "taskList", "indent", "outdent", "blockquote", "callout",
     ...Object.keys(calloutIcons).map((type) => `callout:${type}`), "hr", "divider", "hr:thick", "hr:dashed", "hr:dotted", "lineHeight",
     "styles", ...(formatting?.namedStyles ?? []).map((style) => `style:${style.id}`),
     "link", "image", "painter", "clearFormatting", "undo", "redo",
@@ -137,6 +156,6 @@ export function availableActions(formatting) {
 export const DEFAULT_TOOLBAR = [
   "bold", "italic", "underline", "highlight", "strike", "textColor", "highlightColor", "fontSize", "styles", "painter", "color:none", "color:#dc2626",
   "color:#15803d", "color:#2563eb", "color:#7c3aed", "heading", "bulletList",
-  "orderedList", "taskList", "blockquote", "callout", "link", "hr", "clearFormatting", "undo", "redo",
+  "orderedList", "taskList", "indent", "outdent", "blockquote", "callout", "link", "hr", "clearFormatting", "undo", "redo",
 ];
 export const DEFAULT_SELECTION_MENU = ["bold", "italic", "underline", "highlight", "color:#dc2626", "color:#15803d", "color:#2563eb", "link"];

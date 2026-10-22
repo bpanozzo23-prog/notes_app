@@ -111,3 +111,27 @@ it("caps the tray against the visual viewport and follows keyboard resize withou
   expect(toolbar.parentElement.style.bottom).toBe("400px");
   expect(document.activeElement).toBe(editor.view.dom);
 });
+
+it("shows Indent as unavailable outside a list without taking focus, and indents inside one", () => {
+  const formatting = resolveFormatting({ toolbar: ["bold", "indent", "outdent"] });
+  const note = noteFixture({ html: "<p>Plain</p><ul><li><p>One</p></li><li><p>Two</p></li></ul>" });
+  render(<NoteEditor note={note} formatting={formatting} onChange={() => {}} />);
+  const body = screen.getByLabelText("Note body"), editor = body.editor;
+  stubEditorGeometry(editor);
+  act(() => { editor.view.focus(); editor.commands.setTextSelection(3); });
+  const toolbar = screen.getByRole("toolbar", { name: "Formatting", exact: true });
+  const indent = within(toolbar).getByRole("button", { name: "Indent" });
+  expect(indent.disabled).toBe(false);
+  expect(indent.getAttribute("aria-disabled")).toBe("true");
+  const before = editor.getHTML();
+  tap(indent);
+  expect(editor.getHTML()).toBe(before);
+  expect(document.activeElement).toBe(body);
+  let two = null;
+  editor.state.doc.descendants((node, pos) => { if (node.isText && node.text === "Two") two = pos + 1; });
+  act(() => { editor.commands.setTextSelection(two); });
+  expect(indent.getAttribute("aria-disabled")).toBeNull();
+  tap(indent);
+  expect(editor.getHTML()).toContain("<li><p>One</p><ul><li><p>Two</p></li></ul></li>");
+  expect(document.activeElement).toBe(body);
+});

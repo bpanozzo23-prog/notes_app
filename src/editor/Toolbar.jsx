@@ -11,14 +11,20 @@ export function ActionButtons({ editor, ids, formatting, ui = {}, size = 20, rea
     editor,
     selector: ({ editor }) => Object.fromEntries(ids.map((id) => [id, editor ? resolveAction(id, formatting)?.isActive?.(editor) ?? false : false])),
   });
+  // Unavailable is not `disabled`: a disabled button would take focus from the note and close
+  // the phone keyboard on tap. It still swallows the tap, but does nothing.
+  const unavailable = useEditorState({
+    editor,
+    selector: ({ editor }) => Object.fromEntries(ids.map((id) => [id, editor ? resolveAction(id, formatting)?.canRun?.(editor) === false : false])),
+  });
   return ids.map((id, index) => {
     const action = resolveAction(id, formatting);
     if (!action) return null;
-    return <ActionButton key={`${id}:${index}`} label={action.label} disabled={readOnly}
+    return <ActionButton key={`${id}:${index}`} label={action.label} disabled={readOnly} unavailable={!!unavailable?.[id]}
       pressed={id === "painter" ? !!ui.painterArmed : action.kind === "toggle" ? !!active?.[id] : undefined}
       expanded={action.tray ? ui.openTray === action.tray : undefined}
       onAction={() => {
-        if (!editor) return;
+        if (!editor || unavailable?.[id]) return;
         if (ui.runAction) ui.runAction(action);
         else if (action.tray) ui.toggleTray?.(action.tray);
         else action.run({ editor, ui });

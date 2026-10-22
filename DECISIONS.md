@@ -1669,3 +1669,30 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   `npm run sync-check` 26/26 (15 server, 11 browser, including a mixed Apply, its Undo and Keep
   both through real files), `npm run shots` (207; shots 185–193 read), `npm run browser-checks`
   15/15. `server/README.md` describes the three kinds.
+
+## Indent and outdent buttons (2026-10-22)
+
+- 2026-10-22 — Two toolbar buttons, Indent and Outdent, on the default toolbar right after the
+  list buttons. — The owner asked for a "tab" button to make nested bullets; the phone keyboard
+  has no Tab key. Outdent was added with it (owner approved) so an indent can be undone without
+  Undo.
+- 2026-10-22 — Lists only: they move the innermost bullet, numbered or checklist line under the
+  cursor (Tiptap's `sinkListItem` / `liftListItem`), including lists inside callouts. Outside a
+  list both buttons show as unavailable. — Nested lists were already in the note vocabulary, so
+  no schema change. Indenting plain paragraphs would add new note content and is left out.
+  Outdent on a top-level line turns it into a plain line, as Shift+Tab does on a keyboard.
+- 2026-10-22 — "Unavailable" is `aria-disabled` plus greying, not the `disabled` attribute. — A
+  disabled button cannot keep the note focused, so a tap would close the phone keyboard. The tap
+  is swallowed and does nothing.
+- 2026-10-22 — Owners who already saved their own toolbar do not get the new buttons
+  automatically; they add them in Settings → Toolbar. — Changing a saved list silently would
+  override the owner's choices.
+- Collapsible nested lists (OneNote-style +/−) were discussed the same day: feasible, medium-sized,
+  and would add a new attribute to the note vocabulary. Not planned yet.
+- 2026-10-22 — Indenting plain lines stays out for now (owner). — A typed tab character shows while
+  editing but is dropped when the note is reopened (HTML whitespace is collapsed on load), so it
+  would silently lose the indent. Doing it properly means an indent level on paragraphs and
+  headings: a schema version bump, plus Claude, Copy as text and the XPS Markdown copy. Worth it
+  only once the owner needs it.
+- Verification: `npm test` (92 files, 2,280 tests), `npm run build`, `npm run shots` (209; shots
+  07c and 07d read). Owner checked Indent on the phone, 2026-10-22.

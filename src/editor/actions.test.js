@@ -1,4 +1,4 @@
-import { expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { actions, availableActions, resolveAction, DEFAULT_TOOLBAR } from "./actions.js";
 import { resolveFormatting } from "./formatting.js";
 import { Editor } from "@tiptap/core";
@@ -127,4 +127,70 @@ it("offers one Heading button that replaces Heading 1 and 2 in the default toolb
   expect(DEFAULT_TOOLBAR).not.toContain("h2");
   // The separate buttons stay available for anyone who prefers them.
   expect(availableActions({}).map((action) => action.id)).toEqual(expect.arrayContaining(["heading", "h1", "h2", "h3"]));
+});
+
+describe("indent and outdent", () => {
+  const editorWith = (html, text) => {
+    const editor = new Editor({ extensions, content: html });
+    let at = null;
+    editor.state.doc.descendants((node, pos) => { if (at === null && node.isText && node.text.includes(text)) at = pos + node.text.indexOf(text) + 1; });
+    editor.commands.setTextSelection(at);
+    return editor;
+  };
+  const indent = resolveAction("indent"), outdent = resolveAction("outdent");
+  // The editor adds an empty last line after a list (StarterKit's trailing node).
+  const html = (editor) => editor.getHTML().replace(/<p><\/p>$/, "");
+
+  it("sit after the list buttons in the default toolbar", () => {
+    const at = DEFAULT_TOOLBAR.indexOf("taskList");
+    expect(DEFAULT_TOOLBAR.slice(at + 1, at + 3)).toEqual(["indent", "outdent"]);
+    expect(availableActions().map((action) => action?.id)).toEqual(expect.arrayContaining(["indent", "outdent"]));
+  });
+
+  it("nest a bullet under the one above and bring it back", () => {
+    const editor = editorWith("<ul><li><p>One</p></li><li><p>Two</p></li></ul>", "Two");
+    expect(outdent.canRun(editor)).toBe(true);
+    expect(indent.canRun(editor)).toBe(true);
+    indent.run({ editor });
+    expect(html(editor)).toBe("<ul><li><p>One</p><ul><li><p>Two</p></li></ul></li></ul>");
+    expect(indent.canRun(editor)).toBe(false); // already the first item at its level
+    outdent.run({ editor });
+    expect(html(editor)).toBe("<ul><li><p>One</p></li><li><p>Two</p></li></ul>");
+  });
+
+  it("work in numbered lists and checklists, keeping the tick", () => {
+    const numbered = editorWith("<ol><li><p>One</p></li><li><p>Two</p></li></ol>", "Two");
+    indent.run({ editor: numbered });
+    expect(html(numbered)).toBe("<ol><li><p>One</p><ol><li><p>Two</p></li></ol></li></ol>");
+    const tasks = editorWith('<ul data-type="taskList"><li data-type="taskItem" data-checked="false"><p>One</p></li><li data-type="taskItem" data-checked="true"><p>Two</p></li></ul>', "Two");
+    indent.run({ editor: tasks });
+    const nested = tasks.state.doc.firstChild.firstChild.lastChild;
+    expect(nested.type.name).toBe("taskList");
+    expect(nested.firstChild.attrs.checked).toBe(true);
+    outdent.run({ editor: tasks });
+    expect(tasks.state.doc.firstChild.childCount).toBe(2);
+  });
+
+  it("move only the innermost line, inside a callout too", () => {
+    const editor = editorWith('<div data-callout="tip"><ul><li><p>One</p><ul><li><p>A</p></li><li><p>B</p></li></ul></li></ul></div>', "B");
+    indent.run({ editor });
+    expect(html(editor)).toContain("<li><p>A</p><ul><li><p>B</p></li></ul></li>");
+    expect(editor.state.doc.firstChild.type.name).toBe("callout");
+  });
+
+  it("turn a top-level bullet back into a plain line on outdent", () => {
+    const editor = editorWith("<ul><li><p>Only</p></li></ul>", "Only");
+    outdent.run({ editor });
+    expect(html(editor)).toBe("<p>Only</p>");
+  });
+
+  it("are unavailable and change nothing outside a list", () => {
+    const editor = editorWith("<p>Plain</p><ul><li><p>One</p></li></ul>", "Plain");
+    const before = html(editor);
+    expect(indent.canRun(editor)).toBe(false);
+    expect(outdent.canRun(editor)).toBe(false);
+    expect(indent.run({ editor })).toBe(false);
+    expect(outdent.run({ editor })).toBe(false);
+    expect(html(editor)).toBe(before);
+  });
 });
