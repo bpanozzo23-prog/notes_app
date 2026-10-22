@@ -136,7 +136,7 @@ LLM can read. The code may become public; the notes never are.
   (tags are edited in their own sheet); Pin moved to the top row; Copy as text and Move to Trash
   are in a ⋯ sheet. Text starts about 95 points higher, roughly double the visible text with the
   keyboard open.
-- **Phase 4 — planned and approved 2026-10-19.** Sync to the XPS:
+- **Phase 4 — planned and approved 2026-10-19; complete 2026-10-22.** Sync to the XPS:
   the phone copies the notebook one way to a small service on the XPS over Tailscale (a private
   copy with history and daily backups); Claude Code reads a locked-down view there and proposes
   edits the owner reviews and applies on the phone. The spike passed on the phone 2026-10-19.
@@ -187,7 +187,8 @@ LLM can read. The code may become public; the notes never are.
   works after the note's folder is deleted; windows notice each other's Connect/Disconnect and
   pause sync once an update activates; the XPS cleans crash leftovers from `~/notes`, keeps its
   folders private (0700), repairs changed permissions, and `notes-sync status` checks the notes
-  mapping itself. `docs/DECISIONS-EXPLAINED.md` §80. Owner's final phone check pending.
+  mapping itself. `docs/DECISIONS-EXPLAINED.md` §80. Owner-verified on the phone 2026-10-22.
+  **Phase 4 is complete.**
 
 ## Running it
 

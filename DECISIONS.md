@@ -1848,3 +1848,13 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   15/15 (including an update activated from another tab). The phone, Samsung Keyboard and a
   real Claude Code session were not seen. Contract, BRIEF §7, README and
   `DECISIONS-EXPLAINED.md` §80 updated.
+- 2026-10-22 — **4e released as 0.4.4**: commit 77e4f9d; `npm run sync-deploy` switched the
+  service from 431d79d to 77e4f9d; `notes-sync status` afterwards: active, same counts (16 live,
+  3 in Trash, 8 folders, 2 images), no missing images, history fine, paired, `serve:
+  "configured"` under the stricter check, Funnel off. Pushed; the Pages deploy succeeded and the
+  live bundle is 0.4.4. Owner's final phone check pending.
+- 2026-10-22 — **Owner's final 4e phone check passed** ("Checks pass"): on 0.4.4, Settings
+  showed the version and Sync connected; a stale Claude Code edit whose folder had been deleted
+  offered Keep both and saved the copy in No folder; an Apply; `notebook/proposals.json`
+  showed `kept` and `applied`; a phone edit reached Claude Code's view. **Phase 4 is
+  complete.** The local tag `phase-4-base` (efdc681) is no longer needed.

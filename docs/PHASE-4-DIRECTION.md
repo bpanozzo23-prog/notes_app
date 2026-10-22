@@ -962,6 +962,7 @@ published app.**
    and run L (app, 0.4.4), then a Codex second pass over the fixes. Accepted: inbox cleanup can
    delete a file Claude Code replaces in the instant between the last check and the delete (Linux
    has no delete-if-unchanged; the worst case is a lost revision of a suggestion, never a note).
+   The owner's final phone check passed 2026-10-22; Phase 4 is complete.
 
 ## BRIEF and AGENTS.md amendments (in the commit that adds this file)
 

@@ -1448,4 +1448,7 @@ suggestion, never a note, and Claude Code is already told not to touch files it 
 **Noted:** a suggestion that changes 500 paragraphs takes a few seconds to show (3.3 s in Chromium
 on this XPS). Fine for now; nothing realistic comes near it.
 
+**Your phone check** passed on 2026-10-22 (Keep both after deleting a folder, an Apply, both
+reported back to the XPS, and a phone edit reaching Claude Code). Phase 4 is complete.
+
 **Lock-in: none.** No change to how notes are stored.
