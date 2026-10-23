@@ -1914,3 +1914,19 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   `notes-sync status` afterwards: active, same counts (16 live, 3 in Trash, 8 folders, 2 images),
   no missing images, history fine, paired. Pushed; the Pages deploy succeeded and the live bundle
   is 0.4.5. The installed app's update and its first format-5 round are the owner's to check.
+- 2026-10-22 — **After the 0.4.5 update the installed app opened to a blank screen**; the same app in
+  a Chrome tab worked. Diagnosis (owner's OK to use their notes, made-up output only): the XPS's
+  last push was still from 0.4.4, so 0.4.5 had never finished starting in the installed app; the
+  owner's XPS backup updated from a real 0.4.4 build to 0.4.5 in headless Chromium and all 13 notes
+  opened without error; every published file was present. A stalled format upgrade reproduces
+  the blank page exactly: the app draws nothing until the notebook opens, and an open copy still
+  holding the format-4 database makes the upgrade wait. Swiping the installed app away and
+  reopening fixed it (Android had been bringing back the stuck window). The XPS then recorded
+  0.4.5, format 5 (round 47, counts unchanged). The exact copy holding the old version was not
+  identified; the likeliest is the Chrome tab with 0.4.4, paused in the background.
+- 2026-10-22 — 0.4.6: the boot is never silently blank. `index.html` holds a plain-HTML status
+  box, shown if the app isn't ready after 6 s, with the current step, the version and any error
+  (no note text); App names each boot step; Dexie's `blocked` event says another open copy is
+  holding the old version; a top-level error boundary records a crash while drawing. Checked in
+  headless Chromium with a held format-4 connection: the message appears, and the app opens and
+  the box hides once the connection closes. — The owner had nothing to go on but a blank page.

@@ -1475,3 +1475,18 @@ a backup made by 0.4.5, and an older window still open goes read-only until you 
 notes themselves are unchanged unless you collapse something.
 
 **Not done:** a "+3" count of hidden lines on the toggle (it would redraw next to where you type).
+
+### 82. Why the app was blank after 0.4.5, and the fix (0.4.6, 2026-10-22)
+
+**What happened:** updating to 0.4.5 moves the notebook to format 5. While that happens, any other
+open copy of the app (most likely the Chrome tab with 0.4.4, paused in the background) has to let
+go of the old version first. It didn't, so the installed app waited, and it waits with a blank
+page. Android kept showing that same stuck window until you swiped it away. Nothing was lost; the
+Chrome tab showed your notes the whole time.
+
+**What 0.4.6 changes:** if the app hasn't finished opening after about 6 seconds, it says so in
+plain text: which step it is on, the version, and any error (never note text), with the advice to
+close every copy of the app and reopen it. When another open copy is the cause, the message says
+exactly that.
+
+**Lock-in: none.** No change to the notes or the XPS service.

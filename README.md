@@ -194,6 +194,10 @@ LLM can read. The code may become public; the notes never are.
   checklists; saved in the note and synced, without changing "Edited". Read-only notes and Claude's
   reviews always show every line. `docs/DECISIONS-EXPLAINED.md` §81. Owner phone check pending;
   **export a backup first** (older app versions can't read 0.4.5 backups).
+- **No more blank start, 0.4.6, 2026-10-22.** After the 0.4.5 update the installed app stayed
+  blank: its window was stuck waiting for another open copy holding the old notebook version.
+  If opening ever stalls or crashes now, a plain message after about 6 seconds says the step, the
+  version and any error. App-only; no format change. `docs/DECISIONS-EXPLAINED.md` §82.
 
 ## Running it
 

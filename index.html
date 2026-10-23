@@ -15,6 +15,32 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- Shown only if the app hasn't finished opening after a few seconds, so a stall or a crash
+         says what happened instead of leaving a blank page. Plain HTML: it works even if the app's
+         code fails to run. No note text is ever put here. -->
+    <div id="boot-status" role="alert" hidden style="margin:16px;font:15px/1.45 system-ui,sans-serif;color:#1f2328">
+      <p style="font-weight:600;margin:0 0 6px">The app hasn't finished opening.</p>
+      <p style="margin:0 0 6px">Your notes have not been deleted. Close every copy of the app (including any Chrome tab with it) and open it again.</p>
+      <p style="margin:0 0 6px">Step: <span data-step></span></p>
+      <pre data-errors style="white-space:pre-wrap;word-break:break-word;font-size:12px;background:#f3f4f6;padding:8px;border-radius:6px;margin:0"></pre>
+    </div>
+    <script>
+      (function () {
+        var errors = [];
+        var boot = window.__notesBoot = { step: "loading the app's code", ready: false, errors: errors };
+        var text = function (value) { return String(value && (value.stack || value.message) || value).slice(0, 1500); };
+        window.addEventListener("error", function (event) { errors.push(text(event.error || event.message)); });
+        window.addEventListener("unhandledrejection", function (event) { errors.push(text(event.reason)); });
+        setTimeout(function check() {
+          setTimeout(check, 2000);
+          var box = document.getElementById("boot-status");
+          box.hidden = boot.ready;
+          if (boot.ready) return;
+          box.querySelector("[data-step]").textContent = boot.step + " (version " + (boot.version || "unknown") + ")";
+          box.querySelector("[data-errors]").textContent = errors.length ? errors.join("\n\n") : "No error reported.";
+        }, 6000);
+      })();
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

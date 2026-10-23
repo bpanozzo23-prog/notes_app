@@ -35,6 +35,11 @@ export function createNotebookAccess(database) {
     Dexie.ignoreTransaction(() => { for (const listener of listeners) listener(); });
   };
   const replaced = () => { if (!state.replaced) change({ replaced: true }); };
+  // Another open copy of the app still holds the old version of the database, so this window's
+  // upgrade waits. Say so on the boot status instead of waiting silently.
+  database.on("blocked", () => {
+    if (window.__notesBoot) window.__notesBoot.step = "waiting for another open copy of the app to close (it holds the old notebook version)";
+  });
   database.on("versionchange", () => {
     change({ versionChange: "pending" });
     // Dexie's event chain tests the return value immediately; a Promise does not stop it.

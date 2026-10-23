@@ -87,17 +87,25 @@ export default function App() {
     });
     // The blank boot screen's scroll must not overwrite the saved visit before rows load.
     void nav.run(async () => {
+      // index.html shows this step if the app hasn't finished opening after a few seconds.
+      const boot = window.__notesBoot ?? {};
       try {
+        boot.step = "opening the notebook";
         await notebookAccess.load();
         if (!notebookAccess.getSnapshot().readOnly) {
+          boot.step = "emptying old Trash";
           await purgeExpired();
+          boot.step = "tidying unused images";
           try { await cleanupFiles(); setCleanupError(null); }
           catch (error) { setCleanupError(error.message || "Image cleanup failed."); }
         }
+        boot.step = "loading the notes";
         nav.restore(await refresh());
         void getClaudeStatus().then((status) => { if (status.ready) return loadClaudeSdk(); }).catch(() => {});
+        boot.step = "drawing the app";
         setReady(true);
-      } catch (error) { setBootError(error.message || String(error)); }
+        boot.ready = true;
+      } catch (error) { setBootError(error.message || String(error)); boot.ready = true; }
     }, { captureScroll: false });
     const flush = () => { queue.flush().catch(() => {}); };
     const hidden = () => { if (document.visibilityState === "hidden") flush(); };
