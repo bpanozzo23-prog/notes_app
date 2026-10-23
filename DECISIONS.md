@@ -1909,3 +1909,8 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   touch events, check the keyboard stays open when the note is focused, and outline the zones
   (12f); a unit test fails if `touchstart` is cancelled again.
 - 2026-10-22 — Owner re-checked on the phone (dev server) after the tap fix: "That works."
+- 2026-10-22 — **Released 0.4.5**: commit 215a1c9; `npm run sync-deploy` switched the service from
+  77e4f9d to 215a1c9 (deployed `SCHEMA_VERSION = 5`, `CLAUDE.md` documents `data-collapsed`);
+  `notes-sync status` afterwards: active, same counts (16 live, 3 in Trash, 8 folders, 2 images),
+  no missing images, history fine, paired. Pushed; the Pages deploy succeeded and the live bundle
+  is 0.4.5. The installed app's update and its first format-5 round are the owner's to check.
