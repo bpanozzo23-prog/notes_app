@@ -84,6 +84,18 @@ Línea de puntos
 
 Una palabra para recordar.
 
+- Lista plegada
+  - primera línea escondida
+  - segunda línea escondida
+- Lista abierta
+  - línea visible
+
+1. Paso plegado
+  1. detalle escondido
+
+[ ] Tarea plegada
+  [x] subtarea escondida
+
 Fin de la muestra.
 
 ### Gramática — ser y estar

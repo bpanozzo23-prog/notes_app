@@ -26,6 +26,10 @@ it("reports unsupported elements and attributes, including events and invalid fo
     "1 style the app doesn't support", "4 elements the app doesn't support", "2 attributes the app doesn't support",
   ]);
 });
+it("accepts a collapsed list line, but only data-collapsed=\"true\"", () => {
+  expect(auditList(auditBody('<ul><li data-collapsed="true"><p>A</p><ul><li><p>B</p></li></ul></li></ul>', handles))).toEqual([]);
+  expect(auditList(auditBody('<ul><li data-collapsed="yes"><p>A</p></li></ul>', handles))).toEqual(["1 attribute the app doesn't support"]);
+});
 it("accepts schema aliases and style marks, but not an arbitrary wrapper", () => {
   expect(auditList(auditBody('<p><b>Bold</b><i>Italic</i><del>Strike</del><span style="font-weight: bold">Bold</span></p>', handles))).toEqual([]);
   expect(auditList(auditBody("<div>Unwrapped</div>", handles))).toEqual(["1 element the app doesn't support"]);

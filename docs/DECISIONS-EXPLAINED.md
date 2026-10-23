@@ -1452,3 +1452,26 @@ on this XPS). Fine for now; nothing realistic comes near it.
 reported back to the XPS, and a phone edit reaching Claude Code). Phase 4 is complete.
 
 **Lock-in: none.** No change to how notes are stored.
+
+### 81. Collapsible list lines (0.4.5, 2026-10-22)
+
+You asked for OneNote-style collapsing, and chose: saved in the note, −/+ in front of the line,
+all three list kinds, and no change to the "Edited" date.
+
+**What you'll notice:**
+- Any bullet, numbered or checklist line with lines under it has a small grey **−** in front.
+  Tap it and the lines underneath fold away; the − becomes a blue **+**. Tap + to show them.
+- Tapping −/+ doesn't open or close the keyboard.
+- **Enter** at the end of a collapsed line starts a new line *after* the hidden ones.
+- If something would put the cursor inside hidden lines (Undo, arrow keys, Indent into a collapsed
+  line, Backspace joining into one), that line opens, so you never type into something you can't see.
+- Selecting across a collapsed line and deleting removes its hidden lines too; Undo brings them back.
+- Collapsing isn't an Undo step and doesn't move the note up the list, like pinning.
+- Search, Copy as text, Ask Claude and the notes copy on the XPS still see every line. Claude's
+  review screens always show lists open, so a suggested change can't hide.
+
+**Lock-in: one step.** Notes moved to format 5. An older app version (0.4.4 or earlier) refuses
+a backup made by 0.4.5, and an older window still open goes read-only until you reload it. Your
+notes themselves are unchanged unless you collapse something.
+
+**Not done:** a "+3" count of hidden lines on the toggle (it would redraw next to where you type).

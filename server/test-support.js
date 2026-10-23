@@ -14,7 +14,7 @@ export const note = (extra = {}) => ({ id: "note-1", title: "Fixture title", htm
 export const file = (extra = {}) => ({ id: "image-1", type: "image/png", size: PNG.length,
   width: 12, height: 8, createdAt: AT, ...extra });
 export function push(rows = [note()], extra = {}) {
-  return { base: { round: 0, generation: null }, generation: "generation-A", schemaVersion: 4,
+  return { base: { round: 0, generation: null }, generation: "generation-A", schemaVersion: 5,
     appVersion: "0.3.11", ids: rows.map(({ id, rev }) => ({ id, rev })), rows, folders: [],
     tombstones: [], preferences: {}, files: [], notebookMd: "# Fixture\n", ...extra };
 }

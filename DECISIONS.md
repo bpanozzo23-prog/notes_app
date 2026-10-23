@@ -1858,3 +1858,54 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   offered Keep both and saved the copy in No folder; an Apply; `notebook/proposals.json`
   showed `kept` and `applied`; a phone edit reached Claude Code's view. **Phase 4 is
   complete.** The local tag `phase-4-base` (efdc681) is no longer needed.
+
+## Collapsible list lines (0.4.5, note format 5, 2026-10-22)
+
+- 2026-10-22 — Owner's choices (asked in Plan Mode): the collapsed state is **saved in the note**
+  (`<li data-collapsed="true">`); a grey − in front of every list line that has lines under it,
+  + when collapsed; **bullets, numbered lists and checklists**; collapsing or expanding **doesn't
+  move "Edited"**. — Like OneNote, it stays tidy after closing, in backups and on the XPS.
+- 2026-10-22 — Note format 4 → 5 (`src/version.js`, `server/constants.mjs`, `db.version(5)` with no
+  store change, a 4→5 backup upgrade). — The schema covers the HTML vocabulary. An older app
+  refuses a 0.4.5 backup and an older window goes read-only through the existing guards; the XPS
+  must be deployed before the app is pushed, or pushes wait with "Update the XPS service".
+- 2026-10-22 — `data-collapsed` is written only when true. — Every note without a collapsed line
+  saves byte-for-byte as before, so opening old notes never looks like an edit.
+- 2026-10-22 — Hiding is CSS, only while the editor is editable
+  (`.ProseMirror[contenteditable="true"]`). — Read-only notes and Claude's review previews (which
+  use the same editor, read-only) always show every line, so a suggested change can't hide.
+- 2026-10-22 — The −/+ is a ProseMirror widget with no text (the glyph is CSS), and bullet lines
+  get a small node view that updates the `<li>` in place. — The keyboard's predictions never see
+  the toggle, and tapping it never replaces the line being typed in; TaskItem's own node view
+  already updates in place. Taps call preventDefault and never focus, so the keyboard stays as
+  it was.
+- 2026-10-22 — Toggling is not an Undo step (as in OneNote). One `appendTransaction` rule keeps the
+  promises: the cursor never stays in hidden lines (it opens the line), a change to hidden lines
+  opens them (Indent into a collapsed line, Outdent taking the lines below, Backspace joining in),
+  and a line left with nothing under it loses the mark. Undo/Redo get only the cursor rule. Enter
+  at the end of a collapsed line adds the new line after the hidden group; elsewhere Enter is
+  unchanged. Deleting a selection across a collapsed line deletes its hidden lines (Undo restores).
+- 2026-10-22 — "Edited" ignores collapse-only changes through one shared `isContentEdit` in
+  `src/db/notes.js`, used by saving and the note screen. `rev` still goes up, so it syncs; as with
+  pinning, a pending Claude suggestion for that note then counts as stale (Keep both is offered).
+- 2026-10-22 — No "+3" count on the toggle. — A count would mean redrawing the toggle as lines are
+  added, next to text being typed; the plan allowed a plain + if it didn't fit.
+- 2026-10-22 — Claude: `NOTE_HTML_RULE` and the XPS `CLAUDE.md` say to keep `data-collapsed` as
+  given; the sync audit accepts only the value `true`. Search, Copy as text, Ask and the XPS
+  `notebook.md` list hidden lines normally.
+- 2026-10-22 — The sample's collapsed lists went into "Muestra de formato", not a new note. — A new
+  note shifts the creation-order N handles that 34 Claude fixtures pin (and makes the
+  "unknown N19" test valid).
+- Verification: `npm test` (93 files, 2,426 tests), `npm run build`, `npm run shots` (213; 12b–12e
+  read: collapsed of each kind, tap to open without focusing, Enter after a hidden group,
+  read-only shows every line), `npm run browser-checks` 15/15, `npm run sync-check` 26/26 (15
+  server, 11 browser), `npm run claude-check -- --real` on the sample notebook ($0.27, test key).
+  Not seen: the phone, Samsung Keyboard next to a toggle, a real Claude Code session.
+- 2026-10-22 — **Owner's phone check: the toggle was hard to tap** ("If I try enough times I can
+  eventually trigger it"). Cause: the toggle cancelled `touchstart`, which on Android also cancels
+  the tap's click; the shots used mouse clicks, so they passed. Fix: cancel only
+  `pointerdown`/`mousedown`, as the toolbar buttons do, and make the button itself the tap zone
+  (2.2 × 1.9 em, about 37 × 32 px, from the gutter edge up to the bullet). The shots now tap with
+  touch events, check the keyboard stays open when the note is focused, and outline the zones
+  (12f); a unit test fails if `touchstart` is cancelled again.
+- 2026-10-22 — Owner re-checked on the phone (dev server) after the tap fix: "That works."

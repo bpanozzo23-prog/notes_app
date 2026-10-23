@@ -80,6 +80,18 @@ Línea de puntos
 
 Una palabra para recordar.
 
+- Lista plegada
+  - primera línea escondida
+  - segunda línea escondida
+- Lista abierta
+  - línea visible
+
+1. Paso plegado
+  1. detalle escondido
+
+[ ] Tarea plegada
+  [x] subtarea escondida
+
 Fin de la muestra.",
     "title": "Muestra de formato",
   },
@@ -384,6 +396,11 @@ exports[`projects supported editor HTML: <img data-file="sample-image" width="48
 
 exports[`projects supported editor HTML: <ol start="3"><li><p>Numbered</p></li></ol> 1`] = `"3. Numbered"`;
 
+exports[`projects supported editor HTML: <ol><li data-collapsed="true"><p>Collapsed</p><ol><li><p>Hidden</p></li></ol></li></ol> 1`] = `
+"1. Collapsed
+  1. Hidden"
+`;
+
 exports[`projects supported editor HTML: <p style="line-height: 1">Spacing</p> 1`] = `"Spacing"`;
 
 exports[`projects supported editor HTML: <p style="line-height: 1.5">Spacing</p> 1`] = `"Spacing"`;
@@ -445,9 +462,19 @@ exports[`projects supported editor HTML: <p>Paragraph</p> 1`] = `"Paragraph"`;
 
 exports[`projects supported editor HTML: <pre><code class="language-js">const n = 1;</code></pre> 1`] = `"const n = 1;"`;
 
+exports[`projects supported editor HTML: <ul data-type="taskList"><li data-type="taskItem" data-checked="true" data-collapsed="true"><p>Collapsed task</p><ul data-type="taskList"><li data-type="taskItem" data-checked="false"><p>Hidden task</p></li></ul></li></ul> 1`] = `
+"[x] Collapsed task
+  [ ] Hidden task"
+`;
+
 exports[`projects supported editor HTML: <ul data-type="taskList"><li data-type="taskItem" data-checked="true"><p>Done</p><ul data-type="taskList"><li data-type="taskItem" data-checked="false"><p>Nested task</p></li></ul></li></ul> 1`] = `
 "[x] Done
   [ ] Nested task"
+`;
+
+exports[`projects supported editor HTML: <ul><li data-collapsed="true"><p>Collapsed</p><ul><li><p>Hidden</p></li></ul></li></ul> 1`] = `
+"- Collapsed
+  - Hidden"
 `;
 
 exports[`projects supported editor HTML: <ul><li><p>Bullet</p><ul><li><p>Nested</p></li></ul></li></ul> 1`] = `

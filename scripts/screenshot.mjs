@@ -234,6 +234,59 @@ await page.evaluate(() => window.scrollTo(0, 1200));
 await shot("12-long-note-scrolled");
 await back();
 
+// Collapsible list lines: the formatting sample ends with one collapsed line of each kind.
+{
+  await button("Muestra de formato").click();
+  const body = page.getByLabel("Note body");
+  await body.getByText("Lista plegada", { exact: true }).waitFor();
+  await body.getByText("Fin de la muestra.", { exact: true }).scrollIntoViewIfNeeded();
+  const shown = (text) => body.getByText(text, { exact: true }).isVisible();
+  const expect = async (condition, message) => { if (!(await condition)) throw new Error(message); };
+  await expect(!(await shown("primera línea escondida")) && !(await shown("detalle escondido")) && !(await shown("subtarea escondida")), "Collapsed lines are showing");
+  await expect(shown("línea visible"), "An expanded line is hidden");
+  await shot("12b-collapsed-lines");
+  const toggle = (text) => body.locator("li", { has: page.getByText(text, { exact: true }) }).locator(".collapse-toggle").first();
+  // A real finger tap (touch events), as on the phone.
+  await toggle("Lista plegada").tap();
+  await expect(shown("primera línea escondida"), "Tapping + did not show the lines");
+  await expect(page.evaluate(() => !document.activeElement?.closest(".ProseMirror")), "Tapping the toggle focused the note");
+  await shot("12c-line-expanded");
+  // With the keyboard open (the note focused), a tap keeps it open.
+  await body.getByText("Lista abierta", { exact: true }).click();
+  await toggle("Lista abierta").tap();
+  await expect(page.evaluate(() => !!document.activeElement?.closest(".ProseMirror")), "Tapping the toggle closed the keyboard");
+  await expect(!(await shown("línea visible")), "Tapping − did not hide the lines");
+  await toggle("Lista abierta").tap();
+  await expect(shown("línea visible"), "Tapping + again did not show the lines");
+  // The tap zones, outlined for this picture only.
+  await page.addStyleTag({ content: ".collapse-toggle { outline: 2px dashed #dc2626; outline-offset: -1px; }" }).then((tag) => tag.evaluate((node) => { node.id = "tap-zones"; }));
+  await shot("12f-toggle-tap-zones");
+  await page.evaluate(() => document.getElementById("tap-zones").remove());
+  // Enter at the end of a collapsed line starts a new line after its hidden lines.
+  await body.getByText("Paso plegado", { exact: true }).click();
+  await page.keyboard.press("End");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("Paso nuevo");
+  await page.waitForFunction(() => /detalle escondido<\/p><\/li><\/ol><\/li><li><p>Paso nuevo/.test(document.querySelector(".ProseMirror").innerHTML), null, { timeout: 5000 })
+    .catch(() => { throw new Error("Enter did not add the line after the hidden group"); });
+  await expect(!(await shown("detalle escondido")), "Enter showed the hidden lines");
+  await shot("12d-enter-after-collapsed");
+  // A read-only editor (as in Claude's review previews) shows every line and no toggles.
+  await page.evaluate(() => document.querySelector('[aria-label="Note body"]').editor.setEditable(false));
+  await expect(shown("detalle escondido"), "A read-only note hides collapsed lines");
+  await expect(page.evaluate(() => !document.querySelector(".collapse-toggle")), "A read-only note shows toggles");
+  await shot("12e-read-only-shows-every-line");
+  await page.evaluate(() => document.querySelector('[aria-label="Note body"]').editor.setEditable(true));
+  // Put the sample back: undo the new line, then collapse the first list again.
+  const extraLine = () => page.evaluate(() => [...document.querySelectorAll(".ProseMirror ol > li")].some((li) => /^\s*(Paso nuevo)?\s*$/.test(li.querySelector("p")?.textContent ?? "")));
+  for (let tries = 0; tries < 4 && await extraLine(); tries++) {
+    await page.getByRole("toolbar", { name: "Formatting", exact: true }).getByRole("button", { name: "Undo", exact: true }).click();
+  }
+  await expect(!(await extraLine()), "Undo did not remove the new line");
+  await toggle("Lista plegada").click();
+  await back();
+}
+
 await button("Trash (1)").click();
 await shot("13-trash");
 await back();
@@ -933,7 +986,7 @@ await shot("16-notebook-replaced");
 await page.reload({ waitUntil: "networkidle" });
 await page.getByLabel("Note body").waitFor();
 await page.evaluate(() => new Promise((resolve, reject) => {
-  const request = indexedDB.open("notes_app", 50);
+  const request = indexedDB.open("notes_app", 60);
   request.onsuccess = () => { request.result.close(); resolve(); };
   request.onerror = () => reject(request.error);
 }));

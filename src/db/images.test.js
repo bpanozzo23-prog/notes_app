@@ -170,8 +170,8 @@ it.each(["files", "fileData"])("exports a missing-image reference and validation
   expect(result.ok).toBe(true); expect(result.warnings).toEqual([`Note ${note.id} shows a missing image.`]);
   expect(await acquire(id)).toBeNull(); release(id);
 });
-it.each([1, 2, 3])("upgrades v%s to 4 with no files", (schemaVersion) => {
-  expect(upgradeEnvelope(backupFixture({ schemaVersion })).envelope).toMatchObject({ schemaVersion: 4, files: [] });
+it.each([1, 2, 3])("upgrades v%s to 5 with no files", (schemaVersion) => {
+  expect(upgradeEnvelope(backupFixture({ schemaVersion })).envelope).toMatchObject({ schemaVersion: 5, files: [] });
 });
 it("shares file objects during upgrade, skips unused files without mutating the input, warns for missing files", () => {
   const raw = envelope([file(), file({ id: "unused" })], [noteFixture({ html: '<img data-file="image"><img data-file="missing">', fileIds: ["unused"] })]);

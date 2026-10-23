@@ -166,7 +166,7 @@ describe("validation failures", () => {
     expect(result.errors.length).toBeGreaterThan(0);
   });
   it.each([
-    ["format", "wrong"], ["schemaVersion", undefined], ["schemaVersion", 0], ["schemaVersion", 5],
+    ["format", "wrong"], ["schemaVersion", undefined], ["schemaVersion", 0], ["schemaVersion", 6],
     ["schemaVersion", 1.5], ["schemaVersion", "1"], ["schemaVersion", NaN],
     ["exportedAt", "yesterday"], ["appVersion", ""],
     ["notes", {}], ["folders", null], ["tombstones", "x"], ["preferences", []], ["preferences", null],
@@ -283,7 +283,7 @@ it("v2 warns and sanitises cosmetic preferences and unknown keys without blockin
   expect(await allPrefs()).toEqual({ ...result.envelope.preferences, storagePersisted: true, notebookGeneration: expect.any(String) });
   expect((await allPrefs()).notebookGeneration).not.toBe("must-not-adopt");
   const backup = await buildBackup();
-  expect(backup.schemaVersion).toBe(4);
+  expect(backup.schemaVersion).toBe(5);
   expect(backup.preferences).not.toHaveProperty("notebookGeneration");
 });
 
@@ -297,21 +297,21 @@ it.each([
 });
 
 
-it.each([1, 2, 3])("imports a v%s backup at schema 4 with rows unchanged", async (version) => {
-  const raw = backupFixture({ schemaVersion: version, preferences: { toolbar: ["italic"] } });
-  expect(upgradeEnvelope(raw).envelope).toEqual({ ...raw, schemaVersion: 4, files: [] });
+it.each([1, 2, 3, 4])("imports a v%s backup at schema 5 with rows unchanged", async (version) => {
+  const raw = backupFixture({ schemaVersion: version, preferences: { toolbar: ["italic"] }, ...(version === 4 ? { files: [] } : {}) });
+  expect(upgradeEnvelope(raw).envelope).toEqual({ ...raw, schemaVersion: 5, files: [] });
   await importBackup(raw);
   expect((await buildBackup()).notes).toEqual(raw.notes);
   expect((await buildBackup()).preferences).toEqual(raw.preferences);
 });
 
-it.each([1, 2, 3, 4, 5, undefined])("refuses a key before upgrading or checking version %s", (schemaVersion) => {
+it.each([1, 2, 3, 4, 5, 6, undefined])("refuses a key before upgrading or checking version %s", (schemaVersion) => {
   const checked = validateBackup(backupFixture({ schemaVersion, files: [], preferences: { claudeApiKey: "sk-ant-FAKE" } }));
   expect(checked.ok).toBe(false);
   expect(checked.envelope).toBeNull();
   expect(checked.errors).toContain("This file contains an Anthropic API key, so it was not made by this app's export. Nothing was imported.");
 });
-it.each([1, 2, 3, 4])("warns and ignores other Claude preferences from v%s", async (schemaVersion) => {
+it.each([1, 2, 3, 4, 5])("warns and ignores other Claude preferences from v%s", async (schemaVersion) => {
   const preferences = { claudeEnabled: true, claudeSpend: { dollars: 99 }, claudeLastChange: { fake: true } };
   const checked = validateBackup(backupFixture({ schemaVersion, files: [], preferences }));
   expect(checked.ok).toBe(true);

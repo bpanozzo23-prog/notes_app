@@ -1,6 +1,6 @@
 {
   "name": "notes_app",
-  "version": "0.4.4",
+  "version": "0.4.5",
   "scripts": {
     "dev": "vite --host",
     "build": "vite build",
@@ -19,6 +19,7 @@
     "@tiptap/extension-document": "^3.32.0",
     "@tiptap/extension-highlight": "^3.32.0",
     "@tiptap/extension-horizontal-rule": "^3.32.0",
+    "@tiptap/extension-list-item": "^3.32.0",
     "@tiptap/extension-task-item": "^3.32.0",
     "@tiptap/extension-task-list": "^3.32.0",
     "@tiptap/extension-text-style": "^3.32.0",

@@ -178,9 +178,9 @@ it("serialises two pushes on the same base", async () => {
   expect(responses[1].body.error).toBe("changed");
 });
 it("refuses newer and older schemas without changing the store", async () => {
-  expect((await send(push([note()], { schemaVersion: 5 }))).body.error).toBe("update-service");
+  expect((await send(push([note()], { schemaVersion: 6 }))).body.error).toBe("update-service");
   await send(push());
-  expect((await send(await f.next([note()], { schemaVersion: 3 }))).body.error).toBe("update-app");
+  expect((await send(await f.next([note()], { schemaVersion: 4 }))).body.error).toBe("update-app");
   expect((await f.request("GET", "/v1/state")).body.round).toBe(1);
 });
 
@@ -337,7 +337,7 @@ it("checks versions before the guard, so a refused push never uses up a confirma
   const changed = await f.next([note({ rev: 2, title: "Changed elsewhere" })], { generation: "generation-B" });
   const asked = await send(changed);
   expect(asked.body.error).toBe("confirm");
-  const newer = await send({ ...changed, schemaVersion: 5, confirm: asked.body.confirm });
+  const newer = await send({ ...changed, schemaVersion: 6, confirm: asked.body.confirm });
   expect(newer.body.error).toBe("update-service");
   // The confirmation is still unused, but it was bound to the original push, which still works.
   expect((await send({ ...changed, confirm: asked.body.confirm })).status).toBe(200);

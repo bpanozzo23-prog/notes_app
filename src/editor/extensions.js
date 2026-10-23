@@ -9,12 +9,14 @@ import Document from "@tiptap/extension-document";
 import Callout, { CALLOUT_TYPES } from "./nodes/Callout.js";
 import Divider, { DIVIDER_STYLES } from "./nodes/Divider.js";
 import LineSpacing, { LINE_SPACINGS } from "./nodes/LineSpacing.js";
+import { Collapsible, CollapsibleListItem } from "./nodes/Collapsible.js";
 import { STARTER_HIGHLIGHT_COLORS } from "./formatting.js";
 
 export const extensions = [
   StarterKit.configure({
     document: false,
     horizontalRule: false,
+    listItem: false,
     trailingNode: { notAfter: ["callout"] },
     heading: { levels: [1, 2, 3] },
     link: {
@@ -28,6 +30,7 @@ export const extensions = [
   Callout, Divider, LineSpacing, Image, ImagePlaceholders,
   TaskList,
   TaskItem.configure({ nested: true }),
+  CollapsibleListItem, Collapsible,
 ];
 
 export const SUPPORTED_HTML_SAMPLES = [
@@ -47,6 +50,9 @@ export const SUPPORTED_HTML_SAMPLES = [
   '<p><span style="line-height: 2">Line height</span></p>',
   "<ul><li><p>Bullet</p><ul><li><p>Nested</p></li></ul></li></ul>",
   '<ol start="3"><li><p>Numbered</p></li></ol>',
+  '<ul><li data-collapsed="true"><p>Collapsed</p><ul><li><p>Hidden</p></li></ul></li></ul>',
+  '<ol><li data-collapsed="true"><p>Collapsed</p><ol><li><p>Hidden</p></li></ol></li></ol>',
+  '<ul data-type="taskList"><li data-type="taskItem" data-checked="true" data-collapsed="true"><p>Collapsed task</p><ul data-type="taskList"><li data-type="taskItem" data-checked="false"><p>Hidden task</p></li></ul></li></ul>',
   '<ul data-type="taskList"><li data-type="taskItem" data-checked="true"><p>Done</p><ul data-type="taskList"><li data-type="taskItem" data-checked="false"><p>Nested task</p></li></ul></li></ul>',
   "<blockquote><p>Quote</p></blockquote>", "<hr>",
   "<p><code>Inline code</code></p>", '<pre><code class="language-js">const n = 1;</code></pre>',

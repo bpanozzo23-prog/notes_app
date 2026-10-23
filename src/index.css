@@ -127,6 +127,33 @@ body {
   color: var(--color-muted);
 }
 
+/* Collapsible list lines. Hidden only while editing, so read-only notes and Claude's review
+   previews always show every line. The −/+ sits in the gutter left of the bullet or checkbox. */
+.ProseMirror li { position: relative; }
+.ProseMirror[contenteditable="true"] li[data-collapsed="true"] > p:first-of-type ~ *,
+.ProseMirror[contenteditable="true"] ul[data-type="taskList"] > li[data-collapsed="true"] > div > p:first-of-type ~ * { display: none; }
+.ProseMirror :is(ul, ol):has(> li > .collapse-toggle) { padding-left: 2.6em; }
+.ProseMirror ul[data-type="taskList"]:has(> li > div > .collapse-toggle) { padding-left: 2.2em; }
+/* The button is the whole tap zone (about 37 × 32 px at the note's text size), from the gutter's
+   edge up to the bullet; the drawn circle sits in its middle. */
+.collapse-toggle {
+  position: absolute; top: -0.2em; left: -3.05em; width: 2.2em; height: 1.9em;
+  display: flex; align-items: center; justify-content: center;
+  border: 0; padding: 0; background: none; color: var(--color-muted); touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+}
+ul[data-type="taskList"] > li > div > .collapse-toggle { left: -2.35em; }
+.collapse-toggle:active::before { background: #e5e7eb; }
+.collapse-toggle::before {
+  content: "\2212"; display: flex; align-items: center; justify-content: center;
+  width: 1.05em; height: 1.05em; border: 1.5px solid currentColor; border-radius: 50%;
+  font-size: 0.85em; font-weight: 700; line-height: 1;
+}
+li[data-collapsed="true"] > .collapse-toggle,
+li[data-collapsed="true"] > div > .collapse-toggle { color: var(--color-accent); }
+li[data-collapsed="true"] > .collapse-toggle::before,
+li[data-collapsed="true"] > div > .collapse-toggle::before { content: "+"; }
+
 /* Placeholder-ish hint on the empty first paragraph. */
 .ProseMirror p.is-editor-empty:first-child::before {
   content: "Start typing…";

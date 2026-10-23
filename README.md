@@ -189,6 +189,11 @@ LLM can read. The code may become public; the notes never are.
   folders private (0700), repairs changed permissions, and `notes-sync status` checks the notes
   mapping itself. `docs/DECISIONS-EXPLAINED.md` §80. Owner-verified on the phone 2026-10-22.
   **Phase 4 is complete.**
+- **Collapsible list lines, 0.4.5, note format 5, 2026-10-22.** A list line with lines under it
+  shows a grey − in front; tap to hide them (+ to show again). Bullets, numbered lists and
+  checklists; saved in the note and synced, without changing "Edited". Read-only notes and Claude's
+  reviews always show every line. `docs/DECISIONS-EXPLAINED.md` §81. Owner phone check pending;
+  **export a backup first** (older app versions can't read 0.4.5 backups).
 
 ## Running it
 

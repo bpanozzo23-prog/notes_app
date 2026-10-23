@@ -132,6 +132,8 @@ Supported HTML (keep the note's existing formatting unless asked to change it):
   `<ol start="3"><li><p>Item</p></li></ol>`; lists can nest.
 - Tasks `<ul data-type="taskList"><li data-type="taskItem" data-checked="false"><p>Task</p></li></ul>`;
   use `data-checked="true"` for done. Tasks can nest.
+- A list line whose nested lines the owner has collapsed carries `data-collapsed="true"` on its
+  `<li>` (bullets, numbered and tasks). Keep it as given; the nested lines are still there.
 - Quotes `<blockquote><p>Quote</p></blockquote>`; code blocks
   `<pre><code class="language-js">code</code></pre>`.
 - Dividers `<hr>` or `<hr data-style="thick">`, with `thick`, `dashed` or `dotted`.

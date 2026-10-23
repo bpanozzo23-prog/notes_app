@@ -91,5 +91,5 @@ it('accepts an untitled merged result and uses its first line for review', () =>
 });
 
 it("keeps the tidy prompt byte-identical when sharing its HTML rule", () => {
-  expect(createHash("sha256").update(TIDY_SYSTEM_PROMPT).digest("hex")).toBe("f2d1ece38cbadec1563cf0c7132b63825989565e74c4ce0845d02ba3bac03c86");
+  expect(createHash("sha256").update(TIDY_SYSTEM_PROMPT).digest("hex")).toBe("01a592a268e3df16c748be1fb4ebfcad9c5c948f659a50fcd98cb14a9ce31f70");
 });

@@ -554,7 +554,7 @@ it("opens a newer database for reading, allows text export/copy, and disables ed
   await createFolder("Read only folder");
   db.close();
   const newer = new Dexie(db.name);
-  newer.version(5).stores({ notes: "id, updatedAt, deletedAt, *tags, *linkedIds", folders: "id, position", tombstones: "id", prefs: "key", files: "id, unusedSince", fileData: "id" });
+  newer.version(6).stores({ notes: "id, updatedAt, deletedAt, *tags, *linkedIds", folders: "id, position", tombstones: "id", prefs: "key", files: "id, unusedSince", fileData: "id" });
   await newer.open();
   newer.close();
   const purge = vi.spyOn(notesDb, "purgeExpired");
@@ -618,7 +618,7 @@ it("locks immediately on versionchange, drains held editor input, then closes af
   const observer = editor.view.domObserver;
   editor.view.dom.querySelector("p").firstChild.nodeValue = "Origina";
   observer.flushSoon();
-  act(() => { expect(db.on("versionchange").fire({ oldVersion: 40, newVersion: 50 })).toBe(false); });
+  act(() => { expect(db.on("versionchange").fire({ oldVersion: 50, newVersion: 60 })).toBe(false); });
   expect(screen.getByLabelText("Title").closest("[inert]")).toBeTruthy();
   await waitFor(() => expect(write).toHaveBeenCalledOnce());
   expect(db.isOpen()).toBe(true);
@@ -637,7 +637,7 @@ it("keeps versionchange failures locked with Retry usable, then closes after the
   await openNote("Before upgrade");
   const put = vi.spyOn(db.notes, "put").mockRejectedValue(new Error("Disk full"));
   fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Keep this edit" } });
-  act(() => db.on("versionchange").fire({ oldVersion: 40, newVersion: 50 }));
+  act(() => db.on("versionchange").fire({ oldVersion: 50, newVersion: 60 }));
   await screen.findByText("Not saved. Disk full");
   expect(db.isOpen()).toBe(true);
   expect(screen.getByLabelText("Title").closest("[inert]")).toBeTruthy();

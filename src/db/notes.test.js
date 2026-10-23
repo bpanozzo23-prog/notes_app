@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { db, allPrefs, delPref, getPref, setPref } from "./db.js";
-import { createNote, updateNote, getNote, setPinned, trashNote, restoreNote, purgeExpired, liveNotes, trashedNotes, backlinksFor, TRASH_RETENTION_MS } from "./notes.js";
+import { withoutCollapse, isContentEdit, createNote, updateNote, getNote, setPinned, trashNote, restoreNote, purgeExpired, liveNotes, trashedNotes, backlinksFor, TRASH_RETENTION_MS } from "./notes.js";
 import { createFolder } from "./folders.js";
 import { AT, resetDatabase } from "../test/fixtures.js";
 
@@ -31,6 +31,30 @@ it.each(["title", "html", "folderId", "tags"])("bumps recency and rev for %s edi
   expect(next.updatedAt).not.toBe(note.updatedAt);
   expect(next.createdAt).toBe(note.createdAt);
   expect((await updateNote(note.id, { [field]: value })).updatedAt).toBe(next.updatedAt);
+});
+it("saves and syncs a collapsed or expanded list line without moving Edited", async () => {
+  clock();
+  const open = "<ul><li><p>Parent</p><ul><li><p>Child</p></li></ul></li></ul>";
+  const shut = open.replace("<ul><li>", '<ul><li data-collapsed="true">');
+  const note = await createNote({ html: open });
+  vi.setSystemTime(Date.now() + 1000);
+  const collapsed = await updateNote(note.id, { html: shut });
+  expect(collapsed.html).toBe(shut);
+  expect(collapsed.rev).toBe(note.rev + 1);
+  expect(collapsed.updatedAt).toBe(note.updatedAt);
+  vi.setSystemTime(Date.now() + 1000);
+  const typed = await updateNote(note.id, { html: shut.replace("Child", "Children") });
+  expect(typed.updatedAt).not.toBe(note.updatedAt);
+});
+it("treats only the li attribute as a collapse, never the same words in text or links", () => {
+  expect(withoutCollapse('<ul><li data-checked="true" data-collapsed="true" data-type="taskItem"><p>a</p></li></ul>'))
+    .toBe('<ul><li data-checked="true" data-type="taskItem"><p>a</p></li></ul>');
+  const text = '<p> data-collapsed="true" &lt;li data-collapsed="true"&gt;</p>';
+  expect(withoutCollapse(text)).toBe(text);
+  const link = '<p><a href="https://example.com/?x=%22%20data-collapsed=%22true">l</a></p>';
+  expect(withoutCollapse(link)).toBe(link);
+  expect(isContentEdit({ pinned: true }, { pinned: false })).toBe(false);
+  expect(isContentEdit({ html: "<p>b</p>" }, { html: "<p>a</p>" })).toBe(true);
 });
 it("normalises tags, derives from HTML, and protects immutable/derived fields", async () => {
   const note = await createNote();

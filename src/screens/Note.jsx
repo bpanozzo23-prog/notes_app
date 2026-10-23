@@ -2,7 +2,7 @@ import { captureSplitPayload } from "../claude/split.js";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Pin, Trash2, Sparkles, Copy, Ellipsis } from "lucide-react";
 import { db } from "../db/db.js";
-import { liveNotes } from "../db/notes.js";
+import { isContentEdit, liveNotes } from "../db/notes.js";
 import { allFolders } from "../db/folders.js";
 import { noteToText } from "../lib/textExport.js";
 import { copyText } from "../lib/clipboard.js";
@@ -20,7 +20,6 @@ import { noteDates, nowIso } from "../lib/dates.js";
 import { saveStatusLabel } from "../lib/saveStatus.js";
 
 // The fields whose change counts as an edit, as in src/db/notes.js.
-const CONTENT_FIELDS = ["title", "html", "folderId", "tags"];
 
 export default function Note({ initialNote, notes, folders, toolbarIds, formatting, readOnly: locked = false, queue, status, busy, onBack, onDelete, onOpenNote, error, run, refresh, onImageError, claudeReady, onOpen, setMessage }) {
   const [note, setNote] = useState(initialNote);
@@ -90,7 +89,7 @@ export default function Note({ initialNote, notes, folders, toolbarIds, formatti
     queue.schedule(note.id, patch);
     // Show the edit time at once; the save writes the stored updatedAt moments later.
     setNote((current) => ({ ...current, ...patch,
-      ...(CONTENT_FIELDS.some((key) => Object.hasOwn(patch, key) && JSON.stringify(patch[key]) !== JSON.stringify(current[key])) ? { updatedAt: nowIso() } : {}) }));
+      ...(isContentEdit(patch, current) ? { updatedAt: nowIso() } : {}) }));
   }
   return <section className="flex flex-1 flex-col pb-24" onBlur={() => { queue.flush().catch(() => {}); }}>
     <ScreenHeader title="Note" onBack={onBack} busy={busy}>

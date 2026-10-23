@@ -84,6 +84,7 @@ export function auditBody(html, { imageHandles, noteHandles }) {
       } else if (!known?.attrs.has(name) ||
         (name === "data-callout" && !CALLOUT_TYPES.includes(value)) ||
         (name === "data-style" && !DIVIDER_STYLES.includes(value)) ||
+        (name === "data-collapsed" && value !== "true") ||
         (name === "class" && !(tag === "code" && el.parentElement?.localName === "pre" && /^language-\S+$/.test(value))) ||
         (["width", "height"].includes(name) && (!/^\d+$/.test(value) || !Number.isSafeInteger(Number(value)) || Number(value) <= 0))) add("attribute");
     }
