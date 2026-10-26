@@ -1553,3 +1553,47 @@ wait for its update.
 
 **Owner phone check:** passed on the dev server, 2026-10-26, after exporting a backup ("Checks
 pass and backup was exported").
+
+### 85. Quick add (0.4.9, 2026-10-26)
+
+**The system behind it.** After a week of real use the notebook already showed the problem:
+one-line notes that should have been items in an ideas list, and three notes on one subject in
+five days. The fix is a habit plus one feature. The habit: keep **one living note per topic**
+("Notes App ideas", "Ideas for AI projects", "To-dos"), with a line called **Inbox** at the top.
+Every passing thought goes into that Inbox. Once a week or two, sort the Inbox: move each line
+into its section, merge repeats, delete what's done. When a section outgrows the note, **Split
+this note** by subject, never by date. Notes where the date is the content (reflections, workflow
+questions) are logs: a new note per month or quarter is right for those. Pasted Claude answers
+stay as their own reference notes, linked from one line in the living note. The decision "new
+note or existing note?" is never made at capture time; the Inbox makes it obvious at review time.
+
+**Chosen:** hold the **+** button on the notes list for half a second and a **Quick add** sheet
+slides up: a row of chips for the notes you've marked, a text box with the keyboard already open,
+and **Add**. The text lands as the first bullet under that note's Inbox line; if the note has no
+Inbox, one is created at the top. The list stays where it was and says "Added to “…”". A tap on
++ still makes a new note.
+
+**Marking a note:** Note options (⋯) has **Quick add** (show this note in the sheet) and **Add
+the date** (start each added line with "26 Oct — ", for logs). Both are saved with the note like
+Pin, so they come back from a backup and sync to the XPS, and neither moves "Edited".
+
+**Fold counts:** a folded list line now shows how many lines it hides next to its +, and a folded
+heading's "…" says "… 3 lines". Open lines are unchanged, so the earlier worry (a number redrawing
+beside text you are typing) doesn't arise: nothing can be typed under a folded line.
+
+**Shortcut:** long-press the installed app's icon on the home screen and choose **Quick add** to
+open the sheet without passing through the list.
+
+**Back and updates:** Android Back closes the sheet. An update arriving while the sheet holds
+text waits until you Add or Cancel, like an open Claude conversation.
+
+**What it doesn't do (Tier 4):** share text from another app straight into an Inbox; show a count
+of unsorted items in the list; have Claude propose where each Inbox item belongs. The first is
+already in the brief; the other two were added on 2026-10-26.
+
+**Lock-in: none.** No change to the notebook format, backups or the XPS service. The Inbox is an
+ordinary nested bullet list.
+
+**Owner phone check pending:** hold + with Samsung Keyboard (no text selection or menu should
+appear), the sheet sitting above the keyboard, Add, Back closing the sheet, the two switches, a
+folded line's count, and after the push the home-screen "Quick add" shortcut.

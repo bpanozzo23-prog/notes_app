@@ -317,3 +317,20 @@ it("Android deletes that join a heading run the editor's own command", () => {
   expect(editor.getHTML()).toBe("<h2>Title</h2><p>Body</p><h2>Next</h2><p>End</p>");
 });
 
+
+it("counts hidden leaf blocks, updates an unchanged heading's marker, and never saves count attributes", () => {
+  const editor = make('<h2>Title</h2><p>Paragraph</p><ul><li><p>Bullet</p><ol><li><p>Nested</p></li></ol></li></ul><img data-file="fixture"><h2>Next</h2><p>Visible</p>');
+  expect(editor.view.dom.querySelector("[data-count]")).toBeNull();
+  toggle(editor);
+  const marker = editor.view.dom.querySelector(".heading-fold-marker");
+  expect(marker.dataset.count).toBe("4 lines");
+  expect(editor.view.dom.querySelector("h2").hasAttribute("data-count")).toBe(false);
+  const at = section(editor, "Title").from;
+  editor.view.dispatch(editor.state.tr.insert(at, editor.schema.nodes.paragraph.create(null, editor.schema.text("Added"))).setMeta(FOLD_META, true));
+  expect(editor.view.dom.querySelector(".heading-fold-marker")).toBe(marker);
+  expect(marker.dataset.count).toBe("5 lines");
+  expect(editor.getHTML()).not.toContain("data-count");
+  toggle(editor); expect(editor.view.dom.querySelector("[data-count]")).toBeNull();
+  const single = make('<h2 data-collapsed="true">Only</h2><p>One</p>');
+  expect(single.view.dom.querySelector(".heading-fold-marker").dataset.count).toBe("1 line");
+});

@@ -40,6 +40,7 @@ export function sanitizeNavigation(raw) {
       ...(entry.screen === "note" ? { noteId: entry.noteId, ...(find ? { find, ...(entry.findShown === true ? { findShown: true } : {}) } : {}) } : {}),
       ...(entry.screen === "list" ? { filter: sanitizeFilter(entry.filter),
         ...(query ? { query } : {}),
+        ...(index > 0 && entry.quickAdd === true ? { quickAdd: true } : {}),
       } : {}),
     };
   });
@@ -49,10 +50,15 @@ export function sanitizeNavigation(raw) {
 export function navigationReducer(navigation, action) {
   const stack = navigation.stack;
   switch (action.type) {
+    case "quickAdd": {
+      const { filter, query } = stack.findLast((entry) => entry.screen === "list");
+      return sanitizeNavigation({ version: 1, stack: [...stack, { screen: "list", filter, query, quickAdd: true, key: newId(), scrollY: action.scrollY }] });
+    }
     case "push": return sanitizeNavigation({ version: 1, stack: [...stack, { ...action.entry, key: action.key, scrollY: 0 }] });
     case "replace": return sanitizeNavigation({ version: 1, stack: [...stack.slice(0, -1), { ...action.entry, key: activeEntry(navigation).key, scrollY: action.entry.scrollY ?? 0 }] });
     case "filter": return navigationReducer(navigation, { type: "replace", entry: {
       screen: "list", filter: action.filter,
+      ...(activeEntry(navigation).quickAdd ? { quickAdd: true } : {}),
       query: Object.hasOwn(action, "query") ? action.query : activeEntry(navigation).query,
       scrollY: action.scrollY ?? 0,
     } });
@@ -205,7 +211,17 @@ export function createNavigationController({ win = window, prepare, onChange, on
     },
     run,
     registerOverlay(close) { overlays.add(close); return () => overlays.delete(close); },
-    restore(data) { commit(resolveDestination(navigation, data)); },
+    restore(data, { quickAdd = false } = {}) {
+      // Reload and Forward restore the visit too, with an empty Quick add sheet.
+      commit(resolveDestination(navigation, data));
+      if (quickAdd) commit(resolveDestination(navigationReducer(navigation, { type: "quickAdd", scrollY: win.scrollY }), data), "pushState");
+    },
+    openQuickAdd() {
+      return run(async () => {
+        const data = await prepare();
+        commit(resolveDestination(navigationReducer(navigation, { type: "quickAdd", scrollY: win.scrollY }), data), "pushState");
+      });
+    },
     open(entry) {
       return run(async () => {
         const data = await prepare();

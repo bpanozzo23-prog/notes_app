@@ -365,6 +365,17 @@ await back();
   assert.equal(await body.getByText("Un párrafo para abrir y leer.", { exact: true }).isVisible(), false);
   assert.equal(await wrap.locator(".heading-fold-marker").count(), 1);
   await shot("12h-heading-folded");
+  assert.ok(await wrap.locator(".heading-fold-marker").getAttribute("data-count"));
+  await shot("12q-fold-count-heading");
+  const foldedList = body.locator('li[data-collapsed="true"]', { has: page.getByText("Lista plegada", { exact: true }) }).first();
+  await foldedList.scrollIntoViewIfNeeded();
+  assert.equal(await foldedList.locator(".collapse-toggle").first().getAttribute("data-count"), "2");
+  await shot("12o-fold-count-list");
+  const foldedTask = body.locator('ul[data-type="taskList"] > li[data-collapsed="true"]', { has: page.getByText("Tarea plegada", { exact: true }) }).first();
+  await foldedTask.scrollIntoViewIfNeeded();
+  assert.equal(await foldedTask.locator(".collapse-toggle").first().getAttribute("data-count"), "1");
+  await shot("12p-fold-count-task");
+  await heading.scrollIntoViewIfNeeded();
   const focused = await body.evaluate((el) => el === document.activeElement);
   await toggle.tap();
   assert.equal(await body.evaluate((el) => el === document.activeElement), focused);
@@ -1103,6 +1114,31 @@ await page.getByRole("dialog", { name: "Disconnect from the XPS?" }).getByRole("
 await button("Connect").waitFor();
 await backFromScreen(page);
 await backFromScreen(page);
+// Quick add runs after every review and sync fixture that depends on sample text or order.
+{
+  const holdNew = async () => {
+    const box = await button("+ New note").boundingBox();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down(); await page.waitForTimeout(550);
+    await page.getByRole("dialog", { name: "Quick add", exact: true }).waitFor();
+  };
+  await holdNew();
+  await shot("194-quick-add-sheet"); await page.mouse.up();
+  await page.getByRole("radio", { name: "Libros por leer", exact: true }).click();
+  await page.getByLabel("Text to add").fill("Comprar una lámpara para leer");
+  await shot("194b-quick-add-typed");
+  await button("Add").click(); await page.getByText(/^Added to/).waitFor();
+  await page.getByRole("dialog", { name: "Quick add", exact: true }).waitFor({ state: "hidden" });
+  await shot("194c-quick-add-done");
+  await holdNew(); await page.mouse.up();
+  await page.getByLabel("Text to add").fill("Buscar reseñas de Pedro Páramo");
+  await button("Add").click(); await page.getByText(/^Added to/).waitFor();
+  await page.getByRole("dialog", { name: "Quick add", exact: true }).waitFor({ state: "hidden" });
+  await button("Libros por leer").click(); await page.getByLabel("Note body").waitFor();
+  await shot("194d-quick-add-note");
+  await button("Note options").click(); await shot("194e-note-options-switches");
+  await button("Cancel").click(); await back();
+}
 // Leave a note open for the existing database guards and reload checks.
 await button("Vocabulario — comida").click();
 await page.getByLabel("Note body").waitFor();

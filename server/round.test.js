@@ -389,3 +389,8 @@ it.each([false, true])("preserves explicit outcomes for competing new-note versi
     .toEqual({ outcome: item.outcome, applied: [], at: AT });
   expect(f.git.commit).toHaveBeenCalledTimes(1);
 });
+it("keeps the Quick add and date switches through a push and the backup", async () => {
+  expect((await send(push([note({ quickAdd: true, addDate: true })]))).status).toBe(200);
+  const backup = JSON.parse((await f.request("GET", "/v1/backup")).body);
+  expect(backup.notes[0]).toMatchObject({ quickAdd: true, addDate: true });
+});

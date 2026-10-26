@@ -2,7 +2,7 @@ import { Extension, getRenderedAttributes } from "@tiptap/core";
 import Heading from "@tiptap/extension-heading";
 import { Plugin, PluginKey, TextSelection } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
-import { FOLD_META, foldTransaction, changedRanges } from "./fold.js";
+import { FOLD_META, foldTransaction, changedRanges, leafLines } from "./fold.js";
 
 const key = new PluginKey("headingFold");
 
@@ -54,7 +54,10 @@ function decorations(doc) {
   const result = [], hidden = new Map();
   for (const section of headingSections(doc)) {
     if (!section.foldable) continue;
-    result.push(Decoration.node(section.pos, section.pos + section.node.nodeSize, { class: "heading-foldable" }, { foldable: true }));
+    const count = section.node.attrs.collapsed ? section.blocks.reduce((total, { node }) => total + leafLines(node), 0) : 0;
+    result.push(Decoration.node(section.pos, section.pos + section.node.nodeSize, { class: "heading-foldable",
+      ...(section.node.attrs.collapsed ? { "data-count": `${count} ${count === 1 ? "line" : "lines"}` } : {}),
+    }, { foldable: true }));
     if (section.node.attrs.collapsed) for (const { node, pos } of section.blocks) hidden.set(pos, node.nodeSize);
   }
   for (const [pos, size] of hidden) result.push(Decoration.node(pos, pos + size, { class: "fold-hidden" }));
@@ -174,7 +177,10 @@ export const FoldableHeading = Heading.extend({
         previous = attrs;
         // Centre the button on the first line even when the heading has its own line spacing.
         button.style.lineHeight = heading.style.lineHeight;
-        const foldable = editor.isEditable && decos.some((deco) => deco.spec.foldable);
+        const fold = decos.find((deco) => deco.spec.foldable);
+        const foldable = editor.isEditable && !!fold;
+        if (foldable && next.attrs.collapsed) marker.dataset.count = fold.type.attrs["data-count"];
+        else delete marker.dataset.count;
         dom.classList.toggle("is-folded", foldable && next.attrs.collapsed === true);
         if (foldable) { if (button.parentNode !== dom) dom.append(button); button.setAttribute("aria-expanded", String(!next.attrs.collapsed)); }
         else button.remove();

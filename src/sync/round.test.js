@@ -298,3 +298,11 @@ it("forwards only state status data to the in-memory consumer", async () => {
   expect(onState).toHaveBeenCalledWith(expect.objectContaining({ proposals: [], counts: expect.any(Object) }));
   expect(JSON.stringify(onState.mock.calls)).not.toContain(server.token);
 });
+
+it("carries both Quick add switches in captured note rows", async () => {
+  await db.notes.put(note({ quickAdd: true, addDate: true }));
+  await db.prefs.put({ key: "quickAddLast", value: "note-1" });
+  const captured = await captureNotebook();
+  expect(captured.notes).toEqual([expect.objectContaining({ quickAdd: true, addDate: true })]);
+  expect(captured.preferences).not.toHaveProperty("quickAddLast");
+});

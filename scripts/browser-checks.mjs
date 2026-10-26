@@ -113,6 +113,23 @@ await page.reload({ waitUntil: "networkidle" });
 check("service worker controls the page after install", await page.evaluate(() => !!navigator.serviceWorker.controller));
 check("release a is running", (await buildOf(page)) === "a");
 
+await attempt("manifest has a Quick add shortcut under the app base", async () => {
+  const manifest = JSON.parse(await readFile(resolve(out, "build-a/manifest.webmanifest"), "utf8"));
+  const shortcut = manifest.shortcuts?.find((entry) => entry.name === "Quick add");
+  if (!shortcut) return false;
+  const target = new URL(shortcut.url, url), base = new URL(url);
+  return target.origin === base.origin && target.pathname.startsWith(base.pathname) && target.searchParams.has("quick-add");
+});
+async function checkQuickAddLaunch() {
+  await page.goto(url + "?quick-add", { waitUntil: "load" });
+  await page.getByRole("dialog", { name: "Quick add", exact: true }).waitFor();
+  const clean = new URL(page.url()).search === "";
+  await button("Cancel").click();
+  await page.getByRole("dialog", { name: "Quick add", exact: true }).waitFor({ state: "hidden" });
+  return clean;
+}
+await attempt("Quick add shortcut opens the sheet and consumes its query", checkQuickAddLaunch);
+
 // The made-up sample notebook, through the app's own import.
 await button("Settings").click();
 await page.getByLabel("Import backup").setInputFiles(sample);
@@ -139,6 +156,7 @@ await attempt("reopens offline with the notes", async () => {
   return { ok: fetched.length === 0, detail: fetched.join(", ") };
 });
 await shot(page, "01-offline-reopen");
+await attempt("Quick add shortcut opens offline and consumes its query", checkQuickAddLaunch);
 await attempt("Ask is disabled offline", async () => {
   await page.getByRole("button", { name: "Ask Claude" }).click();
   await page.getByText("You're offline. Claude needs a connection.").first().waitFor();

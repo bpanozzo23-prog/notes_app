@@ -210,6 +210,11 @@ LLM can read. The code may become public; the notes never are.
   The XPS service must accept format 6 before app release. Owner-verified on the phone (dev server) 2026-10-26, after exporting a backup; released
   2026-10-26 (XPS service deployed first). Older app versions can't read 0.4.8 backups.
 
+- **Quick add, 0.4.9, 2026-10-26.** Hold + on the notes list to add a line to a marked note's
+  Inbox without opening it (Note options → Quick add; optional date prefix); folded lines and
+  headings show how many lines they hide; a home-screen "Quick add" shortcut. App-only; no format
+  change. `docs/DECISIONS-EXPLAINED.md` §85. **Owner phone check pending.**
+
 ## Running it
 
 ```

@@ -4,6 +4,7 @@ import { extensions } from "../editor/extensions.js";
 
 export const noteSchema = getSchema(extensions);
 export const parseBody = (html) => generateJSON(html, extensions);
+export const documentFor = (html) => Node.fromJSON(noteSchema, parseBody(html));
 export function serializeBody(json) {
   Node.fromJSON(noteSchema, json).check();
   return generateHTML(json, extensions);

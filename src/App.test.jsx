@@ -12,6 +12,7 @@ import { db, getPref, setPref, DATABASE_UPDATED } from "./db/db.js";
 import * as filesDb from "./db/files.js";
 import * as imageProcessing from "./lib/images.js";
 import * as notesDb from "./db/notes.js";
+import * as quickAddDb from "./db/quickAdd.js";
 import { createNote, getNote, trashNote } from "./db/notes.js";
 import { backupFixture, noteFixture, resetDatabase } from "./test/fixtures.js";
 import { createFolder } from "./db/folders.js";
@@ -36,7 +37,7 @@ beforeEach(async () => {
   claudeSession.clearSession();
   await resetDatabase();
   vi.clearAllMocks();
-  window.history.replaceState(null, "");
+  window.history.replaceState(null, "", window.location.pathname);
   vi.spyOn(window, "scrollTo").mockImplementation(() => {});
   pwa.needRefresh = false;
   pwa.offlineReady = false;
@@ -936,4 +937,131 @@ it("Note options folds and unfolds all sections, saves them without moving Edite
   act(() => screen.getByLabelText("Note body").editor.commands.setContent('<p>No headings</p>'));
   fireEvent.click(screen.getByRole("button", { name: "Note options" }));
   for (const label of ["Fold all sections", "Unfold all sections"]) expect(screen.getByRole("button", { name: label }).disabled).toBe(true);
+});
+
+async function holdNew() {
+  await waitFor(() => expect(screen.getByRole("button", { name: "+ New note" }).disabled).toBe(false));
+  const button = screen.getByRole("button", { name: "+ New note" });
+  fireEvent.pointerDown(button, { button: 0, pointerId: 1, clientX: 20, clientY: 30 });
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 510)); });
+  fireEvent.pointerUp(button); fireEvent.click(button);
+  await screen.findByRole("dialog", { name: "Quick add" });
+  await waitFor(() => expect(screen.getByRole("button", { name: "Cancel" }).disabled).toBe(false));
+}
+async function quickFixture() {
+  const note = await createNote({ title: "Quick fixture" });
+  await notesDb.updateNote(note.id, { quickAdd: true, tags: ["reading"] });
+  return note;
+}
+it("creates a note, opts in and quick-adds from the filtered list without opening the note", async () => {
+  const folder = await createFolder("Reading");
+  await start();
+  fireEvent.click(screen.getByRole("button", { name: "Reading" }));
+  fireEvent.click(screen.getByRole("button", { name: "+ New note" }));
+  await screen.findByLabelText("Title");
+  await waitFor(() => expect(screen.getByRole("button", { name: "Note options" }).disabled).toBe(false));
+  fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Quick fixture" } });
+  fireEvent.click(screen.getByRole("button", { name: "Note options" }));
+  fireEvent.click(screen.getByRole("switch", { name: "Quick add" }));
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" })); await back();
+  fireEvent.change(screen.getByLabelText("Search notes"), { target: { value: "Quick" } });
+  await holdNew();
+  expect(screen.queryByLabelText("Title")).toBeNull();
+  fireEvent.change(screen.getByLabelText("Text to add"), { target: { value: "Read another chapter" } });
+  fireEvent.click(screen.getByRole("button", { name: "Add", exact: true }));
+  await screen.findByText('Added to “Quick fixture”');
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  const [note] = await db.notes.toArray();
+  expect(note.html).toContain("<ul><li><p>Inbox</p><ul><li><p>Read another chapter</p></li></ul></li></ul>");
+  expect(note.folderId).toBe(folder.id);
+  expect(screen.getByLabelText("Search notes").value).toBe("Quick");
+  expect(screen.getByRole("button", { name: "Reading" }).getAttribute("aria-pressed")).toBe("true");
+  expect(window.history.state[NAVIGATION_KEY].stack).toHaveLength(1);
+  await waitFor(async () => expect(await getPref("quickAddLast")).toBe(note.id));
+});
+it("Android Back closes a Quick add visit and Forward restores an empty sheet", async () => {
+  await quickFixture(); await start(); await holdNew();
+  fireEvent.change(screen.getByLabelText("Text to add"), { target: { value: "Unsent" } });
+  act(() => window.history.back());
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(window.history.state[NAVIGATION_KEY].stack).toHaveLength(1);
+  act(() => window.history.forward());
+  await screen.findByRole("dialog", { name: "Quick add" });
+  expect(screen.getByLabelText("Text to add").value).toBe("");
+});
+it("does not pop twice when Back arrives during a successful add", async () => {
+  const note = await quickFixture(); await start();
+  fireEvent.click(screen.getByRole("button", { name: "#reading" }));
+  fireEvent.change(screen.getByLabelText("Search notes"), { target: { value: "Quick" } });
+  await holdNew();
+  let finish;
+  const original = quickAddDb.quickAddToNote;
+  const add = vi.spyOn(quickAddDb, "quickAddToNote").mockImplementationOnce(async (...args) => {
+    await new Promise((resolve) => { finish = resolve; }); return original(...args);
+  });
+  fireEvent.change(screen.getByLabelText("Text to add"), { target: { value: "Survives Back" } });
+  fireEvent.click(screen.getByRole("button", { name: "Add", exact: true }));
+  await waitFor(() => expect(add).toHaveBeenCalled());
+  act(() => window.history.back());
+  await waitFor(() => expect(window.history.state[NAVIGATION_KEY].stack).toHaveLength(1));
+  await act(async () => finish());
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  await screen.findByText('Added to “Quick fixture”');
+  expect(activeEntry(window.history.state[NAVIGATION_KEY])).toMatchObject({ key: "root", query: "Quick", filter: { type: "tag", value: "reading" } });
+  expect((await db.notes.get(note.id)).html).toContain("Survives Back");
+});
+it("keeps a failed add's text in the sheet", async () => {
+  await quickFixture(); await start(); await holdNew();
+  vi.spyOn(quickAddDb, "quickAddToNote").mockRejectedValueOnce(new Error("Fixture disk full"));
+  fireEvent.change(screen.getByLabelText("Text to add"), { target: { value: "Keep this draft" } });
+  fireEvent.click(screen.getByRole("button", { name: "Add", exact: true }));
+  await waitFor(() => expect(within(screen.getByRole("dialog")).getByRole("alert").textContent).toBe("Fixture disk full"));
+  expect(screen.getByLabelText("Text to add").value).toBe("Keep this draft");
+  expect(window.history.state[NAVIGATION_KEY].stack).toHaveLength(2);
+});
+it.each([false, true])("opens the shortcut and removes its query (read-only: %s)", async (readOnly) => {
+  await quickFixture();
+  if (readOnly) {
+    db.close(); const newer = new Dexie(db.name);
+    newer.version(7).stores({ notes: "id, updatedAt, deletedAt, *tags, *linkedIds", folders: "id, position", tombstones: "id", prefs: "key", files: "id, unusedSince", fileData: "id" });
+    try { await newer.open(); } finally { newer.close(); }
+  }
+  window.history.replaceState(null, "", "?quick-add");
+  render(<StrictMode><App /></StrictMode>);
+  await screen.findByRole("dialog", { name: "Quick add" });
+  await waitFor(() => expect(screen.getByRole("button", { name: "Cancel" }).disabled).toBe(false));
+  expect(window.location.search).toBe("");
+  expect(window.history.state[NAVIGATION_KEY].stack).toHaveLength(2);
+  expect(screen.getByLabelText("Text to add").disabled).toBe(readOnly);
+  if (readOnly) expect(screen.getByText("Your notes are read-only right now, so nothing can be added.")).toBeTruthy();
+});
+it.each([false, true])("waits for a Quick add draft before an external update (same turn: %s)", async (sameTurn) => {
+  await quickFixture(); await start(); await holdNew();
+  if (!sameTurn) fireEvent.change(screen.getByLabelText("Text to add"), { target: { value: "Unsent line" } });
+  const reload = vi.fn(), realWindow = window;
+  const stub = Object.create(realWindow);
+  Object.defineProperty(stub, "location", { value: { reload } });
+  vi.stubGlobal("window", stub);
+  act(() => {
+    if (sameTurn) fireEvent.change(screen.getByLabelText("Text to add"), { target: { value: "Unsent line" } });
+    pwa.options.onNeedReload();
+  });
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
+  expect(reload).not.toHaveBeenCalled();
+  expect(screen.getByText("Waiting for your quick add.")).toBeTruthy();
+  expect(screen.getByLabelText("Text to add").disabled).toBe(false);
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+  await waitFor(() => expect(reload).toHaveBeenCalledOnce());
+  vi.unstubAllGlobals();
+});
+it("removes a note from the chips after Quick add is turned off", async () => {
+  await quickFixture(); await start(); await holdNew();
+  expect(screen.getByRole("radio", { name: "Quick fixture" })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  await openNote("Quick fixture"); fireEvent.click(screen.getByRole("button", { name: "Note options" }));
+  fireEvent.click(screen.getByRole("switch", { name: "Quick add" }));
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" })); await back(); await holdNew();
+  expect(screen.queryByRole("radio")).toBeNull();
+  expect(screen.getByText("Turn on Quick add in a note's ⋯ menu to list it here.")).toBeTruthy();
 });

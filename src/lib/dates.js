@@ -5,7 +5,7 @@ export function nowIso() {
 // The app's own words are English, so dates use en-GB ("16 Oct 2026") on every device.
 const sameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 const time = (date) => date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-const dayMonth = (date) => date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+export const dayMonth = (date) => date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 const fullDate = (date) => date.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 
 /** The notes list: "14:02" today, "16 Oct" this year, "16 Oct 2025" before. */

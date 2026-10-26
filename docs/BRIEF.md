@@ -90,7 +90,11 @@ backup); local-first in IndexedDB, works offline.
 - "Collect" selection: tap several non-adjacent words, apply one formatting to all (mobile
   browsers cannot select non-contiguous ranges natively).
 - Comments / sticky notes attached to a passage, hidden by default.
-- Android share-sheet target ("Share → Notes").
+- Android share-sheet target ("Share → Notes"); from 0.4.9 it would open the Quick add sheet
+  with the shared text (2026-10-26).
+- A count of unsorted Inbox items on the notes list, as a nudge to review (2026-10-26).
+- Claude "file my Inbox items": a Tidy pass that proposes a destination note and section for each
+  Inbox line, approved as a set (2026-10-26). Only if sorting by hand turns out to be a chore.
 
 ## 6. Non-goals
 

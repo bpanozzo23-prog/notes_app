@@ -151,3 +151,17 @@ it("purgeNow refuses a live note and rolls back deletion if tombstone creation f
   expect(await purgeNow(target.id)).toBe(1);
   await expect(purgeNow(target.id)).rejects.toThrow("does not exist");
 });
+
+it("defaults Quick add switches off and saves them without moving Edited", async () => {
+  clock();
+  const note = await createNote();
+  expect(note).toMatchObject({ quickAdd: false, addDate: false });
+  vi.setSystemTime(Date.now() + 1000);
+  const next = await updateNote(note.id, { quickAdd: true, addDate: true });
+  expect(next).toMatchObject({ quickAdd: true, addDate: true, rev: note.rev + 1, updatedAt: note.updatedAt });
+  expect(isContentEdit({ quickAdd: true, addDate: true }, note)).toBe(false);
+});
+it.each(["quickAdd", "addDate"])("requires boolean %s", async (field) => {
+  const note = await createNote();
+  for (const value of [null, undefined, 1, "true", {}]) await expect(updateNote(note.id, { [field]: value })).rejects.toThrow(`${field} must be a boolean`);
+});

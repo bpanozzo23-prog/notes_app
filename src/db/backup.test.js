@@ -329,3 +329,20 @@ it("exports safely with a stored key; import deletes Undo and keeps local creden
   await importBackup(backupFixture());
   expect(await allPrefs()).toEqual({ claudeApiKey: preferences.claudeApiKey, claudeEnabled: true, claudeSpend: preferences.claudeSpend, notebookGeneration: expect.any(String) });
 });
+
+it("round-trips Quick add switches but never exports the device's last chip", async () => {
+  const note = await createNote();
+  await updateNote(note.id, { quickAdd: true, addDate: true });
+  await setPref("quickAddLast", note.id);
+  const envelope = await buildBackup();
+  expect(envelope.preferences).not.toHaveProperty("quickAddLast");
+  await importBackup(envelope);
+  expect(await db.notes.get(note.id)).toMatchObject({ quickAdd: true, addDate: true });
+  const validated = validateBackup({ ...envelope, preferences: { quickAddLast: "another-device" } });
+  expect(validated.errors).toEqual([]);
+  expect(validated.envelope.preferences).not.toHaveProperty("quickAddLast");
+});
+it.each(["quickAdd", "addDate"])("rejects a non-boolean %s in a backup", (field) => {
+  const validated = validateBackup(backupFixture({ schemaVersion: 6, files: [], notes: [noteFixture({ [field]: "true" })] }));
+  expect(validated.errors.some((error) => error.includes(`${field} must be a boolean`))).toBe(true);
+});

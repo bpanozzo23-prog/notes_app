@@ -339,3 +339,28 @@ it("uses visible viewport offset and measured dock height when stepping", async 
     expect(scroll).toHaveBeenLastCalledWith({ top: window.scrollY + 1010 - 200, behavior: "instant" });
   } finally { cleanup(); window.visualViewport = viewport; }
 });
+
+it("keeps Quick add switches open, schedules their patches, and leaves Edited alone", () => {
+  const save = queue(), note = noteFixture();
+  render(<Note initialNote={note} notes={[]} folders={[]} queue={save} />);
+  const dates = screen.getByText(/^Created /).textContent;
+  fireEvent.click(screen.getByRole("button", { name: "Note options" }));
+  const quick = screen.getByRole("switch", { name: "Quick add" }), date = screen.getByRole("switch", { name: "Add the date" });
+  expect(quick.getAttribute("aria-checked")).toBe("false"); expect(date.disabled).toBe(true);
+  fireEvent.click(quick);
+  expect(save.schedule).toHaveBeenLastCalledWith(note.id, { quickAdd: true });
+  expect(date.disabled).toBe(false); expect(quick.textContent).toContain("On");
+  fireEvent.click(date);
+  expect(save.schedule).toHaveBeenLastCalledWith(note.id, { addDate: true });
+  expect(date.getAttribute("aria-checked")).toBe("true");
+  expect(screen.getByRole("dialog", { name: "Note options" })).toBeTruthy();
+  expect(screen.getByText(/^Created /).textContent).toBe(dates);
+  fireEvent.click(quick); expect(date.disabled).toBe(true);
+});
+it.each([{ readOnly: true }, { busy: true }])("disables both switches when %j", (extra) => {
+  const props = { initialNote: noteFixture({ quickAdd: true }), notes: [], folders: [], queue: queue() };
+  const { rerender } = render(<Note {...props} />);
+  fireEvent.click(screen.getByRole("button", { name: "Note options" }));
+  rerender(<Note {...props} {...extra} />);
+  expect(screen.getAllByRole("switch").every((button) => button.disabled)).toBe(true);
+});

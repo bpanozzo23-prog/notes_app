@@ -1,8 +1,17 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
-import { afterEach, expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { afterEach, expect, it, vi } from "vitest";
 import Dialog from "./Dialog.jsx";
+import { OverlayNavigation } from "../lib/overlays.jsx";
 
 afterEach(() => { cleanup(); document.body.style.overflow = ""; });
+
+it("leaves routed dialog Back to history but still closes on Escape", () => {
+  const registerOverlay = vi.fn(), onClose = vi.fn();
+  render(<OverlayNavigation value={{ registerOverlay }}><Dialog title="Routed" routed onClose={onClose}>Content</Dialog></OverlayNavigation>);
+  expect(registerOverlay).not.toHaveBeenCalled();
+  fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+  expect(onClose).toHaveBeenCalledOnce();
+});
 
 it.each(["together", "outer first", "inner first"])("restores background locks when nested dialogs close %s", (order) => {
   document.body.style.overflow = "auto";

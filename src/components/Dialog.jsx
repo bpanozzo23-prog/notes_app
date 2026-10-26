@@ -37,8 +37,8 @@ export default function Dialog(props) {
   return useContext(DialogLock) ? null : <DialogPanel {...props} />;
 }
 
-function DialogPanel({ title, children, onClose, busy = false, sheet = false, fullScreen = false, fullWidth = false, descriptionId, footer }) {
-  useOverlay(true, onClose, busy);
+function DialogPanel({ title, children, onClose, busy = false, sheet = false, routed = false, fullScreen = false, fullWidth = false, descriptionId, footer }) {
+  useOverlay(!routed, onClose, busy);
   const titleId = useId();
   const panel = useRef(null);
   const layer = useRef(null);

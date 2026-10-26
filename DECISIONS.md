@@ -2048,3 +2048,82 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   23 live notes, 8 in Trash, 10 folders, 2 images, none missing, history fine, paired. Then
   pushed `main` (GitHub Pages deploys the app).
 
+## Quick add (0.4.9, 2026-10-26)
+
+- 2026-10-26 — The organisation system, after reading the owner's notebook with permission: **one
+  living note per topic with an "Inbox" line at the top; capture always goes to that Inbox; sorting,
+  splitting by subject and hub notes happen at review time, never at capture; logs (dated
+  entries) are the one case for a cutoff by period.** — After one week the notebook already had
+  one-line notes that should have been Inbox items and three notes on one subject, because a new
+  note is one tap and adding to the right note was five steps. Nothing from the notes went into
+  the repo beyond this summary.
+- 2026-10-26 — Owner's choices: **long-press +** on the notes list opens the Quick add sheet (a tap
+  still makes a new note); the sheet lists the notes with the **Quick add switch** on (Note
+  options ⋯), last-used one preselected; the line goes **under the note's Inbox, newest first**,
+  and an Inbox is **created at the top** when the note has none; **Add the date** is a per-note
+  switch, off by default; **folded** list lines and headings show a **count of hidden lines**; a
+  **home-screen shortcut** opens the sheet; the share-sheet target, an unsorted count in the list
+  and a Claude "file my Inbox items" pass are deferred to Tier 4 (`docs/BRIEF.md`). — Capture into
+  the right note must be as fast as starting a new one, and the decision "new note or existing"
+  belongs to review time, when the pile shows the answer.
+- 2026-10-26 — The two switches are **note fields** (`quickAdd`, `addDate`), booleans like `pinned`:
+  backed up, synced as part of the row, not content edits (`rev` up, Edited unchanged), absent on
+  older rows and read as false. — They survive a restore or a new phone with no setting to redo.
+  The XPS validator checks only the fields it lists, the store writes whole rows and the view
+  picks named fields, so no service change and no format bump; the switches reach the XPS
+  history like any revision, and a flip never asks for the cross-generation confirmation
+  (`CONTENT_FIELDS` in `server/guard.mjs`). Conflict copies and merges don't carry them.
+- 2026-10-26 — Quick add is a **headless ProseMirror insertion** on the stored HTML (the links
+  step's `documentFor`/`serializeBody` path, `documentFor` now shared from `src/claude/html.js`),
+  written in one guarded read-modify-write transaction through `writeNoteInTransaction`, after
+  flushing the save queue. Not the Claude Apply path. — One transaction leaves no gap for a
+  revision race, so no retry and no conflict copy; the note is never open in an editor while the
+  list shows. Only an insertion happens: every other node, attribute and fold is untouched
+  (tested against a note with every supported format). Added text is stored in its parse-stable
+  form (runs of spaces collapsed, lines trimmed), so a later add never rewrites an earlier line
+  *(final Codex review)*.
+- 2026-10-26 — Placement rule: the first list line or heading whose text is exactly "Inbox"
+  (case-insensitive). A bullet list right after it takes the new item first; otherwise a new
+  bullet list goes right after the Inbox line, leaving numbered or task sublists and paragraphs
+  where they are. No Inbox: one is created at position 0. The added line is one bullet; newlines
+  become line breaks. — One rule the owner can predict; numbered and task lists cannot take a
+  plain bullet item *(Codex plan review)*.
+- 2026-10-26 — The open sheet is a **pushed history entry** (`list` entry with `quickAdd: true`,
+  allowed only above the root), not an overlay; `Dialog` gains `routed` to skip overlay
+  registration. A shortcut launch (`?quick-add`) strips the parameter at once and passes a flag
+  into `restore`, since the boot task holds the navigation lock *(Codex plan review:
+  `openQuickAdd` would have returned false there)*. A reload or Forward shows the empty sheet
+  again. After an Add, the sheet closes only if its own entry is still active *(Codex: `run`
+  already settles a Back that arrived during the write; a second Back would reset the root's
+  filter)*. Repairing a deleted-folder filter keeps the sheet. — On the root list there is no
+  entry to pop, so Android Back would have closed the installed app instead of the sheet.
+- 2026-10-26 — A non-blank draft in the sheet **blocks the automatic update reload** and the lock
+  that comes with it, like an open Claude conversation; the explicit Reload stays available
+  *(Codex plan review)*. — The draft is not in the save queue, so the existing flush-then-reload
+  would have dropped it.
+- 2026-10-26 — Fold counts appear **only on folded lines**: `data-count` on the list toggle widget
+  (its decoration key includes the count) and on the heading's "…" marker via the node
+  decoration's attributes, never in the document; shared `leafLines` in `src/editor/nodes/fold.js`
+  counts textblocks and images. — This keeps the 2026-10-22 reason intact: nothing can be typed
+  under a folded line, so the toggle never redraws beside typing. Checklist toggles sit under
+  `li > div` and are covered too *(Codex)*.
+- 2026-10-26 — A `useLongPress` hook for the + button copies ActionButton's timing (500 ms, 10 px,
+  swallowed click) without its focus-keeping `preventDefault`; ActionButton itself is unchanged.
+  — The toolbar's long-press is heavily tested; folding the two together is a later tidy.
+- 2026-10-26 — The sample notebook gets no new note; "Libros por leer" and "Recordatorio suelto"
+  carry the switches. — The links tests and handle order depend on exactly 18 live notes *(Codex
+  plan review)*.
+- 2026-10-26 — Provenance: Claude Code drafted the plan after a fresh-model brainstorm and the
+  owner's notebook review; Codex reviewed it read-only (xhigh; two blockers, eight findings, all
+  folded in); Codex implemented; Claude reviewed, ran the checks and wrote the docs; final
+  read-only Codex review (one P2, two P3, all addressed); fixes by Claude.
+- 2026-10-26 — **Review fix (Claude): `pointerleave` only ends the hold.** Codex's hook treated
+  it as a suppressing cancel; on touch the browser fires `pointerleave` between `pointerup` and
+  `click`, so every tap on + would have been swallowed on the phone. Mouse-driven shots could
+  not show it; a test now replays the touch order. Also: the checklist shot locator keyed off
+  the parent `ul[data-type="taskList"]` (the editor's checklist `li` carries no `data-type`), and
+  the quick-add shots moved to 194–194e (40 was taken).
+- 2026-10-26 — Verification: 100 test files / 2,637 tests, build; `npm run shots` 236 PNGs (read
+  194–194e, 12o–12q, 04-list); `npm run browser-checks` 18/18, including the manifest shortcut
+  and the `?quick-add` launch online and offline. Not seen: the phone (long-press under Samsung
+  Keyboard, the sheet above the keyboard, Back, the home-screen shortcut).

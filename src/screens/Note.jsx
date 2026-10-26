@@ -1,6 +1,6 @@
 import { captureSplitPayload } from "../claude/split.js";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
-import { Pin, Trash2, Sparkles, Copy, Ellipsis, ChevronsDownUp, ChevronsUpDown } from "lucide-react";
+import { Pin, Trash2, Sparkles, Copy, Ellipsis, ChevronsDownUp, ChevronsUpDown, ListPlus, CalendarDays } from "lucide-react";
 import { db } from "../db/db.js";
 import { isContentEdit, liveNotes } from "../db/notes.js";
 import { allFolders } from "../db/folders.js";
@@ -129,6 +129,9 @@ export default function Note({ find, findShown, onFindShown, onClearFind, initia
     {optionsSheet && <Dialog title="Note options" sheet busy={busy} onClose={() => setOptionsSheet(false)}>
       <div className="space-y-1">
         <button className="flex min-h-11 w-full items-center gap-3 rounded px-2 text-left hover:bg-black/5" disabled={busy} onClick={async () => { await run(copyAsText); setOptionsSheet(false); }}><Copy size={18} aria-hidden="true" />Copy as text</button>
+        {[["quickAdd", "Quick add", ListPlus], ["addDate", "Add the date", CalendarDays]].map(([field, label, Icon]) => <button key={field} role="switch" aria-label={label} aria-checked={!!note[field]}
+          className="flex min-h-11 w-full items-center gap-3 rounded px-2 text-left hover:bg-black/5" disabled={readOnly || busy || (field === "addDate" && !note.quickAdd)}
+          onClick={() => edit({ [field]: !note[field] })}><Icon size={18} aria-hidden="true" />{label}<span className="ml-auto text-sm text-[var(--color-muted)]">{note[field] ? "On" : "Off"}</span></button>)}
         {[[true, "Fold all sections", ChevronsDownUp], [false, "Unfold all sections", ChevronsUpDown]].map(([fold, label, Icon]) => <button key={label} className="flex min-h-11 w-full items-center gap-3 rounded px-2 text-left hover:bg-black/5" disabled={readOnly || busy || !editorRef.current || !headingSections(editorRef.current.state.doc).some(({ foldable }) => foldable)} onClick={() => { foldAllHeadings(editorRef.current.view, fold); setOptionsSheet(false); }}><Icon size={18} aria-hidden="true" />{label}</button>)}
         <button className="flex min-h-11 w-full items-center gap-3 rounded px-2 text-left text-red-700 hover:bg-black/5" disabled={readOnly || busy} onClick={() => { setOptionsSheet(false); setConfirmDelete(true); }}><Trash2 size={18} aria-hidden="true" />Move to Trash…</button>
       </div>

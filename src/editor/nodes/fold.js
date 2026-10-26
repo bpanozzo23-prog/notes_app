@@ -2,6 +2,13 @@
 export const FOLD_META = "fold";
 export const foldTransaction = (tr) => tr.setMeta(FOLD_META, true).setMeta("addToHistory", false).setMeta("skipTrailingNode", true);
 
+export function leafLines(node) {
+  if (node.isTextblock || node.type.name === "image") return 1;
+  let count = 0;
+  node.forEach((child) => { count += leafLines(child); });
+  return count;
+}
+
 // Ranges each transaction changed, expressed in the final document.
 export function changedRanges(transactions) {
   let ranges = [];

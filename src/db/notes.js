@@ -13,7 +13,7 @@ export const withoutCollapse = (html) => typeof html === "string" ? html.replace
 const sameField = (key, a, b) => key === "html" ? withoutCollapse(a) === withoutCollapse(b) : JSON.stringify(a) === JSON.stringify(b);
 /** True when the patch changes a note's content (not pinning, Trash or a collapsed list line or heading). */
 export const isContentEdit = (patch, note) => EDIT_FIELDS.some((key) => Object.hasOwn(patch, key) && !sameField(key, patch[key], note?.[key]));
-const WRITE_FIELDS = [...EDIT_FIELDS, "pinned", "deletedAt"];
+const WRITE_FIELDS = [...EDIT_FIELDS, "pinned", "quickAdd", "addDate", "deletedAt"];
 export const TRASH_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 function cleanPatch(patch) {
@@ -33,7 +33,9 @@ function cleanPatch(patch) {
     }
     clean.tags = [...new Set(clean.tags.map((tag) => tag.trim()).filter(Boolean))];
   }
-  if (Object.hasOwn(clean, "pinned") && typeof clean.pinned !== "boolean") throw new Error("pinned must be a boolean");
+  for (const key of ["pinned", "quickAdd", "addDate"]) {
+    if (Object.hasOwn(clean, key) && typeof clean[key] !== "boolean") throw new Error(`${key} must be a boolean`);
+  }
   if (Object.hasOwn(clean, "deletedAt") && clean.deletedAt !== null &&
       (typeof clean.deletedAt !== "string" || !Number.isFinite(Date.parse(clean.deletedAt)))) {
     throw new Error("deletedAt must be a timestamp or null");
@@ -52,7 +54,7 @@ async function checkFolder(folderId) {
 export async function createNote({ folderId = null, title = "", html = "<p></p>" } = {}) {
   const at = nowIso();
   const note = {
-    id: newId(), ...cleanPatch({ title, html, folderId }), tags: [], pinned: false, rev: 1,
+    id: newId(), ...cleanPatch({ title, html, folderId }), tags: [], pinned: false, quickAdd: false, addDate: false, rev: 1,
     createdAt: at, updatedAt: at, deletedAt: null,
   };
   await writeTransaction([db.notes, db.folders, db.files], async () => {
@@ -67,7 +69,7 @@ export async function createNote({ folderId = null, title = "", html = "<p></p>"
 export async function insertNoteInTransaction({ id, title, html, folderId, tags }) {
   const at = nowIso(), clean = cleanPatch({ title, html, folderId, tags });
   await checkFolder(folderId);
-  const note = { id, ...clean, pinned: false, rev: 1, createdAt: at, updatedAt: at, deletedAt: null };
+  const note = { id, ...clean, pinned: false, quickAdd: false, addDate: false, rev: 1, createdAt: at, updatedAt: at, deletedAt: null };
   await db.notes.add(note);
   await clearReferencedFileMarks(note.html);
   return note;

@@ -334,3 +334,40 @@ it("allowlists find only on notes, sanitises it, and accepts only a true findSho
   expect(activeEntry(push(initialNavigation(), "note", "n", { noteId: "n", find: " cat ", findShown: "true" }))).toEqual({ screen: "note", key: "n", noteId: "n", find: "cat", scrollY: 0 });
   expect(activeEntry(push(initialNavigation(), "settings", "s", { find: "cat", findShown: true }))).not.toHaveProperty("find");
 });
+
+it("keeps Quick add only on non-root list entries and copies the nearest list's filter/query and scroll", () => {
+  const root = navigationReducer(initialNavigation(), { type: "filter", filter: { type: "tag", value: "reading" }, query: "book" });
+  root.stack[0].quickAdd = true;
+  expect(activeEntry(sanitizeNavigation(root))).not.toHaveProperty("quickAdd");
+  const note = push(root, "note", "note", { noteId: "id", quickAdd: true });
+  expect(activeEntry(note)).not.toHaveProperty("quickAdd");
+  const added = navigationReducer(note, { type: "quickAdd", scrollY: 312 });
+  expect(activeEntry(added)).toMatchObject({ screen: "list", quickAdd: true, query: "book", filter: { type: "tag", value: "reading" }, scrollY: 312 });
+  expect(sanitizeNavigation(added)).toEqual(added);
+});
+it("restores a shortcut inside the boot lock, pushes once, and pops back to its root", async () => {
+  const listeners = new Map(), history = [null]; let index = 0;
+  const win = { scrollY: 140, scrollTo: vi.fn(), addEventListener: (event, callback) => listeners.set(event, callback), removeEventListener: (event) => listeners.delete(event),
+    history: { get state() { return history[index]; }, replaceState: (state) => { history[index] = state; },
+      pushState: (state) => { history[++index] = state; }, back: () => listeners.get("popstate")({ state: history[--index] }) } };
+  const data = { notes: [], folders: [] };
+  const nav = createNavigationController({ win, prepare: async () => data, onChange: vi.fn(), onBusy: vi.fn(), onError: vi.fn() });
+  const stop = nav.start();
+  try {
+    nav.setFilter({ type: "tag", value: "books" }); nav.setQuery("read");
+    await nav.run(async () => nav.restore(data, { quickAdd: true }));
+    expect(index).toBe(1);
+    expect(activeEntry(nav.current)).toMatchObject({ quickAdd: true, query: "read", scrollY: 140 });
+    expect(sanitizeNavigation(win.history.state[NAVIGATION_KEY])).toEqual(nav.current);
+    nav.back(); await waitFor(() => expect(nav.current.stack).toHaveLength(1));
+    expect(activeEntry(nav.current)).toMatchObject({ key: "root", query: "read", filter: { type: "tag", value: "books" } });
+    await nav.openQuickAdd(); expect(index).toBe(1);
+    expect(activeEntry(nav.current).quickAdd).toBe(true);
+  } finally { stop(); }
+});
+
+it("keeps the Quick add sheet when a deleted folder filter is repaired", () => {
+  const filtered = navigationReducer(initialNavigation(), { type: "filter", filter: { type: "folder", value: "gone" }, query: "book" });
+  const sheet = navigationReducer(filtered, { type: "quickAdd", scrollY: 100 });
+  expect(activeEntry(resolveDestination(sheet, { notes: [], folders: [] }))).toMatchObject({ quickAdd: true, filter: { type: "all" }, query: "book" });
+});

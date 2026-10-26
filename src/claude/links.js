@@ -1,11 +1,10 @@
-import { Node } from "@tiptap/pm/model";
 import { Transform } from "@tiptap/pm/transform";
 import { db } from "../db/db.js";
 import { checkGeneration, deepFreeze } from "./payload.js";
 import { noteTitle } from "../lib/notebookView.js";
 import { extractNoteLinks } from "../lib/text.js";
 import { noteToClaudeText } from "./projection.js";
-import { noteSchema, parseBody, serializeBody, withTrailingParagraph } from "./html.js";
+import { noteSchema, documentFor, serializeBody, withTrailingParagraph } from "./html.js";
 import { nullableString, shape, runProposal } from "./proposals.js";
 import { LINKS_SYSTEM_PROMPT } from "./prompts.js";
 import { CLAUDE_MODEL, PROPOSAL_EFFORT, PROPOSAL_MAX_TOKENS } from "./config.js";
@@ -37,7 +36,6 @@ export function buildLinksRequest(payload) {
   return { model: CLAUDE_MODEL, max_tokens: PROPOSAL_MAX_TOKENS, output_config: { effort: PROPOSAL_EFFORT, format: { type: "json_schema", schema: LINKS_SCHEMA } },
     system: payload.system, messages: [{ role: "user", content: payload.requestText }] };
 }
-const documentFor = (html) => Node.fromJSON(noteSchema, parseBody(html));
 export function findLinkPlacement(html, phrase) {
   if (!phrase) return { kind: "see-also" };
   const matches = [];

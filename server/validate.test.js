@@ -106,3 +106,8 @@ it.each(["applied", "kept", "dismissed", "stale"])("accepts the outcome %s with 
     expect(() => validateOutcomes([{ proposal: "p", hash: "a".repeat(64), outcome, at: AT, applied }])).not.toThrow();
   }
 });
+
+it("accepts Quick add and date switches as ordinary note fields", () => {
+  const payload = push([note({ quickAdd: true, addDate: true })]);
+  expect(() => validatePush(payload)).not.toThrow();
+});

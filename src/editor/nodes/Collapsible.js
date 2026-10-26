@@ -1,5 +1,5 @@
 import { Extension, getRenderedAttributes, getSplittedAttributes } from "@tiptap/core";
-import { FOLD_META, foldTransaction, changedRanges } from "./fold.js";
+import { FOLD_META, foldTransaction, changedRanges, leafLines } from "./fold.js";
 import ListItem from "@tiptap/extension-list-item";
 import { Plugin, PluginKey, TextSelection } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
@@ -31,14 +31,15 @@ export function toggleCollapsed(view, pos) {
   return true;
 }
 
-function toggleButton(view, getPos) {
+function toggleButton(view, getPos, count) {
   const button = document.createElement("button");
   button.type = "button";
   button.tabIndex = -1;
   button.contentEditable = "false";
   button.className = "collapse-toggle";
+  if (count !== undefined) button.dataset.count = String(count);
   // No text inside: the −/+ is drawn by CSS from the line's data-collapsed, so the phone
-  // keyboard's predictions never read it, and toggling never redraws this element.
+  // keyboard's predictions never read the toggle or its count.
   button.setAttribute("aria-label", "Show or hide the lines under this one");
   // Keep focus where it is: with the keyboard closed a tap must not open it, and vice versa.
   // Same as the toolbar buttons: cancel the press, never the touch. Cancelling touchstart
@@ -56,8 +57,11 @@ function toggleButton(view, getPos) {
 function toggles(doc) {
   const decorations = [];
   doc.descendants((node, pos) => {
-    if (hasSubLines(node)) decorations.push(Decoration.widget(pos + 1, toggleButton,
-      { side: -1, ignoreSelection: true, stopEvent: () => true, key: "collapse-toggle" }));
+    if (hasSubLines(node)) {
+      const count = node.attrs.collapsed ? leafLines(node) - leafLines(node.firstChild) : undefined;
+      decorations.push(Decoration.widget(pos + 1, (view, getPos) => toggleButton(view, getPos, count),
+        { side: -1, ignoreSelection: true, stopEvent: () => true, key: count === undefined ? "collapse-toggle" : `collapse-toggle-${count}` }));
+    }
   });
   return DecorationSet.create(doc, decorations);
 }

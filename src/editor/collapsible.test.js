@@ -220,3 +220,26 @@ describe("hidden lines never stay hidden around the cursor or a change", () => {
     expect(editor.state.doc.firstChild.child(0).firstChild.textContent).toBe("Parents");
   });
 });
+
+it.each([[BULLETS, 2], [NUMBERED, 1], [TASKS, 1]])("counts hidden leaf blocks only when folded: %s", (content, count) => {
+  const editor = editorFor(content);
+  const widget = () => editor.state.plugins.find((plugin) => plugin.key.startsWith("collapsible$")).getState(editor.state).find()[0];
+  expect(editor.view.dom.querySelector(".collapse-toggle").hasAttribute("data-count")).toBe(false);
+  expect(widget().spec.key).toBe("collapse-toggle");
+  toggle(editor, "Parent");
+  expect(editor.view.dom.querySelector(".collapse-toggle").dataset.count).toBe(String(count));
+  expect(widget().spec.key).toBe(`collapse-toggle-${count}`);
+  expect(editor.getHTML()).not.toContain("data-count");
+  toggle(editor, "Parent");
+  expect(editor.view.dom.querySelector(".collapse-toggle").hasAttribute("data-count")).toBe(false);
+});
+it("counts paragraphs and images in hidden children and redraws the widget when that count changes", () => {
+  const editor = editorFor('<ul><li data-collapsed="true"><p>Parent</p><p>Second</p><img data-file="fixture"><ul><li><p>Nested</p><p>Extra</p></li></ul></li></ul><p></p>');
+  const button = editor.view.dom.querySelector(".collapse-toggle");
+  expect(button.dataset.count).toBe("4");
+  const at = itemPos(editor, "Parent") + editor.state.doc.nodeAt(itemPos(editor, "Parent")).nodeSize - 1;
+  editor.view.dispatch(editor.state.tr.insert(at, editor.schema.nodes.paragraph.create(null, editor.schema.text("Added"))).setMeta("fold", true).setMeta("skipTrailingNode", true));
+  const next = editor.view.dom.querySelector(".collapse-toggle");
+  expect(next).not.toBe(button); expect(next.dataset.count).toBe("5");
+  expect(editor.getHTML()).not.toContain("data-count");
+});

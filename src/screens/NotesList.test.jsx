@@ -95,3 +95,20 @@ it("shows a matching snippet with bold words and passes find, keeping the row's 
   view.rerender(<NotesList {...props} />);
   expect(row.querySelector(".truncate.text-sm").textContent).toBe("Opening line Un niño toma café Last line");
 });
+
+it.each(["hold", "tap", "move", "disabled", "read-only"])("handles the New note FAB's %s gesture", (gesture) => {
+  vi.useFakeTimers();
+  try {
+    const onNew = vi.fn(), onQuickAdd = vi.fn();
+    render(<NotesList notes={[]} folders={[]} filter={{ type: "all" }} onNew={onNew} onQuickAdd={onQuickAdd} busy={gesture === "disabled"} readOnly={gesture === "read-only"} />);
+    const button = screen.getByRole("button", { name: "+ New note" });
+    expect(button.title).toBe("Tap: new note. Hold: quick add");
+    expect(fireEvent.contextMenu(button)).toBe(false);
+    fireEvent.pointerDown(button, { button: 0, pointerId: 1, clientX: 20, clientY: 30 });
+    if (gesture === "move") fireEvent.pointerMove(button, { clientX: 31, clientY: 30 });
+    vi.advanceTimersByTime(gesture === "tap" ? 499 : 500);
+    fireEvent.pointerUp(button); fireEvent.click(button);
+    expect(onNew).toHaveBeenCalledTimes(gesture === "tap" ? 1 : 0);
+    expect(onQuickAdd).toHaveBeenCalledTimes(gesture === "hold" ? 1 : 0);
+  } finally { cleanup(); vi.useRealTimers(); }
+});

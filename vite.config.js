@@ -16,6 +16,8 @@ export default defineConfig({
     manifest: {
       name: "Notes", short_name: "Notes", description: "Personal notes",
       display: "standalone", background_color: "#faf9f6", theme_color: "#faf9f6",
+      shortcuts: [{ name: "Quick add", short_name: "Quick add", description: "Add a line to one of your notes", url: "./?quick-add",
+        icons: [{ src: "icons/icon-192.png", sizes: "192x192", type: "image/png" }] }],
       icons: [
         { src: "icons/icon-192.png", sizes: "192x192", type: "image/png" },
         { src: "icons/icon-512.png", sizes: "512x512", type: "image/png" },

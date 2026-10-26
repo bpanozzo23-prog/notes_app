@@ -19,7 +19,7 @@ export const COMFORTABLE_BACKUP_BYTES = 150 * 1024 * 1024;
 const V1_EXPORTED_PREFS = Object.freeze(["lastBackupAt", "toolbar"]);
 export const EXPORTED_PREFS = Object.freeze(["lastBackupAt", ...FORMATTING_KEYS]);
 // Device-local preferences that older backups contained: accepted with a warning, never restored.
-export const IGNORED_PREFS = Object.freeze(["storagePersisted", claudeEnabled, claudeSpend, claudeLastChange, syncAddress, syncOutbox, syncHandled]);
+export const IGNORED_PREFS = Object.freeze(["storagePersisted", "quickAddLast", claudeEnabled, claudeSpend, claudeLastChange, syncAddress, syncOutbox, syncHandled]);
 export const BACKUP_FORMAT = "notes_app-backup";
 
 async function readBackupRows(includeData = false) {
@@ -133,6 +133,11 @@ function validateV1(envelope, errors, warnings) {
 function validateV2(envelope, errors, warnings) {
   // Run exactly the v1 table checks, then handle v2's cosmetic preferences separately.
   validateV1({ ...envelope, preferences: isObject(envelope.preferences) ? {} : envelope.preferences }, errors, warnings);
+  if (Array.isArray(envelope.notes)) envelope.notes.forEach((note, index) => {
+    for (const key of ["quickAdd", "addDate"]) {
+      if (isObject(note) && Object.hasOwn(note, key) && typeof note[key] !== "boolean") errors.push(`notes[${index}].${key} must be a boolean.`);
+    }
+  });
   if (!isObject(envelope.preferences)) return;
   for (const [key, value] of Object.entries(envelope.preferences)) {
     if (IGNORED_PREFS.includes(key)) {

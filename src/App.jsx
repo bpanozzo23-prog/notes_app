@@ -2,6 +2,9 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalS
 import { useRegisterSW } from "virtual:pwa-register/react";
 import { createNote, createConflictCopy, NoteChangedElsewhereError, purgeExpired, trashNote, updateNote } from "./db/notes.js";
 import { cleanupFiles } from "./db/files.js";
+import { quickAddToNote } from "./db/quickAdd.js";
+import { noteTitle } from "./lib/notebookView.js";
+import QuickAddSheet from "./components/QuickAddSheet.jsx";
 import { SaveQueue } from "./lib/saveQueue.js";
 import { requestPersistence } from "./lib/persistence.js";
 import useNotebook from "./lib/useNotebook.js";
@@ -57,6 +60,7 @@ export default function App() {
   const [databaseUpdateError, setDatabaseUpdateError] = useState(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [quickAddDraft, setQuickAddDraft] = useState(false);
   const [waitingForReload, setWaitingForReload] = useState(false);
   const [workerReady, setWorkerReady] = useState(false);
   const activatedWorker = useRef(false);
@@ -87,6 +91,8 @@ export default function App() {
     });
     // The blank boot screen's scroll must not overwrite the saved visit before rows load.
     void nav.run(async () => {
+      const quickAdd = new URLSearchParams(window.location.search).has("quick-add");
+      if (quickAdd) window.history.replaceState(window.history.state, "", window.location.pathname);
       // index.html shows this step if the app hasn't finished opening after a few seconds.
       const boot = window.__notesBoot ?? {};
       try {
@@ -100,7 +106,7 @@ export default function App() {
           catch (error) { setCleanupError(error.message || "Image cleanup failed."); }
         }
         boot.step = "loading the notes";
-        nav.restore(await refresh());
+        nav.restore(await refresh(), { quickAdd });
         void getClaudeStatus().then((status) => { if (status.ready) return loadClaudeSdk(); }).catch(() => {});
         boot.step = "drawing the app";
         setReady(true);
@@ -148,13 +154,13 @@ export default function App() {
 
   // Consume once; a failed flush stays visible until an explicit retry, never a reload loop.
   useEffect(() => {
-    if (!workerReady || busy || access.versionChange || access.replaced || claudeBusy || (claudeHasContent && !explicitReload.current)) return;
+    if (!workerReady || busy || access.versionChange || access.replaced || claudeBusy || ((claudeHasContent || quickAddDraft) && !explicitReload.current)) return;
     setWorkerReady(false);
     void nav.run(async () => {
-      try { await queue.flush(); if (!claudeSession.isBusy() && (!claudeSession.hasContent() || explicitReload.current)) window.location.reload(); }
+      try { await queue.flush(); if (!claudeSession.isBusy() && ((!claudeSession.hasContent() && !quickAddDraft) || explicitReload.current)) window.location.reload(); }
       finally { explicitReload.current = false; setWaitingForReload(false); }
     });
-  }, [workerReady, busy, nav, queue, access.versionChange, access.replaced, claudeBusy, claudeHasContent]);
+  }, [workerReady, busy, nav, queue, access.versionChange, access.replaced, claudeBusy, claudeHasContent, quickAddDraft]);
 
   function run(task) {
     setMessage(""); setError("");
@@ -172,6 +178,18 @@ export default function App() {
     } catch (error) { setError(error.message || "Couldn't open that note. Try again."); }
   }
   function back() { setMessage(""); setError(""); nav.back(); }
+  function openQuickAdd() { setMessage(""); setError(""); void nav.openQuickAdd(); }
+  async function addToNote(id, text) {
+    const key = activeEntry(nav.current).key;
+    let added;
+    const success = await run(async () => { await queue.flush(); added = await quickAddToNote(id, text); await refresh(); });
+    // run has already settled a Back that arrived during the write; never pop twice.
+    if (success) {
+      setMessage(`Added to “${noteTitle(added)}”`);
+      if (activeEntry(nav.current).key === key) nav.back();
+    }
+    return success;
+  }
   async function newNote() {
     await queue.flush();
     const currentFilter = activeEntry(nav.current).filter;
@@ -186,7 +204,7 @@ export default function App() {
   }
   const saveBlocksReload = ["pending", "saving", "error"].includes(status);
   const reloadReason = [status === "error" ? "Save failed. Retry save before reloading." : saveBlocksReload ? "Waiting for your notes to save." : "",
-    claudeBusy ? "Waiting for Claude's answer." : ""].filter(Boolean).join(" ");
+    claudeBusy ? "Waiting for Claude's answer." : "", quickAddDraft ? "Waiting for your quick add." : ""].filter(Boolean).join(" ");
   const updateState = registrationError ? `Offline setup: ${registrationError}` : needRefresh || activatedWorker.current
     ? `Update available.${reloadReason ? ` ${reloadReason}` : " Ready to reload."}` : offlineReady ? "Ready to work offline" : "No update waiting.";
   async function reload() {
@@ -206,7 +224,7 @@ export default function App() {
       }
     });
   }
-  const locked = busy || !ready || waitingForReload || (workerReady && !claudeHasContent && !claudeBusy) || !!access.versionChange || access.replaced;
+  const locked = busy || !ready || waitingForReload || (workerReady && !claudeHasContent && !claudeBusy && !quickAddDraft) || !!access.versionChange || access.replaced;
   const shared = { busy: locked, readOnly: access.readOnly, onBack: back, run, refresh, error };
   const guardMessage = access.replaced ? new NotebookReplacedError().message : access.readOnly ? new ReadOnlyNotebookError().message
     : access.versionChange === "closed" ? DATABASE_UPDATED : "";
@@ -237,7 +255,8 @@ export default function App() {
     {ready && <ClaudeReadyBar screen={route.screen} onOpen={open} busy={locked} />}
     {ready && route.screen === "list" && <SyncBar onOpen={open} busy={locked} />}
     {ready && <div className="flex flex-1 flex-col" inert={locked} aria-busy={locked}>
-      {route.screen === "list" && <NotesList key={route.key} {...notebook} busy={locked} readOnly={access.readOnly} trashCount={notebook.trash.length} filter={route.filter} query={route.query} onQuery={nav.setQuery} onFilter={nav.setFilter} claudeReady={claudeReady} onOpen={open} onNew={() => run(newNote)} />}
+      {route.screen === "list" && <NotesList key={route.key} {...notebook} busy={locked} readOnly={access.readOnly} trashCount={notebook.trash.length} filter={route.filter} query={route.query} onQuery={nav.setQuery} onFilter={nav.setFilter} claudeReady={claudeReady} onOpen={open} onNew={() => run(newNote)} onQuickAdd={openQuickAdd} />}
+      {route.screen === "list" && route.quickAdd && <QuickAddSheet notes={notebook.notes} folders={notebook.folders} readOnly={access.readOnly} busy={locked} error={error} onClose={back} onAdd={addToNote} onDraft={setQuickAddDraft} />}
       {route.screen === "note" && selected && <Note key={route.key} {...shared} find={route.find} findShown={route.findShown} onFindShown={nav.setFindShown} onClearFind={nav.clearFind} onImageError={setMessage} initialNote={selected} notes={notebook.notes} folders={notebook.folders} queue={queue} status={status} onDelete={deleteNote} onOpenNote={openNote}
         formatting={formatting} claudeReady={claudeReady} onOpen={open} setMessage={setMessage} />}
       {route.screen === "claude-review" && <ClaudeReview openNote={openNote} {...notebook} {...shared} queue={queue} claudeReady={claudeReady} />}
