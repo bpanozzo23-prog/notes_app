@@ -22,7 +22,10 @@ export function toggleCollapsed(view, pos) {
   if (!node || !hasSubLines(node)) return false;
   const collapsed = !node.attrs.collapsed;
   const tr = view.state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, collapsed })
-    .setMeta("addToHistory", false).setMeta(META, true);
+    .setMeta("addToHistory", false).setMeta(META, true)
+    // Folding is only a view preference: do not append a paragraph (or move Edited)
+    // when an imported note ends in a list or heading. Tiptap's trailing-node opt-out.
+    .setMeta("skipTrailingNode", true);
   if (collapsed) {
     // The cursor must never be left inside lines that are about to be hidden.
     const hidden = hiddenRange(node, pos), { from, to } = tr.selection;

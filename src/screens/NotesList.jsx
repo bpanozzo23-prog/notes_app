@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Sparkles, Folder, Settings, Search, Plus, Pin, Trash2, X } from "lucide-react";
 import { claudeSession } from "../claude/session.js";
 import { noteTitle, searchNotes, tagsInUse, visibleNotes } from "../lib/notebookView.js";
+import { queryWords, snippet } from "../lib/searchMatch.js";
 import { shortDate } from "../lib/dates.js";
 
 export default function NotesList({ notes, folders, trashCount, filter, query = "", onQuery, onFilter, onOpen, onNew, busy, readOnly, claudeReady }) {
@@ -12,6 +13,7 @@ export default function NotesList({ notes, folders, trashCount, filter, query = 
   const chips = [{ label: "All", filter: { type: "all" } },
     ...folders.map((folder) => ({ label: folder.name, filter: { type: "folder", value: folder.id } })),
     ...tagsInUse(notes).map((tag) => ({ label: `#${tag}`, filter: { type: "tag", value: tag } }))];
+  const words = queryWords(query);
   const visible = visibleNotes(searchNotes(notes, query), filter);
   return <section className="pb-[calc(6rem+env(safe-area-inset-bottom))]">
     <header className="px-4 pt-3">
@@ -36,16 +38,18 @@ export default function NotesList({ notes, folders, trashCount, filter, query = 
         onClick={() => onFilter(chip.filter)}>{chip.label}</button>)}
     </div>
     <ul aria-label="Notes" className="divide-y divide-[var(--color-line)] px-4">
-      {visible.map((note) => <li key={note.id}>
-        <button aria-label={noteTitle(note)} className="block w-full py-4 text-left" disabled={busy} onClick={() => onOpen({ screen: "note", noteId: note.id })}>
+      {visible.map((note) => {
+        const extract = words.length ? snippet(note.text, words) : null;
+        return <li key={note.id}>
+        <button aria-label={noteTitle(note)} className="block w-full py-4 text-left" disabled={busy} onClick={() => onOpen({ screen: "note", noteId: note.id, ...(query ? { find: query } : {}) })}>
           <span className="flex items-center gap-2"><span className="min-w-0 flex-1 truncate font-medium">{noteTitle(note)}</span>{note.pinned && <Pin size={16} aria-label="Pinned" className="shrink-0 text-[var(--color-accent)]" />}</span>
-          <span className="mt-1 block truncate text-sm text-[var(--color-muted)]">{note.text.replace(/\s+/g, " ") || "Empty note"}</span>
+          <span className={`mt-1 text-sm text-[var(--color-muted)] ${extract ? "line-clamp-2" : "block truncate"}`}>{extract ? extract.parts.map((part, i) => part.match ? <mark className="search-snippet" key={i}>{part.text}</mark> : part.text) : note.text.replace(/\s+/g, " ") || "Empty note"}</span>
           <span className="mt-2 flex flex-wrap items-center gap-1 text-xs text-[var(--color-muted)]">
             <span className="mr-1 max-w-full truncate">{folders.find((folder) => folder.id === note.folderId)?.name ?? "No folder"}{shortDate(note.updatedAt) && ` · ${shortDate(note.updatedAt)}`}</span>
             {note.tags.map((tag) => <span key={tag} className="tag-chip max-w-full break-all px-2 py-0.5">#{tag}</span>)}
           </span>
         </button>
-      </li>)}
+      </li>; })}
     </ul>
     {!busy && !visible.length && <p className="px-4 py-10 text-center text-[var(--color-muted)]">{query ? "No notes match." : notes.length ? "No notes in this filter." : "No notes yet."}</p>}
     <button className="mx-4 mt-4 flex min-h-11 items-center gap-2 text-sm text-[var(--color-muted)]" disabled={busy} onClick={() => onOpen({ screen: "trash" })}>

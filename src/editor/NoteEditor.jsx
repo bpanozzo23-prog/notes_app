@@ -1,4 +1,7 @@
 import { useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { ChevronUp, ChevronDown, X } from "lucide-react";
+import { searchNotes } from "../lib/notebookView.js";
+import { setSearch, searchState, revealSearchMatch } from "./nodes/SearchHighlight.js";
 import { EditorContent, useEditor } from "@tiptap/react";
 import { extensions } from "./extensions.js";
 import ImageViewer from "./ImageViewer.jsx";
@@ -15,7 +18,7 @@ import { useVisibleViewport } from "./useToolbarSize.js";
 import { useOverlay } from "../lib/overlays.jsx";
 import { DialogLock } from "../components/Dialog.jsx";
 
-function NoteDocument({ queue, onImageError, note, onChange, toolbarIds, formatting, readOnly = false, busy = false, run, refresh, error, ui, onEditor }) {
+function NoteDocument({ find, findShown, onFindShown, onClearFind, queue, onImageError, note, onChange, toolbarIds, formatting, readOnly = false, busy = false, run, refresh, error, ui, onEditor }) {
   const input = useRef(null), pickerPosition = useRef(null), inserter = useRef(null);
   const [adding, setAdding] = useState(0), [imageErrors, setImageErrors] = useState([]), [viewImage, setViewImage] = useState(null);
   const current = useRef({});
@@ -76,6 +79,79 @@ function NoteDocument({ queue, onImageError, note, onChange, toolbarIds, formatt
     },
     onUpdate: ({ editor }) => onChange(editor.getHTML()),
   });
+  const [found, setFound] = useState({ count: 0, current: 0, hadMatches: false, hidden: false });
+  const titleMatch = !!find && searchNotes([{ title: note.title, text: "" }], find).length > 0;
+  const firstJump = useRef(false), imageJump = useRef(null), searchLayout = useRef({}), findSpace = useRef(0);
+  // Leave room to centre the last line. Keep that room for this visit when Close
+  // removes the fixed bar, so the browser cannot clamp the owner's scroll upward.
+  if (find) findSpace.current = Math.max(findSpace.current, (viewport.height + dockHeight) / 2);
+  searchLayout.current = { viewport, dockHeight };
+  function updateFound(hidden = false) {
+    const state = searchState(editor);
+    setFound((old) => ({ count: state.ranges.length, current: state.current,
+      hadMatches: old.hadMatches || state.ranges.length > 0, hidden }));
+  }
+  function centerMatch(onlyIfOutside = false) {
+    const element = editor.view.dom.querySelector(".search-match-current");
+    if (!element) return false;
+    const rect = element.getBoundingClientRect(), { viewport, dockHeight } = searchLayout.current;
+    const top = viewport.top, bottom = top + viewport.height - dockHeight;
+    if (onlyIfOutside && rect.top >= top && rect.bottom <= bottom) return false;
+    window.scrollTo({ top: Math.max(0, window.scrollY + (rect.top + rect.bottom - top - bottom) / 2), behavior: "instant" });
+    return true;
+  }
+  function showMatch(index) {
+    imageJump.current = null;
+    const state = setSearch(editor, find, index);
+    const hidden = revealSearchMatch(editor, state.ranges[state.current], mayStart() && !queue.blocked && !document.querySelector('[role="dialog"]'));
+    updateFound(hidden);
+    if (!hidden) centerMatch();
+    return !hidden && state.ranges.length > 0;
+  }
+  useEffect(() => {
+    if (!editor) return;
+    firstJump.current = false;
+    imageJump.current = null;
+    setSearch(editor, find);
+    setFound({ count: searchState(editor).ranges.length, current: 0, hadMatches: searchState(editor).ranges.length > 0 || titleMatch, hidden: false });
+    const updated = () => { imageJump.current = null; updateFound(); };
+    editor.on("update", updated);
+    return () => { editor.off("update", updated); imageJump.current = null; };
+  }, [editor, find]);
+  useEffect(() => {
+    if (!editor || !find || findShown || firstJump.current || busy || locked) return;
+    // App restores history scroll in a layout effect. Wait for that and dock measurement.
+    const frame = requestAnimationFrame(() => {
+      firstJump.current = true;
+      if (showMatch(0)) imageJump.current = { scrollY: window.scrollY };
+      onFindShown?.();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [editor, find, findShown, busy, locked]);
+  useEffect(() => {
+    if (!editor || !find) return;
+    let frame;
+    const cancel = () => { imageJump.current = null; };
+    const scroll = () => { if (imageJump.current && Math.abs(window.scrollY - imageJump.current.scrollY) > 1) cancel(); };
+    const loaded = (event) => {
+      const current = editor.view.dom.querySelector(".search-match-current");
+      if (!imageJump.current || event.target.tagName !== "IMG" || !current ||
+          !(event.target.compareDocumentPosition(current) & Node.DOCUMENT_POSITION_FOLLOWING)) return;
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        if (imageJump.current && centerMatch(true)) cancel();
+      });
+    };
+    editor.view.dom.addEventListener("load", loaded, true);
+    window.addEventListener("scroll", scroll, { passive: true });
+    for (const type of ["wheel", "touchstart", "pointerdown", "keydown", "beforeinput"]) window.addEventListener(type, cancel, { passive: true });
+    return () => {
+      cancel(); cancelAnimationFrame(frame);
+      editor.view.dom.removeEventListener("load", loaded, true);
+      window.removeEventListener("scroll", scroll);
+      for (const type of ["wheel", "touchstart", "pointerdown", "keydown", "beforeinput"]) window.removeEventListener(type, cancel);
+    };
+  }, [editor, find]);
   useEffect(() => {
     if (!editor) return;
     const controller = createImageInserter({ editor, queue, onPending: setAdding, mayStart,
@@ -110,7 +186,7 @@ function NoteDocument({ queue, onImageError, note, onChange, toolbarIds, formatt
     const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
     observer?.observe(dock.current);
     return () => observer?.disconnect();
-  }, [editor, openTray, painterLook, viewport.height, formatting?.toolbarLayout]);
+  }, [editor, openTray, painterLook, find, found.count, found.hidden, viewport.height, formatting?.toolbarLayout]);
   function toggleTray(name, options = {}) {
     if (readOnly || locked || busy || !TRAYS[name]) return;
     setOpenTray(openTray === name && trayOptions.source === options.source ? null : name);
@@ -166,7 +242,7 @@ function NoteDocument({ queue, onImageError, note, onChange, toolbarIds, formatt
     <div className="flex flex-1 flex-col" data-editor-surface onClick={(event) => {
       if (!event.target.closest(".ProseMirror, [data-selection-menu]")) editor.commands.focus("end");
     }}>
-      <EditorContent editor={editor} className="flex-1" />
+      <EditorContent editor={editor} className="flex-1" style={findSpace.current ? { paddingBottom: findSpace.current } : undefined} />
     </div>
     <div ref={dock} data-formatting-dock className="fixed inset-x-0 z-30" style={{ bottom: Math.max(0, window.innerHeight - viewport.height - viewport.top) }}>
       {openTray && !locked && !readOnly && <Tray name={openTray} {...trayOptions} viewportHeight={viewport.height} onClose={closeTray}
@@ -181,6 +257,17 @@ function NoteDocument({ queue, onImageError, note, onChange, toolbarIds, formatt
         {adding > 0 && <p role="status">Adding image…</p>}
         {imageErrors.map((message, i) => <p role="alert" key={i}>{message}</p>)}
         {imageErrors.length > 0 && <button className="min-h-10 underline" onClick={() => setImageErrors([])}>Dismiss</button>}
+      </div>}
+      {find && <div data-find-bar className="border-t border-[var(--color-line)] bg-[var(--color-paper)]">
+        <div className="mx-auto flex max-w-2xl items-center gap-1 px-3 py-1 text-xs">
+          <span role="status" className="min-w-0 flex-1 break-words">{found.hidden ? "In folded lines" : found.count ? `${found.current + 1} of ${found.count}` : titleMatch ? "Found in the title" : found.hadMatches ? "No matches left" : "No matches in the text"} · "{find}"</span>
+          {[["Previous match", ChevronUp, -1], ["Next match", ChevronDown, 1]].map(([label, Icon, direction]) => <button key={label} className="min-h-11 min-w-11" aria-label={label} disabled={!found.count || busy || locked}
+            onPointerDown={(event) => event.preventDefault()} onMouseDown={(event) => event.preventDefault()}
+            onClick={() => showMatch((found.current + direction + found.count) % found.count)}><Icon size={20} className="mx-auto" aria-hidden="true" /></button>)}
+          <button className="min-h-11 min-w-11" aria-label="Close search" disabled={busy || locked}
+            onPointerDown={(event) => event.preventDefault()} onMouseDown={(event) => event.preventDefault()}
+            onClick={() => { imageJump.current = null; onClearFind?.(); }}><X size={20} className="mx-auto" aria-hidden="true" /></button>
+        </div>
       </div>}
       <Toolbar editor={editor} ids={formatting?.toolbar ?? toolbarIds} layout={formatting?.toolbarLayout} formatting={formatting} readOnly={readOnly || locked || busy} ui={editorUi} />
     </div>

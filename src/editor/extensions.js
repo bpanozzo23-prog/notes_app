@@ -1,3 +1,4 @@
+import { SearchHighlight } from "./nodes/SearchHighlight.js";
 import Image from "./nodes/Image.js";
 import { ImagePlaceholders } from "./imageInsertion.js";
 import StarterKit from "@tiptap/starter-kit";
@@ -30,7 +31,7 @@ export const extensions = [
   Callout, Divider, LineSpacing, Image, ImagePlaceholders,
   TaskList,
   TaskItem.configure({ nested: true }),
-  CollapsibleListItem, Collapsible,
+  CollapsibleListItem, Collapsible, SearchHighlight,
 ];
 
 export const SUPPORTED_HTML_SAMPLES = [

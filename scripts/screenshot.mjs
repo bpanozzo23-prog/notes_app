@@ -179,6 +179,66 @@ await shot("06-search-accent-insensitive");
 await button("Clear search").click();
 await button("All").click();
 
+// Search 27 occurs only in the long note, twice, far below the opening screen.
+await page.getByLabel("Search notes").fill("27");
+await page.getByLabel("Search notes").press("Enter");
+assert.equal(await page.getByRole("list", { name: "Notes", exact: true }).getByRole("button").count(), 1);
+await shot("06b-search-deep-snippet");
+await button("Nota larga para probar el scroll").click();
+await page.getByText('1 of 2 · "27"', { exact: true }).waitFor();
+const checkSearchPosition = async () => {
+  await page.waitForFunction(() => {
+    const match = document.querySelector(".search-match-current")?.getBoundingClientRect();
+    const dock = document.querySelector("[data-formatting-dock]")?.getBoundingClientRect();
+    return match && dock && Math.abs((match.top + match.bottom) / 2 - dock.top / 2) < 8;
+  });
+};
+await checkSearchPosition();
+assert.equal(await page.evaluate(() => !!document.activeElement?.closest(".ProseMirror")), false);
+await shot("06c-search-deep-open");
+await button("Next match").tap();
+await page.getByText('2 of 2 · "27"', { exact: true }).waitFor();
+await checkSearchPosition();
+await shot("06d-search-next");
+// Headless Chromium has no phone keyboard: reserve its space by reducing the viewport.
+await page.setViewportSize({ width: viewport.width, height: Math.round(viewport.height * 0.6) });
+await page.getByLabel("Note body").focus();
+await button("Previous match").tap();
+await checkSearchPosition();
+assert.equal(await page.evaluate(() => !!document.activeElement?.closest(".ProseMirror")), true);
+await shot("06e-search-keyboard-space");
+await page.getByLabel("Note body").evaluate((element) => element.blur());
+await page.setViewportSize(viewport);
+await back();
+assert.equal(await page.getByLabel("Search notes").inputValue(), "27");
+await page.getByLabel("Search notes").fill("escondida");
+await page.getByLabel("Search notes").press("Enter");
+await button("Muestra de formato").click();
+await page.getByText('1 of 3 · "escondida"', { exact: true }).waitFor();
+await checkSearchPosition();
+assert.equal(await page.getByLabel("Note body").getByText("primera línea escondida", { exact: true }).isVisible(), true);
+assert.equal(await page.getByLabel("Note body").getByText("detalle escondido", { exact: true }).isVisible(), false);
+await shot("06f-search-unfolded");
+await button("Next match").tap();
+await button("Next match").tap();
+await page.getByText('3 of 3 · "escondida"', { exact: true }).waitFor();
+await checkSearchPosition();
+await shot("06g-search-checked-line");
+await button("Close search").tap();
+// Restore the fixture's fold for the later collapsible-line screenshots.
+for (const text of ["Lista plegada", "Tarea plegada"]) {
+  await page.getByLabel("Note body").locator("li", { has: page.getByText(text, { exact: true }) }).locator(".collapse-toggle").first().tap();
+}
+await back();
+await page.getByLabel("Search notes").fill("Guarda");
+await page.getByLabel("Search notes").press("Enter");
+await button("Muestra de formato").click();
+await page.getByText('1 of 1 · "Guarda"', { exact: true }).waitFor();
+await checkSearchPosition();
+await shot("06i-search-callout");
+await back();
+await button("Clear search").click();
+
 await button("Vocabulario — comida").click();
 await shot("07-note-vocab");
 await button("Edit tags").click();
@@ -263,7 +323,11 @@ await back();
   await shot("12f-toggle-tap-zones");
   await page.evaluate(() => document.getElementById("tap-zones").remove());
   // Enter at the end of a collapsed line starts a new line after its hidden lines.
-  await body.getByText("Paso plegado", { exact: true }).click();
+  // Tap like a finger, then wait for the editor to take the new cursor before typing:
+  // pressing keys at once raced it and typed into the line tapped before.
+  await body.getByText("Paso plegado", { exact: true }).tap();
+  await page.waitForFunction(() => document.getSelection().anchorNode?.textContent === "Paso plegado");
+  await page.waitForTimeout(100);
   await page.keyboard.press("End");
   await page.keyboard.press("Enter");
   await page.keyboard.type("Paso nuevo");

@@ -1930,3 +1930,30 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   holding the old version; a top-level error boundary records a crash while drawing. Checked in
   headless Chromium with a held format-4 connection: the message appears, and the app opens and
   the box hides once the connection closes. — The owner had nothing to go on but a blank page.
+- 2026-10-26 — Search results show an extract of the line with the most distinct search words, with matching words bold; opened results mark every word and offer Previous, Next and Close in the formatting dock. — Long notes need search to show the place, not just the note.
+- 2026-10-26 — Search uses one per-character, accent-insensitive matcher with original-text offsets and a ς→σ fold; the existing text.js normalize stays unchanged for other callers. — List results, snippets and editor marks must agree, including decomposed accents, Greek final sigma, Korean and emoji.
+- 2026-10-26 — Search decorations live outside editor transactions and redraw with view.setProps({}); history stores find and findShown with the visit key and scroll. — Searching must not trigger a trailing paragraph or a save, and returning through a link must not jump again.
+- 2026-10-26 — Showing a hidden match unfolds only the collapsed ancestors hiding it, using the existing toggle and only when editing is allowed. — The owner chose saved and synced unfolding, with the existing revision/conflict rules and no Undo step; read-only notes already show all lines.
+- 2026-10-26 — Search scrolls the window within the visible space above the dock, without moving focus or selection, and allows one correction for an earlier picture loading unless the owner interacts. — The keyboard and the owner's chosen scroll position must stay under their control.
+- 2026-10-26 — Fold toggles use Tiptap's skipTrailingNode flag on their existing transaction. — Without it, unfolding an imported note ending in a list or heading appended an empty paragraph and moved Edited; the fold must change only its saved attribute.
+- 2026-10-26 — The plan came from a conversation about keeping one living note per topic:
+  search must lead inside a long note. Claude Code drafted it, Codex reviewed it read-only
+  against the code (its eight findings are folded in, the serious one being that any editor
+  transaction can append StarterKit's trailing paragraph and save), the owner chose unfolding
+  over a temporary peek, and Codex implemented it.
+- 2026-10-26 — Search marks have no dark-mode colours. — The app has no dark theme; a dark
+  current-match fill on the light page would have looked broken on a phone set to dark mode.
+- 2026-10-26 — Screenshot step 12d now taps "Paso plegado" and waits for the editor to take the
+  cursor before End/Enter. — It had failed since the 0.4.5 tap fix (on that commit too, not
+  just this change): after the touch taps, a mouse click didn't move the cursor and keys raced the
+  selection, so the new line went under "Lista abierta" and every later shot was skipped.
+- 2026-10-26 — Accepted, not changed: with the find bar open, each keystroke rescans the whole
+  note. Codex's final read-only review measured (jsdom on the XPS) 8–17 ms per keystroke for a
+  12,000-character note with 1,600 matches, and 120–240 ms only for 119,000 characters searching
+  one letter; 2–3 ms without search. — Notes here are far shorter; re-scanning only the edited
+  block is the fix if typing ever stalls with the bar open. Codex found no unintended save.
+- Verification: `npm test` (95 files, 2,471 tests), `npm run build`, `npm run shots` (221, all
+  steps; 06b–06i read: snippet, deep match centred, ▼, keyboard space, unfold, ticked line,
+  callout); `npm run browser-checks` 15/15. One walk run alongside Codex's review timed out in
+  the XPS-suggestions steps (no search involved) and passed when rerun alone. Not seen: the
+  phone, Samsung Keyboard with the bar open, real scrolling feel.

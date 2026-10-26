@@ -238,7 +238,7 @@ export default function App() {
     {ready && route.screen === "list" && <SyncBar onOpen={open} busy={locked} />}
     {ready && <div className="flex flex-1 flex-col" inert={locked} aria-busy={locked}>
       {route.screen === "list" && <NotesList key={route.key} {...notebook} busy={locked} readOnly={access.readOnly} trashCount={notebook.trash.length} filter={route.filter} query={route.query} onQuery={nav.setQuery} onFilter={nav.setFilter} claudeReady={claudeReady} onOpen={open} onNew={() => run(newNote)} />}
-      {route.screen === "note" && selected && <Note key={route.key} {...shared} onImageError={setMessage} initialNote={selected} notes={notebook.notes} folders={notebook.folders} queue={queue} status={status} onDelete={deleteNote} onOpenNote={openNote}
+      {route.screen === "note" && selected && <Note key={route.key} {...shared} find={route.find} findShown={route.findShown} onFindShown={nav.setFindShown} onClearFind={nav.clearFind} onImageError={setMessage} initialNote={selected} notes={notebook.notes} folders={notebook.folders} queue={queue} status={status} onDelete={deleteNote} onOpenNote={openNote}
         formatting={formatting} claudeReady={claudeReady} onOpen={open} setMessage={setMessage} />}
       {route.screen === "claude-review" && <ClaudeReview openNote={openNote} {...notebook} {...shared} queue={queue} claudeReady={claudeReady} />}
       {route.screen === "sync-review" && <SyncReview {...shared} queue={queue} />}

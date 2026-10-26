@@ -256,3 +256,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--color-accen
 .review-added, .review-removed { border-radius: 3px; padding: 0 2px; }
 .review-added { background: var(--color-ins-bg); color: var(--color-ins-ink); text-decoration: none; font-weight: 600; }
 .review-removed { background: var(--color-del-bg); color: var(--color-del-ink); text-decoration: line-through; }
+
+/* Search decorations never become the note's own highlight marks. */
+.search-snippet { background: transparent; color: inherit; font-weight: 700; }
+.ProseMirror .search-match { outline: 1px solid #6366f1; outline-offset: 1px; border-radius: 2px; }
+.ProseMirror .search-match-current { background: #e0e7ff; color: #312e81; outline: 2px solid #4f46e5; }

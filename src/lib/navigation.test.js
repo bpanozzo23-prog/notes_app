@@ -119,6 +119,34 @@ describe("browser history and popstate", () => {
   });
   const openNote = () => nav.open({ screen: "note", noteId: noteFixture().id });
 
+  it("keeps find and first-jump state through a link, Back, Forward and reload; clear keeps scroll and key", async () => {
+    nav.setQuery("cat");
+    scroll(120);
+    await nav.open({ screen: "note", noteId: noteFixture().id, find: " cat ", findShown: false });
+    const key = activeEntry(nav.current).key;
+    expect(activeEntry(nav.current)).toMatchObject({ find: "cat", scrollY: 0 });
+    scroll(640); nav.setFindShown();
+    expect(activeEntry(nav.current)).toMatchObject({ findShown: true, key, scrollY: 640 });
+    await openNote();
+    expect(activeEntry(nav.current)).not.toHaveProperty("find");
+    window.history.back();
+    await waitFor(() => expect(activeEntry(nav.current)).toMatchObject({ key, find: "cat", findShown: true, scrollY: 640 }));
+    window.history.forward();
+    await waitFor(() => expect(nav.current.stack).toHaveLength(3));
+    expect(activeEntry(nav.current)).not.toHaveProperty("find");
+    window.history.back();
+    await waitFor(() => expect(activeEntry(nav.current).key).toBe(key));
+    stop();
+    nav = createNavigationController({ prepare: async () => data, onChange: change, onError: error, onBusy: busy });
+    stop = nav.start();
+    expect(activeEntry(nav.current)).toMatchObject({ key, find: "cat", findShown: true, scrollY: 640 });
+    scroll(900); nav.clearFind();
+    expect(activeEntry(nav.current)).toMatchObject({ key, scrollY: 900 });
+    expect(activeEntry(nav.current)).not.toHaveProperty("find");
+    expect(activeEntry(nav.current)).not.toHaveProperty("findShown");
+    expect(nav.current.stack[0]).toMatchObject({ query: "cat", scrollY: 120 });
+  });
+
   it("closes an overlay with go(1) without flushing or changing the stack; the next Back leaves", async () => {
     await openNote();
     const snapshot = nav.current;
@@ -293,4 +321,16 @@ describe("browser history and popstate", () => {
     expect(nav.current.stack).toHaveLength(fail ? 3 : 1);
     expect(window.history.state[NAVIGATION_KEY].stack).toHaveLength(fail ? 3 : 1);
   });
+});
+
+
+it("allowlists find only on notes, sanitises it, and accepts only a true findShown with find", () => {
+  for (const find of ["a\nb", "x".repeat(201), 42, ""]) {
+    const route = activeEntry(push(initialNavigation(), "note", "n", { noteId: "n", find, findShown: true, html: "drop" }));
+    expect(route).not.toHaveProperty("find");
+    expect(route).not.toHaveProperty("findShown");
+    expect(route).not.toHaveProperty("html");
+  }
+  expect(activeEntry(push(initialNavigation(), "note", "n", { noteId: "n", find: " cat ", findShown: "true" }))).toEqual({ screen: "note", key: "n", noteId: "n", find: "cat", scrollY: 0 });
+  expect(activeEntry(push(initialNavigation(), "settings", "s", { find: "cat", findShown: true }))).not.toHaveProperty("find");
 });

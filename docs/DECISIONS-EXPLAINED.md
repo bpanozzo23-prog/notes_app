@@ -1490,3 +1490,34 @@ close every copy of the app and reopen it. When another open copy is the cause, 
 exactly that.
 
 **Lock-in: none.** No change to the notes or the XPS service.
+
+### 83. Search shows where the match is (0.4.7, 2026-10-26)
+
+Search now takes you to the words inside a note, which matters when you keep adding to one long
+note about a topic.
+
+**What you'll notice:**
+- A result shows a short extract from the line containing the most search words. The matching
+  words are bold. With no search, the list looks as before.
+- Open a result and the first match appears in the middle of the space above the toolbar.
+  Matches have an outline; the current one also has a coloured fill. These marks are temporary.
+- A small bar above the toolbar says, for example, `2 of 5 · "sync"`. Its arrows move through
+  the matches and wrap around. Close removes the bar and marks, keeping your place.
+- If the word is only in the title, the bar says so. If you edit away every match, it says
+  "No matches left". You can keep typing while the bar is open.
+- A match inside folded lines opens just the folds hiding it. You chose to save and sync this,
+  like tapping + yourself. It isn't an Undo step. As with any saved fold change, the note's
+  version advances, so a waiting Claude suggestion can show "changed since Claude read it";
+  the normal conflict-copy protection still applies.
+- Back keeps your search and place in the list. Following a note link opens it without search;
+  Back to the searched note keeps your place instead of jumping again.
+- Accents work as before, including accents typed as separate characters. Greek σ and ς now
+  match each other in search too.
+
+**Searching itself saves nothing.** Marks are drawn over the text without changing the note.
+The only saved action is opening a fold. Navigation never moves the cursor or opens the keyboard.
+
+**Lock-in: none.** No change to the notebook format, backups or the XPS service.
+
+**Owner phone check pending:** deep matches, arrow wrapping, folded lines, Back, and typing with
+Samsung Keyboard predictions or swipe. Headless checks cannot verify the phone keyboard.

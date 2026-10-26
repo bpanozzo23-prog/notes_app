@@ -1,12 +1,13 @@
-import { firstLine, normalize } from "./text.js";
+import { firstLine } from "./text.js";
+import { normalizeWithMap, queryWords } from "./searchMatch.js";
 
 export const noteTitle = (note) => note.title.trim() || firstLine(note.text) || "Untitled note";
 
 export function searchNotes(notes, query = "") {
-  const words = normalize(query).trim().split(/\s+/).filter(Boolean);
+  const words = queryWords(query);
   if (!words.length) return notes;
   return notes.filter((note) => {
-    const text = normalize(`${note.title}\n${note.text}`);
+    const text = normalizeWithMap(`${note.title}\n${note.text}`).normalized;
     return words.every((word) => text.includes(word));
   });
 }

@@ -35,9 +35,9 @@ export function sanitizeNavigation(raw) {
         (entry.screen === "note" && !safeString(entry.noteId))) {
       return { ...base, screen: "list", filter: { type: "all" } };
     }
-    const query = sanitizeQuery(entry.query);
+    const query = sanitizeQuery(entry.query), find = sanitizeQuery(entry.find);
     return { ...base, screen: entry.screen,
-      ...(entry.screen === "note" ? { noteId: entry.noteId } : {}),
+      ...(entry.screen === "note" ? { noteId: entry.noteId, ...(find ? { find, ...(entry.findShown === true ? { findShown: true } : {}) } : {}) } : {}),
       ...(entry.screen === "list" ? { filter: sanitizeFilter(entry.filter),
         ...(query ? { query } : {}),
       } : {}),
@@ -56,6 +56,15 @@ export function navigationReducer(navigation, action) {
       query: Object.hasOwn(action, "query") ? action.query : activeEntry(navigation).query,
       scrollY: action.scrollY ?? 0,
     } });
+    case "findShown":
+    case "clearFind": {
+      const route = activeEntry(navigation);
+      if (route.screen !== "note" || !route.find) return navigation;
+      return navigationReducer(navigation, { type: "replace", entry: { ...route,
+        ...(action.type === "clearFind" ? { find: undefined, findShown: undefined } : { findShown: true }),
+        scrollY: action.scrollY ?? route.scrollY,
+      } });
+    }
     case "scroll": return { ...navigation, stack: stack.map((entry, i) => i === stack.length - 1 ? { ...entry, scrollY: safeScroll(action.y) } : entry) };
     default: return navigation;
   }
@@ -219,6 +228,14 @@ export function createNavigationController({ win = window, prepare, onChange, on
       captureScroll();
       const route = activeEntry(navigation);
       commit(navigationReducer(navigation, { type: "filter", filter: route.filter, query, scrollY: route.scrollY }));
+    },
+    setFindShown() {
+      if (busy || stopped) return;
+      commit(navigationReducer(navigation, { type: "findShown", scrollY: win.scrollY }));
+    },
+    clearFind() {
+      if (busy || stopped) return;
+      commit(navigationReducer(navigation, { type: "clearFind", scrollY: win.scrollY }));
     },
     back() {
       if (busy) return;

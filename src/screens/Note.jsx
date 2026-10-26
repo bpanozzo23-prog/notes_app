@@ -21,7 +21,7 @@ import { saveStatusLabel } from "../lib/saveStatus.js";
 
 // The fields whose change counts as an edit, as in src/db/notes.js.
 
-export default function Note({ initialNote, notes, folders, toolbarIds, formatting, readOnly: locked = false, queue, status, busy, onBack, onDelete, onOpenNote, error, run, refresh, onImageError, claudeReady, onOpen, setMessage }) {
+export default function Note({ find, findShown, onFindShown, onClearFind, initialNote, notes, folders, toolbarIds, formatting, readOnly: locked = false, queue, status, busy, onBack, onDelete, onOpenNote, error, run, refresh, onImageError, claudeReady, onOpen, setMessage }) {
   const [note, setNote] = useState(initialNote);
   const [conflict, setConflict] = useState(null);
   const readOnly = locked || !!conflict;
@@ -112,7 +112,7 @@ export default function Note({ initialNote, notes, folders, toolbarIds, formatti
         </button>
       </div>
     </div>
-    <NoteEditor queue={queue} onImageError={onImageError} note={note} onChange={(html) => edit({ html })} toolbarIds={toolbarIds} formatting={formatting} readOnly={readOnly} busy={busy} run={run} refresh={refresh} error={error} onEditor={onEditor}
+    <NoteEditor find={find} findShown={findShown} onFindShown={onFindShown} onClearFind={onClearFind} queue={queue} onImageError={onImageError} note={note} onChange={(html) => edit({ html })} toolbarIds={toolbarIds} formatting={formatting} readOnly={readOnly} busy={busy} run={run} refresh={refresh} error={error} onEditor={onEditor}
       ui={{ openLinkPicker, openNote: onOpenNote, removeLink }} />
     {linkedFrom.length > 0 && <section aria-label="Linked from" className="mx-4 mt-4 border-t border-[var(--color-line)] pt-4">
       <h2 className="font-semibold">Linked from</h2>

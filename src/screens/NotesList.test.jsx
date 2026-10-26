@@ -79,3 +79,19 @@ it("shows each note's last edit date beside its folder", () => {
     filter={{ type: "all" }} onFilter={() => {}} onOpen={() => {}} onNew={() => {}} trashCount={0} />);
   expect(within(screen.getByRole("button", { name: "Dated" })).getByText("Reading · 9 Mar 2025")).toBeTruthy();
 });
+
+it("shows a matching snippet with bold words and passes find, keeping the row's title label", () => {
+  const open = vi.fn(), note = noteFixture({ title: "Spanish", text: "Opening line\nUn niño toma café\nLast line" });
+  const props = { notes: [note], folders: [], filter: { type: "all" }, onOpen: open };
+  const view = render(<NotesList {...props} query="nino cafe" />);
+  const row = screen.getByRole("button", { name: "Spanish", exact: true });
+  expect([...row.querySelectorAll("mark")].map((mark) => mark.textContent)).toEqual(["niño", "café"]);
+  expect(row.textContent).not.toContain("Opening line");
+  fireEvent.click(row);
+  expect(open).toHaveBeenCalledWith({ screen: "note", noteId: note.id, find: "nino cafe" });
+  view.rerender(<NotesList {...props} query="Spanish" />);
+  expect(row.querySelector("mark")).toBeNull();
+  expect(row.textContent).toContain("Opening line");
+  view.rerender(<NotesList {...props} />);
+  expect(row.querySelector(".truncate.text-sm").textContent).toBe("Opening line Un niño toma café Last line");
+});
