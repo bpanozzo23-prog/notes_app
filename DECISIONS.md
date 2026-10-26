@@ -2130,3 +2130,5 @@ Append-only. One dated line per decision: what was decided, then why, after the 
 - 2026-10-26 — Owner checked 0.4.9 on the phone (dev server): "push". **Released 0.4.9** by pushing
   `main` (GitHub Pages deploys it). App-only: the XPS service is unchanged, so no `npm run
   sync-deploy`. The home-screen shortcut can only be tried once the installed app has updated.
+- 2026-10-26 — Owner verified the home-screen "Quick add" shortcut on the installed, updated app
+  ("Verified."). 0.4.9 is fully checked.

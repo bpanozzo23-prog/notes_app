@@ -1594,5 +1594,5 @@ already in the brief; the other two were added on 2026-10-26.
 **Lock-in: none.** No change to the notebook format, backups or the XPS service. The Inbox is an
 ordinary nested bullet list.
 
-**Owner phone check:** passed on the dev server, 2026-10-26 ("push"). Still to try after the
-update installs: the home-screen "Quick add" shortcut.
+**Owner phone check:** passed on the dev server, 2026-10-26 ("push"); the home-screen "Quick
+add" shortcut verified on the installed app after the update, 2026-10-26.
