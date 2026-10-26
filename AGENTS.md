@@ -39,6 +39,12 @@ features; the owner's notes are the one thing that must never be lost or leaked.
   above that, ask first with the reason. Free calls (token counting) need no allowance.
   `npm run claude-check -- --real` drives the app with real requests on the sample notebook
   (question, follow-up, tidy, Apply, Undo; about 10¢) and writes `private-data/claude-check/`.
+- **Touch comes first.** New pointer handling (long-press, drag, tap zones) gets a test that
+  replays the touch event order: `pointerdown`, `pointerup`, `pointerleave`, then `click`. Mouse-
+  driven tests and screenshots cannot see what a finger does; in 0.4.9 a hook that was right under
+  a mouse would have swallowed every tap on + on the phone (2026-10-26).
+- **Run the full test suite once, when the code is final.** Targeted test files while iterating.
+  Editing while the full run is in flight produces false failures and a wasted ten minutes.
 - **Explain choices and define jargon the first time it appears.** The owner reads everything.
 - **Copy mi-cuaderno's patterns, not its code.** `~/code/mi-cuaderno` has the Dexie layer, backup
   export/import, the on-device Anthropic key with a spend cap, and the PWA/GitHub Pages setup.
@@ -79,3 +85,13 @@ features; the owner's notes are the one thing that must never be lost or leaked.
 - **Codex:** the owner's real browser data is not available in Codex's test browser; verify
   against seeded fixture data and never treat an empty notebook as the owner's actual state.
   Subagents: at most two, read-only, for substantial reviews or independent investigations.
+  A Codex task file points at the approved plan file and lists only what differs from it;
+  Codex can read `~/.claude/plans/` in either sandbox (2026-10-26). Codex's sandbox blocks
+  sockets by default, and that block is also what keeps the notes and the test key from leaving
+  the XPS by any route other than instructions, so by default Codex extends
+  `scripts/screenshot.mjs` and `scripts/browser-checks.mjs` but does not run them; Claude runs
+  them and reads the PNGs. When a step is mostly about those scripts, Claude may run that one
+  Codex task with `-c sandbox_workspace_write.network_access=true` (trial 2026-10-26: the full
+  screenshot run completes inside the sandbox) and the task file must say localhost only, no
+  other network use. Claude still reads the PNGs: the layout check stays with the agent that
+  has the phone's history.
