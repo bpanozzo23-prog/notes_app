@@ -1594,6 +1594,5 @@ already in the brief; the other two were added on 2026-10-26.
 **Lock-in: none.** No change to the notebook format, backups or the XPS service. The Inbox is an
 ordinary nested bullet list.
 
-**Owner phone check pending:** hold + with Samsung Keyboard (no text selection or menu should
-appear), the sheet sitting above the keyboard, Add, Back closing the sheet, the two switches, a
-folded line's count, and after the push the home-screen "Quick add" shortcut.
+**Owner phone check:** passed on the dev server, 2026-10-26 ("push"). Still to try after the
+update installs: the home-screen "Quick add" shortcut.

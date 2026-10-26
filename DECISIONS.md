@@ -2127,3 +2127,6 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   194–194e, 12o–12q, 04-list); `npm run browser-checks` 18/18, including the manifest shortcut
   and the `?quick-add` launch online and offline. Not seen: the phone (long-press under Samsung
   Keyboard, the sheet above the keyboard, Back, the home-screen shortcut).
+- 2026-10-26 — Owner checked 0.4.9 on the phone (dev server): "push". **Released 0.4.9** by pushing
+  `main` (GitHub Pages deploys it). App-only: the XPS service is unchanged, so no `npm run
+  sync-deploy`. The home-screen shortcut can only be tried once the installed app has updated.
