@@ -18,7 +18,7 @@ it("the sample notebook imports cleanly and its derived fields are current", () 
     expect(note.text).toBe(htmlToText(note.html));
     expect(note.linkedIds).toEqual(extractNoteLinks(note.html));
   }
-  expect(result.envelope.schemaVersion).toBe(5);
+  expect(result.envelope.schemaVersion).toBe(6);
   for (const note of result.envelope.notes) for (const id of extractFileIds(note.html)) {
     const image = result.envelope.files.find((file) => file.id === id);
     expect(image).toBeDefined();
@@ -48,7 +48,7 @@ it("preserves every formatting-note value through editor, save, reopen, backup, 
   const reopened = open((await db.notes.get(note.id)).html);
   expect(reopened.getHTML()).toBe(original);
   const backup = await buildBackup();
-  expect(backup.schemaVersion).toBe(5);
+  expect(backup.schemaVersion).toBe(6);
   expect(backup.preferences.namedStyles).toEqual(sample.preferences.namedStyles);
   await db.notes.clear();
   await importBackup(backup);
@@ -59,6 +59,8 @@ it("preserves every formatting-note value through editor, save, reopen, backup, 
   expect([...body.querySelectorAll("mark")].map((node) => node.dataset.color ?? null)).toEqual(["#fde68a", "#bfdbfe", "#a7f3d0", null]);
   expect([...body.querySelectorAll("span[style]")].map((node) => node.style.fontSize || node.style.fontFamily)).toEqual(["12pt", "17pt", "24pt", "serif", "monospace", "17pt"]);
   expect([...body.querySelectorAll('li[data-collapsed="true"]')].map((node) => node.querySelector("p").textContent)).toEqual(["Lista plegada", "Paso plegado", "Tarea plegada"]);
+  expect(body.querySelector('h2[data-collapsed="true"]').textContent).toBe("Sección plegada");
+  expect(body.textContent).toContain("Más palabras dentro de la sección.");
   expect(body.querySelector('p[style]').style.lineHeight).toBe("1.5");
   expect([...body.querySelectorAll('[data-callout]')].map((node) => node.dataset.callout)).toEqual(["note", "tip", "warning", "important"]);
   expect([...body.querySelectorAll('hr')].map((node) => node.dataset.style ?? "thin")).toEqual(["thin", "thick", "dashed", "dotted"]);

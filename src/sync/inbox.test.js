@@ -219,3 +219,14 @@ it("ingests file pairs through the real handler, reports Apply and Dismiss next 
     expect(records[1]).toMatchObject({ status: "dismissed" });
   } finally { await server.clean(); }
 });
+
+it.each([true, false])("a Claude Code proposal can keep or drop heading folds (keep=%s)", async (keep) => {
+  const before = '<h2 data-collapsed="true">Section</h2><p>Before words.</p>';
+  const source = await createNote({ html: before });
+  const body = before.replace('Before', 'Better').replace(keep ? 'unused' : ' data-collapsed="true"', '');
+  const cards = await build([proposalFixture(source, { body })]);
+  expect(cards[0].audit).toEqual([]); expect(cards[0].html).toBe(body);
+  const { changeId } = await applyClaudeChanges(inboxPlan(cards, allTicks(cards), null));
+  expect((await db.notes.get(source.id)).html).toBe(body);
+  await undoClaudeChange(changeId); expect((await db.notes.get(source.id)).html).toBe(before);
+});

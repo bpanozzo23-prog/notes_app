@@ -90,3 +90,16 @@ it("changes every eligible selected line without lifting, preserving spacing and
   expect(editor.getHTML()).toBe('<div data-callout="tip"><h3 style="line-height: 2;">callout</h3><ul><li><p>first</p><h3>second</h3></li></ul></div>');
   editor.state.doc.check();
 });
+
+it("the heading tray changes a folded heading in place and normal text reveals the section", () => {
+  render(<NoteEditor note={noteFixture({ html: '<h2 data-collapsed="true">Section</h2><p>Body</p>' })} formatting={resolveFormatting({ toolbar: ["heading"], selectionMenu: [] })} onChange={() => {}} />);
+  const body = screen.getByLabelText("Note body"), editor = body.editor; stubEditorGeometry(editor);
+  act(() => { editor.commands.setTextSelection(2); editor.view.focus(); });
+  tap(within(screen.getByRole("toolbar", { name: "Formatting", exact: true })).getByRole("button", { name: "Heading", exact: true }));
+  tap(within(screen.getByRole("region", { name: "Heading tray" })).getByRole("button", { name: "Heading 3" }));
+  expect(body.querySelector("h3").textContent).toBe("Section");
+  expect(editor.state.doc.firstChild.attrs.collapsed).toBe(true);
+  tap(within(screen.getByRole("toolbar", { name: "Formatting", exact: true })).getByRole("button", { name: "Heading", exact: true }));
+  tap(within(screen.getByRole("region", { name: "Heading tray" })).getByRole("button", { name: "Normal text" }));
+  expect(body.querySelector(".fold-hidden")).toBeNull(); expect(editor.state.doc.firstChild.type.name).toBe("paragraph");
+});

@@ -549,12 +549,12 @@ it.each(["open", "purge", "refresh"])("shows a boot failure instead of an empty 
 });
 
 it("opens a newer database for reading, allows text export/copy, and disables editing and backup controls", async () => {
-  const live = await createNote({ title: "Newer notebook" });
+  const live = await createNote({ title: "Newer notebook", html: '<h2>Section</h2><p>Body</p>' });
   await db.notes.add(noteFixture({ id: "old-trash", title: "Expired", deletedAt: "2020-01-01T00:00:00.000Z" }));
   await createFolder("Read only folder");
   db.close();
   const newer = new Dexie(db.name);
-  newer.version(6).stores({ notes: "id, updatedAt, deletedAt, *tags, *linkedIds", folders: "id, position", tombstones: "id", prefs: "key", files: "id, unusedSince", fileData: "id" });
+  newer.version(7).stores({ notes: "id, updatedAt, deletedAt, *tags, *linkedIds", folders: "id, position", tombstones: "id", prefs: "key", files: "id, unusedSince", fileData: "id" });
   await newer.open();
   newer.close();
   const purge = vi.spyOn(notesDb, "purgeExpired");
@@ -575,6 +575,7 @@ it("opens a newer database for reading, allows text export/copy, and disables ed
   Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
   fireEvent.click(screen.getByRole("button", { name: "Note options" }));
   expect(screen.getByRole("button", { name: "Copy as text" }).disabled).toBe(false);
+  for (const label of ["Fold all sections", "Unfold all sections"]) expect(screen.getByRole("button", { name: label }).disabled).toBe(true);
   expect(screen.getByRole("button", { name: "Move to Trash…" }).disabled).toBe(true);
   fireEvent.click(screen.getByRole("button", { name: "Copy as text" }));
   await screen.findByText("Copied as text.");
@@ -618,7 +619,7 @@ it("locks immediately on versionchange, drains held editor input, then closes af
   const observer = editor.view.domObserver;
   editor.view.dom.querySelector("p").firstChild.nodeValue = "Origina";
   observer.flushSoon();
-  act(() => { expect(db.on("versionchange").fire({ oldVersion: 50, newVersion: 60 })).toBe(false); });
+  act(() => { expect(db.on("versionchange").fire({ oldVersion: 60, newVersion: 70 })).toBe(false); });
   expect(screen.getByLabelText("Title").closest("[inert]")).toBeTruthy();
   await waitFor(() => expect(write).toHaveBeenCalledOnce());
   expect(db.isOpen()).toBe(true);
@@ -637,7 +638,7 @@ it("keeps versionchange failures locked with Retry usable, then closes after the
   await openNote("Before upgrade");
   const put = vi.spyOn(db.notes, "put").mockRejectedValue(new Error("Disk full"));
   fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Keep this edit" } });
-  act(() => db.on("versionchange").fire({ oldVersion: 50, newVersion: 60 }));
+  act(() => db.on("versionchange").fire({ oldVersion: 60, newVersion: 70 }));
   await screen.findByText("Not saved. Disk full");
   expect(db.isOpen()).toBe(true);
   expect(screen.getByLabelText("Title").closest("[inert]")).toBeTruthy();
@@ -892,7 +893,7 @@ it("honours explicit Reload with content through the activation callback, retain
 });
 
 it.each(["edit", "trash", "purge"])("opens a conflict copy even while list refresh is pending after another window's %s", async (change) => {
-  const note = await createNote({ title: "Original", html: "<p>Before</p>" });
+  const note = await createNote({ title: "Original", html: "<h2>Before</h2><p>Section</p>" });
   await start(); await openNote("Original");
   if (change === "edit") await notesDb.updateNote(note.id, { html: "<p>Other window</p>" });
   else { await trashNote(note.id); if (change === "purge") await notesDb.purgeNow(note.id); }
@@ -903,6 +904,9 @@ it.each(["edit", "trash", "purge"])("opens a conflict copy even while list refre
   fireEvent(window, new Event("pagehide"));
   await screen.findByText(/This note was changed in another window/);
   await waitFor(() => expect(release).toBeTypeOf("function"));
+  fireEvent.click(screen.getByRole("button", { name: "Note options" }));
+  for (const label of ["Fold all sections", "Unfold all sections"]) expect(screen.getByRole("button", { name: label }).disabled).toBe(true);
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
   fireEvent.click(screen.getByRole("button", { name: "Open the copy" }));
   delete navigator.storage.persisted;
   await act(async () => { release(false); });
@@ -917,4 +921,19 @@ it.each(["edit", "trash", "purge"])("opens a conflict copy even while list refre
   }
   await back();
   expect(screen.getByRole("button", { name: "My draft (conflict copy)" })).toBeTruthy();
+});
+
+it("Note options folds and unfolds all sections, saves them without moving Edited, and disables rows without sections", async () => {
+  const html = '<h2>One</h2><p>Body</p><h2>Two</h2><p>More</p>';
+  const note = await createNote({ title: "Sections", html }); await start(); await openNote("Sections");
+  for (const [label, expected] of [["Fold all sections", html.replaceAll('<h2>', '<h2 data-collapsed="true">')], ["Unfold all sections", html]]) {
+    fireEvent.click(screen.getByRole("button", { name: "Note options" }));
+    expect(screen.getByRole("button", { name: label }).disabled).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: label }));
+    await waitFor(async () => expect((await getNote(note.id)).html).toBe(expected));
+    expect((await getNote(note.id)).updatedAt).toBe(note.updatedAt);
+  }
+  act(() => screen.getByLabelText("Note body").editor.commands.setContent('<p>No headings</p>'));
+  fireEvent.click(screen.getByRole("button", { name: "Note options" }));
+  for (const label of ["Fold all sections", "Unfold all sections"]) expect(screen.getByRole("button", { name: label }).disabled).toBe(true);
 });

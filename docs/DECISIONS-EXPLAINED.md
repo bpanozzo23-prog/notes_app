@@ -1520,3 +1520,37 @@ The only saved action is opening a fold. Navigation never moves the cursor or op
 **Lock-in: none.** No change to the notebook format, backups or the XPS service.
 
 **Owner phone check:** passed on the dev server, 2026-10-26 ("Looks good").
+
+### 84. Heading folds (0.4.8, 2026-10-26)
+
+**Chosen:** each heading with something below it has a grey − at the right. Tap it and that
+section folds away; the button becomes a blue + and a faint … appears under the heading. Tap
+again to open it. A section ends at the next heading of the same or bigger size, or at the end
+of its callout or list line. Smaller headings belong to the section; their own folds are kept.
+
+**Why:** a long note about one topic can stay organised under headings while you keep adding to
+it. Note options (⋯) now has **Fold all sections** and **Unfold all sections** to turn the note
+into an outline or show everything. These leave list folds alone and are unavailable when the
+note can't be edited or has no sections to fold.
+
+**Typing:** Enter in a folded heading opens it first, so the new line appears right below it.
+At the very start, Enter still puts a line above. Moving the cursor into hidden words opens
+them too. Changing a heading to normal text shows its section. The heading keeps the same
+on-screen element while you type or fold; its button and marker sit outside the part the
+keyboard edits. Tapping the button should leave the keyboard as it was.
+
+**Saving:** folds survive reopening, backups and sync. Folding isn't an Undo step and doesn't
+move "Edited". It does advance the note's saved version, so a waiting Claude suggestion may
+need another review. Search opens just the folds hiding its match. Copy as text, Ask Claude,
+the XPS text copy and read-only previews always include every word. If Claude returns a
+heading without its fold mark, the section simply opens.
+
+**Lock-in: one step.** This is note format 6. Older app versions can't read 0.4.8 backups.
+Export a backup before updating. The XPS service must update before the phone app is released.
+For the dev-server phone check, Sync must say it isn't connected; otherwise wait to check the
+published app after release. Sending format 6 once would make the older published app's sync
+wait for its update.
+
+**Owner phone check pending:** especially Samsung Keyboard predictions and swipe typing in and
+next to headings, Enter, the tap zone, keyboard staying open or closed, reopening saved folds,
+search and unchanged "Edited". Automated composition-shaped input cannot reproduce the phone.

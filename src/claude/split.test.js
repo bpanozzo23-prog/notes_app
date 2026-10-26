@@ -67,3 +67,16 @@ it('supports untitled originals and new notes and uses the first line in Split i
   const proposal = validateSplitProposal({ ...splitProposal, title: '', notes: [{ ...splitProposal.notes[0], title: '' }] }, payload), plan = splitPlan(payload, proposal);
   expect(proposal.title).toBeNull(); expect(plan.createNotes[0].title).toBe(''); expect(plan.notes[0].patch.html).toContain('En el restaurante</a>');
 });
+
+it('carries folded headings through split validation, Apply and Undo', async () => {
+  const html = '<h2 data-collapsed="true">Original</h2><p>Remaining words.</p>';
+  const newHtml = '<h3 data-collapsed="true">New section</h3><p>Moved words.</p>';
+  const proposal = validateSplitProposal({ ...splitProposal, html, notes: [{ ...splitProposal.notes[0], html: newHtml }] }, payload);
+  expect(proposal.remaining).toBe(html); expect(proposal.notes[0].html).toBe(newHtml);
+  const { applyClaudeChanges, undoClaudeChange } = await import('../db/claudeChanges.js');
+  const plan = splitPlan(payload, proposal), before = await db.notes.get(payload.note.id);
+  const { changeId } = await applyClaudeChanges(plan);
+  expect((await db.notes.get(payload.note.id)).html).toContain(html);
+  expect((await db.notes.get(plan.createNotes[0].id)).html).toBe(newHtml);
+  await undoClaudeChange(changeId); expect((await db.notes.get(payload.note.id)).html).toBe(before.html);
+});

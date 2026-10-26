@@ -159,13 +159,13 @@ it("focuses tag entry with suggestions open, keeps them after adding, and saves 
   expect(schedule).toHaveBeenCalledTimes(1);
 });
 
-it("lists exactly Copy as text, Move to Trash… and Cancel in Note options, and Cancel restores focus", () => {
+it("lists copy, section folds, Trash and Cancel in Note options, and Cancel restores focus", () => {
   render(<Note initialNote={noteFixture()} notes={[]} folders={[]} queue={queue()} />);
   const opener = screen.getByRole("button", { name: "Note options" });
   opener.focus();
   fireEvent.click(opener);
   const sheet = within(screen.getByRole("dialog", { name: "Note options" }));
-  expect(sheet.getAllByRole("button").map((button) => button.textContent)).toEqual(["Copy as text", "Move to Trash…", "Cancel"]);
+  expect(sheet.getAllByRole("button").map((button) => button.textContent)).toEqual(["Copy as text", "Fold all sections", "Unfold all sections", "Move to Trash…", "Cancel"]);
   fireEvent.click(sheet.getByRole("button", { name: "Cancel" }));
   expect(screen.queryByRole("dialog")).toBeNull();
   expect(document.activeElement).toBe(opener);

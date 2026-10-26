@@ -123,6 +123,8 @@ review. Nothing applies until the owner taps Apply or Add as a new note in Keep 
 Supported HTML (keep the note's existing formatting unless asked to change it):
 
 - Paragraphs `<p>`, headings `<h1>`–`<h3>`, hard breaks `<br>`.
+- Headings h1–h3 may carry `data-collapsed="true"` for a folded section. Keep it as given;
+  all section text remains in the note.
 - Bold `<strong>`, italic `<em>`, underline `<u>`, strike `<s>`, inline code `<code>`.
 - Highlights `<mark>` or `<mark data-color="#fde68a" style="background-color: #fde68a; color: inherit">`.
 - Text styles on spans: `<span style="color: #15803d; font-size: 17pt; font-family: serif">`.

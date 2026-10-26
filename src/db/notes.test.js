@@ -46,9 +46,16 @@ it("saves and syncs a collapsed or expanded list line without moving Edited", as
   const typed = await updateNote(note.id, { html: shut.replace("Child", "Children") });
   expect(typed.updatedAt).not.toBe(note.updatedAt);
 });
-it("treats only the li attribute as a collapse, never the same words in text or links", () => {
+it("treats only li and heading attributes as a collapse, never the same words in text or links", () => {
   expect(withoutCollapse('<ul><li data-checked="true" data-collapsed="true" data-type="taskItem"><p>a</p></li></ul>'))
     .toBe('<ul><li data-checked="true" data-type="taskItem"><p>a</p></li></ul>');
+  for (const tag of ["h1", "h2", "h3"]) {
+    const open = `<${tag} style="line-height: 2;">Title</${tag}><p>Section</p>`;
+    const folded = open.replace(' style=', ' data-collapsed="true" style=');
+    expect(withoutCollapse(folded)).toBe(open);
+    expect(isContentEdit({ html: folded }, { html: open })).toBe(false);
+    expect(withoutCollapse(`<p>&lt;${tag} data-collapsed="true"&gt;</p>`)).toBe(`<p>&lt;${tag} data-collapsed="true"&gt;</p>`);
+  }
   const text = '<p> data-collapsed="true" &lt;li data-collapsed="true"&gt;</p>';
   expect(withoutCollapse(text)).toBe(text);
   const link = '<p><a href="https://example.com/?x=%22%20data-collapsed=%22true">l</a></p>';

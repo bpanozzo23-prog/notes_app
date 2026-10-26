@@ -1960,3 +1960,85 @@ Append-only. One dated line per decision: what was decided, then why, after the 
 - 2026-10-26 — Owner checked 0.4.7 on the phone (dev server): "Looks good. Push". **Released
   0.4.7** by pushing `main` (GitHub Pages deploys it). App-only: the XPS service is unchanged, so
   no `npm run sync-deploy`.
+
+## Heading folds (0.4.8, note format 6, 2026-10-26)
+
+- 2026-10-26 — Owner's choices: a grey − at the **right end** of each heading with a section,
+  blue + when folded; a section ends at the next **same-or-bigger heading**, or the end of its
+  parent (note, callout or list line); a faint **…** under the folded heading; **Fold all sections /
+  Unfold all sections** in Note options. — Long topic notes can become an outline, with a clear
+  sign that words are tucked away. The tap zone is 44 × 44 px; long titles leave room for it.
+- 2026-10-26 — Save `data-collapsed="true"` on H1–H3 only when true; hide following sibling
+  blocks with editable-only decorations. Inner heading folds keep their state. — Opening notes
+  changes nothing, unfolded HTML stays byte-identical to the previous renderer, and read-only
+  notes and Claude previews show every line. Search, text export, Ask and the XPS text view see
+  all the words. A heading with no section has no button.
+- 2026-10-26 — **Enter opens a folded heading first**, except a cursor at the very start of a
+  non-empty heading, where normal Enter inserts above. — Unlike a list line, a heading has no
+  place "after its hidden group" that isn't still part of its section. Opening first keeps the
+  new line visible directly under the heading. Selection or edits inside hidden blocks open the
+  folds; Undo/Redo use only the selection rule. Deleting across folds deletes their text too,
+  and Undo restores it. Converting the heading to normal text shows the section.
+- 2026-10-26 — A heading node view keeps its `<hN>` and an inner text `<span>` in place while
+  folding and typing. Its text-free button and CSS-drawn marker live outside that span. — The
+  keyboard's composing text never contains the controls. The view keeps decoration classes,
+  so an inner heading and its button disappear together under an outer fold. Only pointerdown
+  and mousedown are cancelled, never touchstart; toggles never focus the editor.
+- 2026-10-26 — List folds, heading folds, Fold all and both normalisers share `fold` metadata
+  and changed-range calculation in `src/editor/nodes/fold.js`. Every fold transaction disables
+  history and the trailing paragraph. — A heading toggle must not open a list line, or vice
+  versa, and folding must never append text. Fold all moves a selection it would hide to the
+  outer heading's end, in the same transaction; it leaves list folds alone.
+- 2026-10-26 — `withoutCollapse` also ignores H1–H3 fold attributes when deciding whether content
+  changed. `rev` still advances and syncs; "Edited" and list order stay put. — The real save queue
+  tests compare exact HTML, revision and timestamps, including notes ending in a list or heading.
+  Search opens only the heading/list folds hiding a match, under the existing editing guard.
+- 2026-10-26 — Note format **5 → 6**, without a store change: both version constants, database
+  version, backup upgrade/validator and sample envelope advance. The HTML vocabulary and XPS
+  audit accept folded H1, H2 and H3, including in callouts. Claude's instructions say to keep
+  folds; if tidy, merge, split or a Claude Code proposal drops one, all its words remain visible.
+  — Older apps refuse format-6 backups and older windows become read-only.
+- 2026-10-26 — Release order: Claude reviews and commits; **owner exports a backup** from the
+  published app; deploy the XPS service to accept format 6; owner checks the dev server only if
+  Settings → Sync says it isn't connected; push on the owner's OK. If dev is connected, check
+  the published app after release instead. — One format-6 push makes the published 0.4.7's
+  format-5 pushes fail until it updates. Codex does not commit, push or deploy this change.
+- 2026-10-26 — **Review fix (Claude): the heading keeps its text directly in the `<hN>`**; the
+  button and "…" sit beside it in a thin wrapper `<div class="heading-fold-wrap">` that the node
+  view owns (decoration classes land on the wrapper). — The screenshot run (Pixel 7 emulation)
+  found that Codex's inner text `<span>` broke **Enter at the end of every heading** on Android
+  Chrome: there ProseMirror ignores the Enter key and recognises the browser's own edit as Enter
+  only for a plain block, so Chrome's clone of the heading (fold mark included) became a second
+  heading instead of a new line. The same probe on 0.4.7 gave a paragraph; with the wrapper it
+  does again, folded or not. jsdom tests take the desktop Enter path and could not see it.
+- 2026-10-26 — Review fix (Claude): Enter on a folded heading opens it and splits in **one**
+  transaction and reports itself handled. — Dispatching the opening first and returning false
+  also misbehaved on that Android path. A test pins one dispatch and the paragraph result.
+- 2026-10-26 — Review fixes (Claude, from Codex's final read-only review): deletes that join a
+  heading with its neighbour, cross a heading in a selection, or reach into hidden lines run the
+  editor's own Backspace/Delete from `beforeinput`, only when the browser lets the edit be
+  cancelled. — Pixel 7 emulation, keyboard composing: Backspace at the start of a heading left an
+  empty heading behind (0.4.7 did not), and after a folded section it added an empty line. Now
+  every case gives the joined line (`BodyNext`), folded or not, composing or not — cleaner than
+  0.4.7, whose composing merge carried the heading's size into the paragraph.
+- 2026-10-26 — Review fixes: the button copies the heading's own line spacing, so it stays centred;
+  Claude's review previews reset the margins of a heading inside its wrapper, as they did for a
+  bare heading. Text sizes set on part of a heading can still shift it slightly.
+- Verification (Codex, 2026-10-26): `npm test -- --reporter=verbose` passes all **2,558 tests in
+  96 files**, including 41 heading-fold tests and the unchanged list-fold tests; `npm run build`
+  passes. The real save queue preserves exact HTML and Edited while advancing revisions;
+  the stock heading renderer comparison, composition-shaped DOM input, heading tray, named
+  styles, nested search, Claude Apply/Undo and format-6 server tests pass. `git diff --check`
+  and the screenshot script's syntax check pass. `npm run sync-check` and `npm run browser-checks`
+  were attempted but temporary localhost listeners are blocked by the sandbox (`listen EPERM`);
+  screenshots 12g–12n were added, but Chromium launch is also blocked (`Operation not permitted`).
+  No screenshots or phone keyboard were seen. Claude must run and read the shots and browser/sync
+  checks outside this sandbox; owner phone check remains pending. No real API calls, commits,
+  pushes or deployments were made.
+- Verification (Claude, 2026-10-26, after the review fixes): `npm test` (96 files, 2,562 tests),
+  `npm run build`, `npm run sync-check`, `npm run browser-checks` 15/15, `npm run shots` (229, all
+  steps; 12g–12n read: buttons, folded with "…", unfolded, Enter, read-only, search opening a
+  heading, Note options, the long note as an outline). Pixel 7 probes against 0.4.7 for Enter and
+  Backspace at headings, folded and not, composing and not. Screenshot fixes: the wrapper
+  locator, clearing the search before the long note, and the simulated newer database (Dexie
+  stores version 6 as 60, so 70). Not seen: the phone, Samsung Keyboard, the tap zone by finger.

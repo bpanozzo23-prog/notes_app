@@ -1,4 +1,5 @@
 import { Extension, getRenderedAttributes, getSplittedAttributes } from "@tiptap/core";
+import { FOLD_META, foldTransaction, changedRanges } from "./fold.js";
 import ListItem from "@tiptap/extension-list-item";
 import { Plugin, PluginKey, TextSelection } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
@@ -8,7 +9,6 @@ import { Decoration, DecorationSet } from "@tiptap/pm/view";
 // an editable editor only, so read-only notes and Claude's review previews always show every line.
 
 export const COLLAPSIBLE_TYPES = ["listItem", "taskItem"];
-const META = "collapsible";
 const key = new PluginKey("collapsible");
 
 const isItem = (node) => COLLAPSIBLE_TYPES.includes(node.type.name);
@@ -21,11 +21,7 @@ export function toggleCollapsed(view, pos) {
   const node = view.state.doc.nodeAt(pos);
   if (!node || !hasSubLines(node)) return false;
   const collapsed = !node.attrs.collapsed;
-  const tr = view.state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, collapsed })
-    .setMeta("addToHistory", false).setMeta(META, true)
-    // Folding is only a view preference: do not append a paragraph (or move Edited)
-    // when an imported note ends in a list or heading. Tiptap's trailing-node opt-out.
-    .setMeta("skipTrailingNode", true);
+  const tr = foldTransaction(view.state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, collapsed }));
   if (collapsed) {
     // The cursor must never be left inside lines that are about to be hidden.
     const hidden = hiddenRange(node, pos), { from, to } = tr.selection;
@@ -66,19 +62,6 @@ function toggles(doc) {
   return DecorationSet.create(doc, decorations);
 }
 
-// Ranges each transaction changed, expressed in the final document.
-function changedRanges(transactions) {
-  let ranges = [];
-  for (const tr of transactions) {
-    ranges = ranges.map(({ from, to }) => ({ from: tr.mapping.map(from, -1), to: tr.mapping.map(to, 1) }));
-    tr.mapping.maps.forEach((map, index) => {
-      const rest = tr.mapping.slice(index + 1);
-      map.forEach((_oldStart, _oldEnd, start, end) => ranges.push({ from: rest.map(start, -1), to: rest.map(end, 1) }));
-    });
-  }
-  return ranges;
-}
-
 function itemsAround(doc, { from, to }, visit) {
   const size = doc.content.size;
   const a = Math.max(0, Math.min(from, size)), b = Math.max(0, Math.min(to, size));
@@ -93,7 +76,7 @@ function itemsAround(doc, { from, to }, visit) {
 // (Indent into a collapsed line, Outdent taking the lines below, Backspace joining into one)
 // shows them. Also drops the mark from a line that no longer has lines under it.
 function normalise(transactions, newState) {
-  if (transactions.every((tr) => tr.getMeta(META))) return null;
+  if (transactions.every((tr) => tr.getMeta(FOLD_META))) return null;
   const docChanged = transactions.some((tr) => tr.docChanged);
   const expand = new Set(), clear = new Set();
   const { $anchor, $head } = newState.selection;
@@ -105,7 +88,7 @@ function normalise(transactions, newState) {
   }
   // Undo and Redo restore an earlier, consistent document; only the cursor rule applies to them.
   if (docChanged && !transactions.some((tr) => tr.getMeta("history$"))) {
-    for (const range of changedRanges(transactions)) {
+    for (const range of changedRanges(transactions.filter((tr) => !tr.getMeta(FOLD_META)))) {
       itemsAround(newState.doc, range, (node, pos) => {
         if (!node.attrs.collapsed) return;
         if (!hasSubLines(node)) { clear.add(pos); return; }
@@ -120,7 +103,7 @@ function normalise(transactions, newState) {
     const node = tr.doc.nodeAt(pos);
     if (node && isItem(node) && node.attrs.collapsed) tr.setNodeMarkup(pos, undefined, { ...node.attrs, collapsed: false });
   }
-  return tr.docChanged ? tr : null;
+  return tr.docChanged ? foldTransaction(tr) : null;
 }
 
 // Enter at the end of a collapsed line starts a new line after the whole hidden group.

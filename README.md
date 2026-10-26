@@ -204,6 +204,10 @@ LLM can read. The code may become public; the notes never are.
   and Close above the toolbar. Hidden matches unfold only their enclosing folded lines;
   Back keeps the search and scroll. No format change. `docs/DECISIONS-EXPLAINED.md` §83.
   Owner-verified on the phone (dev server) 2026-10-26.
+- **Heading folds, 0.4.8, note format 6, 2026-10-26.** Headings fold their sections with a
+  right-end −/+ button and a faint …; Note options gains Fold all sections / Unfold all sections.
+  Folds save and sync without moving Edited; Enter and search open hidden sections when needed.
+  The XPS service must accept format 6 before app release. Owner phone check pending; **export a backup first** (older app versions can't read 0.4.8 backups).
 
 ## Running it
 

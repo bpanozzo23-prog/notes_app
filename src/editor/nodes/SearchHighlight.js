@@ -4,6 +4,8 @@ import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { findRanges, queryWords } from "../../lib/searchMatch.js";
 import { hasSubLines, toggleCollapsed } from "./Collapsible.js";
 
+import { hidingHeadings, toggleHeading } from "./HeadingFold.js";
+
 export function documentRanges(doc, words) {
   const ranges = [];
   if (!words.length) return ranges;
@@ -55,7 +57,9 @@ export function revealSearchMatch(editor, range, mayUnfold) {
     const node = $pos.node(depth);
     if (hasSubLines(node) && node.attrs.collapsed && $pos.index(depth) > 0) folds.push($pos.before(depth));
   }
-  if (!mayUnfold) return folds.length > 0;
+  const headings = hidingHeadings($pos);
+  if (!mayUnfold) return folds.length > 0 || headings.length > 0;
+  for (const { pos } of headings) toggleHeading(editor.view, pos);
   for (const pos of folds) toggleCollapsed(editor.view, pos);
   return false;
 }

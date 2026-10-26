@@ -184,8 +184,9 @@ const UPGRADES = Object.freeze({
   2: (envelope) => ({ ...envelope, schemaVersion: 3 }),
   3: (envelope) => ({ ...envelope, schemaVersion: 4, files: [] }),
   4: (envelope) => ({ ...envelope, schemaVersion: 5 }),
+  5: (envelope) => ({ ...envelope, schemaVersion: 6 }),
 });
-const VALIDATORS = Object.freeze({ 1: validateV1, 2: validateV2, 3: validateV2, 4: validateV4, 5: validateV4 });
+const VALIDATORS = Object.freeze({ 1: validateV1, 2: validateV2, 3: validateV2, 4: validateV4, 5: validateV4, 6: validateV4 });
 
 export function upgradeEnvelope(envelope, targetVersion = SCHEMA_VERSION, upgrades = UPGRADES, validators = VALIDATORS) {
   const { files, ...rest } = envelope;

@@ -111,3 +111,17 @@ it("an interrupted stream retains a cost lower bound and never adds partial usag
   expect(await getPref('claudeSpend')).toBeUndefined();
   expect(JSON.stringify(session.getSnapshot())).not.toContain(key);
 });
+
+it.each([true, false])("tidy may keep or drop a heading fold without losing text (keep=%s); partial Apply and Undo", async (keep) => {
+  const before = '<h2 data-collapsed="true">Section</h2><p>Before words.</p><p>Unchanged paragraph.</p>';
+  await updateNote(note.id, { html: before }); payload = await captureTidyPayload(note.id);
+  const after = before.replace('Before words.', 'Better words.').replace(keep ? 'unused' : ' data-collapsed="true"', '');
+  const proposal = validateTidyProposal({ ...classProposal, html: after, title: 'Unticked title' }, payload);
+  const bodyIds = proposal.changes.filter(({ id }) => id).map(({ id }) => id);
+  expect(bodyIds.length).toBeGreaterThan(0);
+  const { changeId } = await applyClaudeChanges(tidyPlan(payload, proposal, bodyIds));
+  expect(await db.notes.get(note.id)).toMatchObject({ html: after, title: note.title });
+  const { undoClaudeChange } = await import('../db/claudeChanges.js');
+  await undoClaudeChange(changeId);
+  expect((await db.notes.get(note.id)).html).toBe(before);
+});

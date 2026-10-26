@@ -5,13 +5,13 @@ import { extractNoteLinks, htmlToText, neutralizeNoteLinks } from "../lib/text.j
 import { clearReferencedFileMarks } from "./files.js";
 
 const EDIT_FIELDS = ["title", "html", "folderId", "tags"];
-// Collapsing or expanding a list line changes only this attribute. Like pinning, it saves and
+// Collapsing or expanding a list line or heading changes only this attribute. Like pinning, it saves and
 // syncs but is not a content edit, so it doesn't move "Edited" or the note's place in the list.
 // `<` never appears unescaped in text and `"` is escaped in attribute values, so this matches tags only.
-const COLLAPSED = /(<li\b[^>]*?)\s+data-collapsed="true"/g;
+const COLLAPSED = /(<(?:li|h[1-3])\b[^>]*?)\s+data-collapsed="true"/g;
 export const withoutCollapse = (html) => typeof html === "string" ? html.replace(COLLAPSED, "$1") : html;
 const sameField = (key, a, b) => key === "html" ? withoutCollapse(a) === withoutCollapse(b) : JSON.stringify(a) === JSON.stringify(b);
-/** True when the patch changes a note's content (not pinning, Trash or a collapsed list line). */
+/** True when the patch changes a note's content (not pinning, Trash or a collapsed list line or heading). */
 export const isContentEdit = (patch, note) => EDIT_FIELDS.some((key) => Object.hasOwn(patch, key) && !sameField(key, patch[key], note?.[key]));
 const WRITE_FIELDS = [...EDIT_FIELDS, "pinned", "deletedAt"];
 export const TRASH_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;

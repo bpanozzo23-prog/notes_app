@@ -91,5 +91,16 @@ it('accepts an untitled merged result and uses its first line for review', () =>
 });
 
 it("keeps the tidy prompt byte-identical when sharing its HTML rule", () => {
-  expect(createHash("sha256").update(TIDY_SYSTEM_PROMPT).digest("hex")).toBe("01a592a268e3df16c748be1fb4ebfcad9c5c948f659a50fcd98cb14a9ce31f70");
+  expect(createHash("sha256").update(TIDY_SYSTEM_PROMPT).digest("hex")).toBe("c024d5312fb758dadac459d3a1dd59be9c516d7415703c02da954184ba81fd90");
+});
+
+it('carries a folded heading through merge validation, Apply and Undo', async () => {
+  const html = '<h2 data-collapsed="true">Books</h2><p>All the book words.</p>';
+  const proposal = validateMergeProposal({ ...mergeProposal, html }, payload);
+  expect(proposal.html).toBe(html);
+  const { applyClaudeChanges, undoClaudeChange } = await import('../db/claudeChanges.js');
+  const before = await db.notes.get(payload.keepId);
+  const { changeId } = await applyClaudeChanges(mergePlan(payload, proposal));
+  expect((await db.notes.get(payload.keepId)).html).toBe(html);
+  await undoClaudeChange(changeId); expect((await db.notes.get(payload.keepId)).html).toBe(before.html);
 });

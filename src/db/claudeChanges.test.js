@@ -118,7 +118,7 @@ it.each(["clear", "replace"])("retains images past 30 days, starting a fresh clo
 it("refuses through the real newer-database and replaced-generation guards", async () => {
   const before = await createNote(), plan = planFor([before]);
   const backend = db.backendDB();
-  const version = vi.spyOn(backend, 'version', 'get').mockReturnValue(60);
+  const version = vi.spyOn(backend, 'version', 'get').mockReturnValue(70);
   await expect(applyClaudeChanges(plan)).rejects.toThrow('newer version');
   version.mockRestore();
   // Reload the access state after restoring the test database's reported version.

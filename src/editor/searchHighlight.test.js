@@ -107,3 +107,17 @@ it.each(["", "<h2>Last heading</h2>"])("unfolding never appends a trailing parag
   await queue.flush();
   expect(await getNote(note.id)).toMatchObject({ rev: note.rev + 1, updatedAt: note.updatedAt });
 });
+
+const headingFolds = '<h1 data-collapsed="true">Outer</h1><div data-callout="note"><h2 data-collapsed="true">Middle</h2><ul><li data-collapsed="true"><p>List</p><h3 data-collapsed="true">Inner</h3><p>match</p></li></ul></div><h1 data-collapsed="true">Unrelated</h1><p>Elsewhere</p>';
+it("reveals a search through nested heading and list folds without touching unrelated folds", () => {
+  const editor = make(headingFolds), selection = editor.state.selection;
+  setSearch(editor, "match"); revealSearchMatch(editor, searchState(editor).ranges[0], true);
+  expect(editor.getHTML()).toBe(headingFolds.replaceAll(' data-collapsed="true"', '').replace('<h1>Unrelated', '<h1 data-collapsed="true">Unrelated'));
+  expect(editor.state.selection.eq(selection)).toBe(true);
+  expect(editor.view.dom.querySelector('.search-match-current').closest('.fold-hidden')).toBeNull();
+});
+it.each(["locked", "read-only"])("leaves heading folds untouched when %s", (kind) => {
+  const editor = make(headingFolds, { editable: kind !== "read-only" }); setSearch(editor, "match");
+  expect(revealSearchMatch(editor, searchState(editor).ranges[0], false)).toBe(kind === "locked");
+  expect(editor.getHTML()).toBe(headingFolds);
+});

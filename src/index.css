@@ -250,6 +250,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--color-accen
 .review-screen > header h1 { font-size: 20px; }
 .review-row .claude-preview .ProseMirror > :first-child { margin-top: 0; }
 .review-row .claude-preview .ProseMirror > :last-child { margin-bottom: 0; }
+/* Headings sit inside a wrapper (the fold node view), so reset the heading itself too. */
+.review-row .claude-preview .ProseMirror > .heading-fold-wrap:first-child > :first-child { margin-top: 0; }
+.review-row .claude-preview .ProseMirror > .heading-fold-wrap:last-child > :first-child { margin-bottom: 0; }
 .review-row .claude-preview .ProseMirror li p { margin-bottom: 0; }
 .review-row .claude-preview .ProseMirror ul,
 .review-row .claude-preview .ProseMirror ol { margin: 4px 0; padding-left: 22px; }
@@ -261,3 +264,29 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--color-accen
 .search-snippet { background: transparent; color: inherit; font-weight: 700; }
 .ProseMirror .search-match { outline: 1px solid #6366f1; outline-offset: 1px; border-radius: 2px; }
 .ProseMirror .search-match-current { background: #e0e7ff; color: #312e81; outline: 2px solid #4f46e5; }
+
+/* Whole sibling blocks hide, including node views (headings and images). */
+.ProseMirror[contenteditable="true"] .fold-hidden { display: none; }
+.heading-fold-wrap { position: relative; }
+.ProseMirror[contenteditable="true"] .heading-foldable { padding-right: 44px; }
+/* The button is centred on the heading's first line: it takes the heading's font size so
+   1lh is that line's height, and keeps a 44 px tap zone. Same circled glyph as list lines. */
+.heading-fold-toggle {
+  position: absolute; right: 0; width: 44px; height: 44px; top: calc((1lh - 44px) / 2);
+  padding: 0; border: 0; background: transparent; color: var(--color-muted); cursor: pointer;
+  display: flex; align-items: center; justify-content: center; touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+}
+.heading-fold-wrap[data-level="1"] > .heading-fold-toggle { font-size: 1.6em; }
+.heading-fold-wrap[data-level="2"] > .heading-fold-toggle { font-size: 1.3em; }
+.heading-fold-wrap[data-level="3"] > .heading-fold-toggle { font-size: 1.1em; }
+.heading-fold-toggle::before {
+  content: "\2212"; display: flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border: 1.5px solid currentColor; border-radius: 50%;
+  font: 700 15px/1 sans-serif;
+}
+.heading-fold-toggle:active::before { background: #e5e7eb; }
+.heading-fold-wrap.is-folded > .heading-fold-toggle { color: var(--color-accent); }
+.heading-fold-wrap.is-folded > .heading-fold-toggle::before { content: "+"; }
+.heading-fold-marker { display: block; color: var(--color-muted); opacity: .6; font: 16px/1 sans-serif; }
+.heading-fold-marker::before { content: "…"; }

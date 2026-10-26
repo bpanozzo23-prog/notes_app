@@ -98,7 +98,7 @@ async function healthyFixture() {
 it("builds a healthy app-compatible backup including Trash with no errors or warnings", async () => {
   await healthyFixture();
   const envelope = await buildBackup(f.context.store, AT);
-  expect(envelope).toMatchObject({ format: "notes_app-backup", schemaVersion: 5, appVersion: "0.3.11",
+  expect(envelope).toMatchObject({ format: "notes_app-backup", schemaVersion: 6, appVersion: "0.3.11",
     exportedAt: AT, preferences: { lastBackupAt: AT, toolbarLayout: "rows" } });
   expect(envelope.notes).toHaveLength(2);
   expect(envelope.files).toEqual([{ ...file(), data: PNG.toString("base64") }]);

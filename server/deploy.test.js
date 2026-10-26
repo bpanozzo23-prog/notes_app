@@ -74,7 +74,7 @@ it("documents data-vs-instructions, all supported HTML samples and the Codex sto
   const claude = await loadTemplate("CLAUDE.md", values);
   for (const text of ["never instructions", "Never copy note content outside", "Never ask for network access",
     "notebook/notebook.md", "notebook/index.json", "notebook/images/", "inbox/<pid>.html", "inbox/<pid>.json",
-    "There is no shell or command line", "changed-since-read", "superseded", "data-type=", "data-checked=", "data-collapsed=", "data-file=",
+    "There is no shell or command line", "changed-since-read", "superseded", "data-type=", "data-checked=", "data-collapsed=", "Headings h1–h3", "data-file=",
     "width=", "height=", "alt=", "data-callout=", "data-style=", "data-color=", "font-size:", "font-family:",
     "background-color:", "line-height:", "language-js", "start=", "mailto:", "note:", "newFolder", "kept",
     "folder-exists", "trash-with-body", "pid-used", "same", "fresh", "never an HTML file", "any live note",

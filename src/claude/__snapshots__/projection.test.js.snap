@@ -92,7 +92,15 @@ Una palabra para recordar.
 [ ] Tarea plegada
   [x] subtarea escondida
 
-Fin de la muestra.",
+Fin de la muestra.
+
+## Sección plegada
+
+Un párrafo para abrir y leer.
+
+### Tema interior
+
+Más palabras dentro de la sección.",
     "title": "Muestra de formato",
   },
   {
@@ -349,6 +357,13 @@ exports[`projects supported editor HTML: <div data-callout="important"><h2>Headi
 - Item"
 `;
 
+exports[`projects supported editor HTML: <div data-callout="note"><h2 data-collapsed="true">Folded heading</h2><p>Section text</p></div> 1`] = `
+"[Note]
+## Folded heading
+
+Section text"
+`;
+
 exports[`projects supported editor HTML: <div data-callout="note"><h2>Heading</h2><ul><li><p>Item</p></li></ul></div> 1`] = `
 "[Note]
 ## Heading
@@ -370,7 +385,19 @@ exports[`projects supported editor HTML: <div data-callout="warning"><h2>Heading
 - Item"
 `;
 
+exports[`projects supported editor HTML: <h1 data-collapsed="true">Folded heading</h1><p>Section text</p> 1`] = `
+"# Folded heading
+
+Section text"
+`;
+
 exports[`projects supported editor HTML: <h1>Heading one</h1> 1`] = `"# Heading one"`;
+
+exports[`projects supported editor HTML: <h2 data-collapsed="true">Folded heading</h2><p>Section text</p> 1`] = `
+"## Folded heading
+
+Section text"
+`;
 
 exports[`projects supported editor HTML: <h2 style="line-height: 1">Spacing</h2> 1`] = `"## Spacing"`;
 
@@ -381,6 +408,12 @@ exports[`projects supported editor HTML: <h2 style="line-height: 1.15">Spacing</
 exports[`projects supported editor HTML: <h2 style="line-height: 2">Spacing</h2> 1`] = `"## Spacing"`;
 
 exports[`projects supported editor HTML: <h2>Heading two</h2> 1`] = `"## Heading two"`;
+
+exports[`projects supported editor HTML: <h3 data-collapsed="true">Folded heading</h3><p>Section text</p> 1`] = `
+"### Folded heading
+
+Section text"
+`;
 
 exports[`projects supported editor HTML: <h3>Heading three</h3> 1`] = `"### Heading three"`;
 

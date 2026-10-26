@@ -45,7 +45,7 @@ it.each(SUPPORTED_HTML_SAMPLES)("preserves attribute values through two editors:
   const input = document.createElement("div"), output = document.createElement("div");
   input.innerHTML = html;
   output.innerHTML = editorFor(editorFor(html).getHTML()).getHTML();
-  for (const tag of ["mark", "p", "h2", "span", "div[data-callout]", "hr", "li"]) {
+  for (const tag of ["mark", "p", "h1", "h2", "h3", "span", "div[data-callout]", "hr", "li"]) {
     const before = [...input.querySelectorAll(tag)], after = [...output.querySelectorAll(tag)];
     before.forEach((node, index) => {
       for (const attr of ["data-color", "data-callout", "data-style", "data-collapsed", "data-checked"]) {

@@ -38,3 +38,9 @@ it("accepts schema aliases and style marks, but not an arbitrary wrapper", () =>
   expect(auditList(auditBody(styled, handles))).toEqual(["1 element the app doesn't support"]);
   expect(fromClaudeHtml(styled, handles).html).toContain("<strong>Unwrapped</strong>");
 });
+
+it.each(["h1", "h2", "h3"])("accepts only true on folded %s, including callouts", (tag) => {
+  const html = `<div data-callout="note"><${tag} data-collapsed="true">Section</${tag}><p>Body</p></div>`;
+  expect(auditList(auditBody(html, handles))).toEqual([]);
+  expect(auditList(auditBody(html.replace('data-collapsed="true"', 'data-collapsed="false"'), handles))).toEqual(["1 attribute the app doesn't support"]);
+});

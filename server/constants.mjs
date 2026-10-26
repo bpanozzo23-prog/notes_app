@@ -1,5 +1,5 @@
 // Deployed independently of src/. compatibility.test.js prevents these copies drifting.
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 export const FORMATTING_KEYS = Object.freeze([
   "toolbar", "toolbarLayout", "selectionMenu", "textColors", "highlightColors", "namedStyles",
 ]);

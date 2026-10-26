@@ -351,6 +351,73 @@ await back();
   await back();
 }
 
+// Heading sections: all data is still the imported sample, never the owner's notebook.
+{
+  await button("Muestra de formato").click();
+  const body = page.getByLabel("Note body");
+  const heading = body.locator("h2", { hasText: "Sección plegada" });
+  // The button and "…" sit beside the <h2> in its wrapper, not inside the heading text.
+  const wrap = body.locator(".heading-fold-wrap", { has: page.locator("h2", { hasText: "Sección plegada" }) });
+  const toggle = wrap.getByRole("button", { name: "Fold or unfold this section" });
+  await body.locator("h2", { hasText: "Colores y letras" }).scrollIntoViewIfNeeded();
+  await shot("12g-heading-buttons");
+  await heading.scrollIntoViewIfNeeded();
+  assert.equal(await body.getByText("Un párrafo para abrir y leer.", { exact: true }).isVisible(), false);
+  assert.equal(await wrap.locator(".heading-fold-marker").count(), 1);
+  await shot("12h-heading-folded");
+  const focused = await body.evaluate((el) => el === document.activeElement);
+  await toggle.tap();
+  assert.equal(await body.evaluate((el) => el === document.activeElement), focused);
+  assert.equal(await body.getByText("Un párrafo para abrir y leer.", { exact: true }).isVisible(), true);
+  await shot("12i-heading-unfolded");
+  await toggle.tap();
+  const original = await body.evaluate((el) => el.editor.getHTML());
+  // A real tap and settled selection before Enter, as on the 0.4.7 search shots.
+  await heading.tap();
+  await page.waitForFunction(() => document.getSelection().anchorNode?.textContent === "Sección plegada");
+  await page.waitForTimeout(100);
+  await page.keyboard.press("End");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("Línea nueva de prueba");
+  await page.waitForFunction(() => document.querySelector('[aria-label="Note body"]').editor.getHTML().includes("Línea nueva de prueba"));
+  assert.equal(await heading.getAttribute("data-collapsed"), null);
+  assert.equal(await body.getByText("Un párrafo para abrir y leer.", { exact: true }).isVisible(), true);
+  await shot("12n-enter-on-folded-heading");
+  await body.evaluate((el, html) => el.editor.commands.setContent(html), original);
+  await body.evaluate((el) => el.editor.setEditable(false));
+  assert.equal(await body.locator(".heading-fold-toggle").count(), 0);
+  assert.equal(await body.getByText("Más palabras dentro de la sección.", { exact: true }).isVisible(), true);
+  await heading.scrollIntoViewIfNeeded();
+  await shot("12l-read-only-heading-sections");
+  await body.evaluate((el) => el.editor.setEditable(true));
+  await back();
+  await page.getByLabel("Search notes").fill("dentro");
+  await page.getByLabel("Search notes").press("Enter");
+  await button("Muestra de formato").click();
+  await page.getByText('1 of 1 · "dentro"', { exact: true }).waitFor();
+  await page.waitForFunction(() => ![...document.querySelectorAll('.ProseMirror h2')].find((el) => el.textContent === "Sección plegada")?.hasAttribute("data-collapsed"));
+  assert.equal(await body.getByText("Más palabras dentro de la sección.", { exact: true }).isVisible(), true);
+  await shot("12m-search-opens-heading");
+  await button("Close search").tap();
+  await toggle.tap();
+  await back();
+  // Back keeps the search; clear it so the long note is listed again.
+  await button("Clear search").click();
+  await button("Nota larga para probar el scroll").click();
+  await body.locator("h3").first().waitFor();
+  await button("Note options").tap();
+  await shot("12j-section-options");
+  await button("Fold all sections").tap();
+  assert.equal(await body.locator('h3[data-collapsed="true"]').count(), 30);
+  assert.equal(await body.locator("p:visible").count(), 1);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await shot("12k-long-note-folded-outline");
+  await button("Note options").tap();
+  await button("Unfold all sections").tap();
+  assert.equal(await body.locator('h3[data-collapsed="true"]').count(), 0);
+  await back();
+}
+
 await button("Trash (1)").click();
 await shot("13-trash");
 await back();
@@ -1050,7 +1117,7 @@ await shot("16-notebook-replaced");
 await page.reload({ waitUntil: "networkidle" });
 await page.getByLabel("Note body").waitFor();
 await page.evaluate(() => new Promise((resolve, reject) => {
-  const request = indexedDB.open("notes_app", 60);
+  const request = indexedDB.open("notes_app", 70); // Dexie stores version(6) as 60: one above it.
   request.onsuccess = () => { request.result.close(); resolve(); };
   request.onerror = () => reject(request.error);
 }));

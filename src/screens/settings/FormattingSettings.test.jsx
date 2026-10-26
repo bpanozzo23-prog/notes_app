@@ -218,7 +218,7 @@ it("round-trips UI choices through the existing schema-5 backup preferences", as
   await click("Add Heading 3", within(screen.getByRole("dialog")));
   await click("Done", within(screen.getByRole("dialog")));
   const backup = await buildBackup();
-  expect(backup.schemaVersion).toBe(5);
+  expect(backup.schemaVersion).toBe(6);
   expect(backup.preferences.toolbarLayout).toBe("rows");
   expect(backup.preferences.toolbar.at(-1)).toBe("h3");
   cleanup();

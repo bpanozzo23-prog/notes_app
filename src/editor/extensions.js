@@ -1,3 +1,4 @@
+import { HeadingFold, FoldableHeading } from "./nodes/HeadingFold.js";
 import { SearchHighlight } from "./nodes/SearchHighlight.js";
 import Image from "./nodes/Image.js";
 import { ImagePlaceholders } from "./imageInsertion.js";
@@ -19,7 +20,7 @@ export const extensions = [
     horizontalRule: false,
     listItem: false,
     trailingNode: { notAfter: ["callout"] },
-    heading: { levels: [1, 2, 3] },
+    heading: false,
     link: {
       protocols: ["note"], openOnClick: false, autolink: false,
       isAllowedUri: (uri) => /^(https:|mailto:|note:)/i.test(uri) && !/[\u0000-\u0020\u007f]/.test(uri),
@@ -31,10 +32,12 @@ export const extensions = [
   Callout, Divider, LineSpacing, Image, ImagePlaceholders,
   TaskList,
   TaskItem.configure({ nested: true }),
-  CollapsibleListItem, Collapsible, SearchHighlight,
+  CollapsibleListItem, Collapsible, FoldableHeading.configure({ levels: [1, 2, 3] }), HeadingFold, SearchHighlight,
 ];
 
 export const SUPPORTED_HTML_SAMPLES = [
+  ...[1, 2, 3].map((level) => `<h${level} data-collapsed="true">Folded heading</h${level}><p>Section text</p>`),
+  '<div data-callout="note"><h2 data-collapsed="true">Folded heading</h2><p>Section text</p></div>',
   '<img data-file="sample-image" width="480" height="270" alt="">',
   ...STARTER_HIGHLIGHT_COLORS.map(({ color }) => `<p><mark data-color="${color}" style="background-color: ${color}; color: inherit">Highlight</mark></p>`),
   ...LINE_SPACINGS.flatMap((value) => ["p", "h2"].map((tag) => `<${tag} style="line-height: ${value}">Spacing</${tag}>`)),
