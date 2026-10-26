@@ -1957,3 +1957,6 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   callout); `npm run browser-checks` 15/15. One walk run alongside Codex's review timed out in
   the XPS-suggestions steps (no search involved) and passed when rerun alone. Not seen: the
   phone, Samsung Keyboard with the bar open, real scrolling feel.
+- 2026-10-26 — Owner checked 0.4.7 on the phone (dev server): "Looks good. Push". **Released
+  0.4.7** by pushing `main` (GitHub Pages deploys it). App-only: the XPS service is unchanged, so
+  no `npm run sync-deploy`.

@@ -203,7 +203,7 @@ LLM can read. The code may become public; the notes never are.
   bold words; opening a result marks the matches and scrolls to the first, with Previous, Next
   and Close above the toolbar. Hidden matches unfold only their enclosing folded lines;
   Back keeps the search and scroll. No format change. `docs/DECISIONS-EXPLAINED.md` §83.
-  **Owner phone check pending.**
+  Owner-verified on the phone (dev server) 2026-10-26.
 
 ## Running it
 

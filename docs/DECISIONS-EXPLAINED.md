@@ -1519,5 +1519,4 @@ The only saved action is opening a fold. Navigation never moves the cursor or op
 
 **Lock-in: none.** No change to the notebook format, backups or the XPS service.
 
-**Owner phone check pending:** deep matches, arrow wrapping, folded lines, Back, and typing with
-Samsung Keyboard predictions or swipe. Headless checks cannot verify the phone keyboard.
+**Owner phone check:** passed on the dev server, 2026-10-26 ("Looks good").
