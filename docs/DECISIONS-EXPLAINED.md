@@ -1551,6 +1551,5 @@ For the dev-server phone check, Sync must say it isn't connected; otherwise wait
 published app after release. Sending format 6 once would make the older published app's sync
 wait for its update.
 
-**Owner phone check pending:** especially Samsung Keyboard predictions and swipe typing in and
-next to headings, Enter, the tap zone, keyboard staying open or closed, reopening saved folds,
-search and unchanged "Edited". Automated composition-shaped input cannot reproduce the phone.
+**Owner phone check:** passed on the dev server, 2026-10-26, after exporting a backup ("Checks
+pass and backup was exported").

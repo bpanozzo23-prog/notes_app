@@ -2042,3 +2042,9 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   Backspace at headings, folded and not, composing and not. Screenshot fixes: the wrapper
   locator, clearing the search before the long note, and the simulated newer database (Dexie
   stores version 6 as 60, so 70). Not seen: the phone, Samsung Keyboard, the tap zone by finger.
+- 2026-10-26 — Owner's phone check (dev server) passed, after exporting a backup: "Checks pass and
+  backup was exported. Ok to push". **Released 0.4.8**: `npm run sync-deploy` switched the XPS
+  service from 215a1c9 to 1271e78 (format 6); `notes-sync status` afterwards: active, round 177,
+  23 live notes, 8 in Trash, 10 folders, 2 images, none missing, history fine, paired. Then
+  pushed `main` (GitHub Pages deploys the app).
+
