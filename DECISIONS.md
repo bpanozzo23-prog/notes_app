@@ -2132,3 +2132,19 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   sync-deploy`. The home-screen shortcut can only be tried once the installed app has updated.
 - 2026-10-26 — Owner verified the home-screen "Quick add" shortcut on the installed, updated app
   ("Verified."). 0.4.9 is fully checked.
+
+## Optional Line break button (2026-10-30)
+
+- 2026-10-30 — Owner approved an optional **Line break** toolbar button: continue the same
+  bullet on a new line aligned with its text, without another bullet. It uses the existing
+  `setHardBreak` command (the same as Shift+Enter); ordinary Enter still creates the next item.
+  Available in Settings → Formatting → Toolbar → Add buttons → Lines & blocks. Default and
+  saved toolbar layouts stay as they are. — A continuation keeps an explanation or translation
+  attached to its point; exposing the existing command makes it accessible on the phone.
+  No new note vocabulary, storage version or sync-service change is needed.
+- Verification: all 2,646 tests across 100 files passed; production build passed. Tests cover
+  the touch event order, continuing a bullet with nested items, ordinary Enter afterward, and
+  reopening the serialized content. Browser screenshots and phone keyboard/layout checks were
+  not run; owner phone verification remains pending.
+- 2026-10-30 — Owner verified the change on the phone ("looks good") and authorized commit
+  and deployment. Release 0.4.10 is app-only; the sync service needs no deployment.

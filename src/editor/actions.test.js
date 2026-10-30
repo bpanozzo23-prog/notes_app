@@ -45,6 +45,13 @@ it("adds Heading 3 without changing the default toolbar or the existing HTML voc
   expect(editor.state.doc.firstChild.textContent).toBe("Heading");
   editor.destroy();
 });
+
+it("offers Line break as an optional toolbar button", () => {
+  expect(DEFAULT_TOOLBAR).not.toContain("lineBreak");
+  expect(availableActions(resolveFormatting({}))).toEqual(expect.arrayContaining([
+    expect.objectContaining({ id: "lineBreak", label: "Line break", group: "Lines & blocks" }),
+  ]));
+});
 it.each(["unknown", "__proto__", "constructor", "toString", "style:default-heading", "color:#abc", "color:blue", null, 4])(
   "skips unavailable action %j", (id) => expect(resolveAction(id)).toBeNull());
 it("builds arbitrary colour actions with palette labels and recognises hex and rgb after reopening", () => {

@@ -61,6 +61,7 @@ export const SUPPORTED_HTML_SAMPLES = [
   "<blockquote><p>Quote</p></blockquote>", "<hr>",
   "<p><code>Inline code</code></p>", '<pre><code class="language-js">const n = 1;</code></pre>',
   "<p>Hard<br>break</p>",
+  "<ul><li><p>Point<br>Continuation</p><ul><li><p>Detail</p></li></ul></li><li><p>Next point</p></li></ul>",
   '<p><a href="https://example.com">Web link</a></p>',
   '<p><a href="mailto:owner@example.com">Mail link</a></p>',
   '<p><a href="note:12345678-1234-4234-8234-123456789abc">Note link</a></p>',

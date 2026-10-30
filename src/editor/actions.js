@@ -1,5 +1,5 @@
 import {
-  ImagePlus, Bold, Italic, Underline, Strikethrough, Highlighter, Heading, Heading1, Heading2, Heading3, List,
+  CornerDownLeft, ImagePlus, Bold, Italic, Underline, Strikethrough, Highlighter, Heading, Heading1, Heading2, Heading3, List,
   ListOrdered, ListChecks, ListIndentIncrease, ListIndentDecrease, Quote, Minus, Undo2, Redo2, Eraser, Link, Circle,
   Paintbrush, PaintRoller, Baseline, ALargeSmall, CaseSensitive, ListCollapse, MessageSquare, Info, Lightbulb, TriangleAlert, CircleAlert, SeparatorHorizontal,
 } from "lucide-react";
@@ -98,6 +98,7 @@ export const actions = [
   mark("taskList", "Checklist", ListChecks, (chain) => chain.toggleTaskList()),
   listAction("indent", "Indent", ListIndentIncrease, "sinkListItem"),
   listAction("outdent", "Outdent", ListIndentDecrease, "liftListItem"),
+  { ...action("lineBreak", "Line break", CornerDownLeft, (chain) => chain.setHardBreak()), group: "Lines & blocks" },
   mark("blockquote", "Quote", Quote, (chain) => chain.toggleBlockquote()),
   action("hr", "Divider", Minus, (chain) => chain.setDivider("thin")),
   action("clearFormatting", "Clear formatting", Eraser, (chain) => chain.unsetAllMarks().clearNodes()),
@@ -146,7 +147,7 @@ export function availableActions(formatting) {
     ...(formatting?.highlightColors ?? []).filter((entry) => !entry.hidden).map((entry) => `highlight:${entry.color}`),
     "color:none", ...(formatting?.textColors ?? []).filter((entry) => !entry.hidden).map((entry) => `color:${entry.color}`),
     "fontSize", "fontFamily",
-    "heading", "h1", "h2", "h3", "bulletList", "orderedList", "taskList", "indent", "outdent", "blockquote", "callout",
+    "heading", "h1", "h2", "h3", "bulletList", "orderedList", "taskList", "indent", "outdent", "lineBreak", "blockquote", "callout",
     ...Object.keys(calloutIcons).map((type) => `callout:${type}`), "hr", "divider", "hr:thick", "hr:dashed", "hr:dotted", "lineHeight",
     "styles", ...(formatting?.namedStyles ?? []).map((style) => `style:${style.id}`),
     "link", "image", "painter", "clearFormatting", "undo", "redo",

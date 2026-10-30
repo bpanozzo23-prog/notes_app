@@ -16,6 +16,30 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 const tap = (button) => { expect(fireEvent.pointerDown(button)).toBe(false); fireEvent.pointerUp(button); fireEvent.click(button); };
 
+it("continues a bullet on a touch tap, keeps nested items, and reopens with the break intact", () => {
+  const formatting = resolveFormatting({ toolbar: ["lineBreak"] });
+  const note = noteFixture({ html: "<ul><li><p>Point</p><ul><li><p>Detail</p></li></ul></li><li><p>Next</p></li></ul>" });
+  const view = render(<NoteEditor note={note} formatting={formatting} onChange={() => {}} />);
+  const body = screen.getByLabelText("Note body"), editor = body.editor;
+  stubEditorGeometry(editor);
+  act(() => { editor.view.focus(); editor.commands.setTextSelection(8); });
+  const button = screen.getByRole("button", { name: "Line break", exact: true });
+  fireEvent.pointerDown(button, { pointerType: "touch" });
+  fireEvent.pointerUp(button, { pointerType: "touch" });
+  fireEvent.pointerLeave(button, { pointerType: "touch" });
+  fireEvent.click(button);
+  expect(document.activeElement).toBe(body);
+  act(() => { editor.commands.insertContent("Continuation"); });
+  const saved = editor.getHTML();
+  expect(saved).toContain("<ul><li><p>Point<br>Continuation</p><ul><li><p>Detail</p></li></ul></li><li><p>Next</p></li></ul>");
+  // Ordinary Enter still starts a sibling bullet after the continuation.
+  fireEvent.keyDown(body, { key: "Enter", code: "Enter" });
+  expect(editor.state.doc.firstChild.childCount).toBe(3);
+  view.unmount();
+  render(<NoteEditor note={{ ...note, html: saved }} formatting={formatting} onChange={() => {}} />);
+  expect(screen.getByLabelText("Note body").editor.getHTML()).toBe(saved);
+});
+
 it("measures the actual toolbar width, skips unknown slots, and updates the inert preview on resize", () => {
   const capacity = vi.fn();
   const ids = ["unknown", "constructor", ...Array(21).fill("bold")];

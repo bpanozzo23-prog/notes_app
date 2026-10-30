@@ -514,3 +514,10 @@ exports[`projects supported editor HTML: <ul><li><p>Bullet</p><ul><li><p>Nested<
 "- Bullet
   - Nested"
 `;
+
+exports[`projects supported editor HTML: <ul><li><p>Point<br>Continuation</p><ul><li><p>Detail</p></li></ul></li><li><p>Next point</p></li></ul> 1`] = `
+"- Point
+  Continuation
+  - Detail
+- Next point"
+`;

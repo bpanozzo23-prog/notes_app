@@ -218,6 +218,10 @@ LLM can read. The code may become public; the notes never are.
 
 ## Running it
 
+Optional Line break button (0.4.10, 2026-10-30): Settings → Formatting → Toolbar →
+Add buttons → Lines & blocks → Line break. Tap it to continue a bullet on a new line without
+another bullet; Enter still starts the next bullet. Owner-verified on the phone 2026-10-30.
+
 ```
 npm ci             # only for a fresh checkout; dependencies are already installed on the XPS
 npm run dev        # Vite with --host, port 5174; app is under /notes_app/
