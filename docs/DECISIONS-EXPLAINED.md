@@ -5,7 +5,7 @@ this one is for the owner: what was chosen, why, what it means for the app, what
 and how hard it would be to reverse ("lock-in"). Ordered by lock-in, hardest first. Updated whenever
 `DECISIONS.md` gains an entry with consequences for how the app behaves.
 
-Last updated 2026-11-14, at 0.4.12 (§87).
+Last updated 2026-11-15, at 0.4.12 (§87).
 
 ---
 
@@ -1702,4 +1702,5 @@ next start reinstalls the offline files. Recorded in the brief's privacy section
 **Lock-in: none.** No change to the notes, backups or the XPS service. Removing the feature
 would be deleting one manifest entry and one small file.
 
-**Owner phone check:** pending, after release (export a backup first).
+**Released 2026-11-15.** **Owner phone check:** pending. Notes may take a day or more to
+appear in the Share menu.

@@ -2337,3 +2337,9 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   after importing the sample empties it from Trash; a reload added to the shots before the
   Trash steps would break them. Not seen: the phone, the real Android Share menu, the WebAPK
   update, a share while the app is open, Chrome's history.
+- 2026-11-15 — Owner: "Commit and push". **Released 0.4.11 and 0.4.12** together by pushing `main`
+  (GitHub Pages deploy succeeded). Checked on the published site: the manifest carries
+  `share_target` (POST), `sw.js` imports `share-target.js`, that file is served and matches the
+  repository, and the app bundle says 0.4.12. App-only: the XPS service is unchanged, so no
+  `npm run sync-deploy`. Neither version was checked on the phone before release (0.4.12 cannot
+  be: only the installed, published app receives shares). Owner phone checks for both pending.

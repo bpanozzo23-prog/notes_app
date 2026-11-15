@@ -225,14 +225,14 @@ LLM can read. The code may become public; the notes never are.
   italic, strikethrough, code, links, lists, checklists, quotes and callouts are kept; colours,
   highlights and sizes aren't. Android only shares listed file types and `.md` isn't one, so
   Share sends the same Markdown as `Title.txt`. App-only; no format change.
-  `docs/DECISIONS-EXPLAINED.md` §86. Owner phone check pending.
+  `docs/DECISIONS-EXPLAINED.md` §86. Released 2026-11-15; owner phone check pending.
 - **Share → Notes, 0.4.12, 2026-11-14.** The installed app appears as **Notes** in Android's
   Share menu; shared text (a link, a passage) opens the **Quick add** sheet with the text in
   the box, ready to Add to a note's Inbox. The text is handed over inside the phone and never
   placed in a web address. Any `https://` address in a Quick add line, shared or typed, is now
   a tappable link. Only the installed, published app can receive shares, and Notes may take a
   day or more to appear in the Share menu after the update. App-only; no format change.
-  `docs/DECISIONS-EXPLAINED.md` §87. Owner phone check pending (after release).
+  `docs/DECISIONS-EXPLAINED.md` §87. Released 2026-11-15; owner phone check pending.
 
 ## Running it
 
