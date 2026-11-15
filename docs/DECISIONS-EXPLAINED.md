@@ -5,7 +5,7 @@ this one is for the owner: what was chosen, why, what it means for the app, what
 and how hard it would be to reverse ("lock-in"). Ordered by lock-in, hardest first. Updated whenever
 `DECISIONS.md` gains an entry with consequences for how the app behaves.
 
-Last updated 2026-11-01, at 0.4.11 (§86).
+Last updated 2026-11-14, at 0.4.12 (§87).
 
 ---
 
@@ -1652,3 +1652,54 @@ exactly as it was. Opening a `.md` file as a new note could come later.
 **What it leads to:** like any copy, a shared or saved note is outside the app's protections.
 
 **Lock-in: none.** No change to the notes, backups or the XPS service.
+
+### 87. Share → Notes (0.4.12, 2026-11-14)
+
+**Chosen:** the installed app appears as **Notes** in Android's Share menu. Share a link from
+Chrome, a selected passage, a podcast episode: the app opens on the **Quick add** sheet (§85)
+with the shared text already in the box. Edit it if you like, pick the note, tap **Add**, and it
+lands under that note's Inbox like any quick add. A page's title and its address arrive on two
+lines.
+
+**Web addresses are now links.** Any `https://…` address in a Quick add line, shared or typed,
+is saved as a tappable link. A full stop, comma or closing bracket right after the address
+stays outside it.
+`http://` addresses (no "s") stay plain text, because the editor itself only allows `https` links.
+
+**How the text gets in, and why this way.** There were two ways to hand shared text to a web app:
+put it in the app's web address (simple), or pass it inside the request, out of sight. You chose
+the second. With the first, the shared text would have sat in an address that Chrome may record
+in its history (and copy to your Google account if history sync is on). Instead, a small add-on
+to the app's *service worker* (the background script that makes the app work offline) catches
+the share, leaves the text in a private storage box, and opens the app; the app reads the box
+once and empties it. Every start of the app empties that box (and tries again next time if the
+phone refuses), so shared text isn't left lying in storage. If the notebook fails to open on
+that start, the share is kept and Reload brings it back. The automated check confirms that nothing is sent to any server and that the
+address stays clean.
+
+**What it means in use:**
+- **Only the installed app can receive shares**, and only the published one. It can't be tried
+  on the dev server, so the first real test is after release (as with the home-screen shortcut).
+- **Notes may take a day or more to show up in the Share menu** after the update. Chrome rebuilds
+  the installed app's Android wrapper on its own schedule; opening the app a few times helps.
+- **Sharing while the app is open reloads it.** Typing in an open note is saved first, as it is
+  whenever you leave the app. An open Claude answer, or text sitting unsent in the Quick add
+  sheet, is lost, exactly as with the home-screen shortcut today.
+- **Long text is cut at 2,000 characters** (the sheet's limit) and the sheet says so.
+- **No note marked for Quick add?** The sheet shows the usual hint and the shared text
+  underneath, so it can be copied rather than vanish.
+- If Android closes the app while the sheet holds unsent shared text, share it again.
+
+**Not chosen:** the text in the web address (above). Sharing pictures: the hand-off chosen here
+can carry them later, but Quick add only adds a line of text today. A "new note from share"
+button: capture goes to an Inbox and the new-note-or-not decision waits for review time (§85).
+
+**One rare leak to know about:** if the app's offline files were ever missing (Chrome's site
+data cleared while the app stays installed), one share would go to GitHub's server inside a
+request and fail there. In that state the notes would already be gone from the phone, and the
+next start reinstalls the offline files. Recorded in the brief's privacy section.
+
+**Lock-in: none.** No change to the notes, backups or the XPS service. Removing the feature
+would be deleting one manifest entry and one small file.
+
+**Owner phone check:** pending, after release (export a backup first).

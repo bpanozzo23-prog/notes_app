@@ -73,3 +73,34 @@ it("disables every control while busy", () => {
   setup({ busy: true });
   for (const control of [...screen.getAllByRole("radio"), ...screen.getAllByRole("button"), screen.getByRole("textbox")]) expect(control.disabled).toBe(true);
 });
+it("starts with shared text, tells the app it was taken once mounted, and adds it like typed text", async () => {
+  const onShared = vi.fn();
+  const { props, rerender } = setup({ shared: { text: "An article\nhttps://example.com/a", cut: false }, onShared });
+  const input = screen.getByLabelText("Text to add");
+  expect(input.value).toBe("An article\nhttps://example.com/a");
+  expect(onShared).toHaveBeenCalled();
+  expect(props.onDraft).toHaveBeenLastCalledWith(true);
+  expect(screen.queryByText(/was shortened/)).toBeNull();
+  // The app clears its copy; the sheet keeps what it holds.
+  rerender(<QuickAddSheet {...props} shared={null} />);
+  expect(input.value).toBe("An article\nhttps://example.com/a");
+  fireEvent.click(screen.getByRole("button", { name: "Add" }));
+  await waitFor(() => expect(props.onAdd).toHaveBeenCalledWith("pinned", "An article\nhttps://example.com/a"));
+  await waitFor(() => expect(input.value).toBe(""));
+});
+it("says when the shared text was shortened, until it is added", async () => {
+  const { props } = setup({ shared: { text: "Long", cut: true } });
+  expect(screen.getByText("The shared text was shortened to 2,000 characters.")).toBeTruthy();
+  expect(screen.getByLabelText("Text to add").maxLength).toBe(2000);
+  fireEvent.click(screen.getByRole("button", { name: "Add" }));
+  await waitFor(() => expect(props.onAdd).toHaveBeenCalledWith("pinned", "Long"));
+  await waitFor(() => expect(screen.queryByText(/was shortened/)).toBeNull());
+});
+it("shows shared text to copy when no note has Quick add on", () => {
+  const { props } = setup({ notes: [], shared: { text: "Keep this", cut: false } });
+  expect(screen.getByText("Turn on Quick add in a note's ⋯ menu to list it here.")).toBeTruthy();
+  const box = screen.getByLabelText("Shared text");
+  expect(box.value).toBe("Keep this"); expect(box.readOnly).toBe(true);
+  expect(screen.queryByRole("button", { name: "Add" })).toBeNull();
+  expect(props.onDraft).toHaveBeenLastCalledWith(true);
+});

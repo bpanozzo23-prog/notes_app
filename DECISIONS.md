@@ -2242,3 +2242,98 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   saved `.md` (same bytes) and the fallback message read; Share… was called with the tap's
   activation live. Not seen: the phone, the real Android share sheet, receiving apps, Samsung
   Keyboard.
+
+## Share → Notes (0.4.12, 2026-11-14)
+
+- 2026-11-14 — Owner's choices: the installed app is a target in Android's Share menu and shared
+  text opens the Quick add sheet (the BRIEF's Tier 4 item); the text travels **inside the
+  request, never in a web address**; **`https` addresses in any Quick add line become links**,
+  shared or typed. Plan: `~/.claude/plans/shimmering-coalescing-valiant.md`.
+- 2026-11-14 — The manifest's `share_target` is a **POST** to `./share-target`
+  (`application/x-www-form-urlencoded`, fields `title`, `text`, `url`), answered by
+  `public/share-target.js`, which the generated service worker loads through
+  `workbox.importScripts`. It stores the three fields as one entry in the Cache Storage box
+  `notes_app-share-target` and redirects (303) to `./?shared`; any failure redirects to
+  `./?quick-add`, so the app still opens. — A GET share target would have been a manifest-only
+  change, but puts the shared text in the app's address, where Chrome may record it in history
+  (synced to the Google account when history sync is on) and where a missing worker would send
+  it to GitHub Pages in a logged URL. `importScripts` keeps the worker generated (`generateSW`):
+  no hand-written worker, and the update machinery is untouched. Workbox's own routes answer
+  only GET, so the add-on's listener is the only one that can answer this POST. The box name
+  carries the app's name because mi-cuaderno shares the origin and Cache Storage is per origin.
+  A file share is not declared; the add-on ignores any field that is not text and also reads a
+  multipart form, so pictures can be added later without changing the hand-off.
+- 2026-11-14 — The app reads the box **once, when the notebook has opened, and empties it**
+  (`takeShared` in `src/lib/shareTarget.js`, boot step "checking for shared text", just before
+  the sheet is restored); a start without `?shared` deletes a leftover unread. `?shared` holds
+  no text and is stripped only after that read (`?quick-add` is still stripped at once). —
+  Shared text must not stay in storage, and a stalled read must name its step (the 0.4.6
+  lesson). Reading after the notebook opens means a failed start leaves both `?shared` and the
+  share in place, so Reload finds them *(Codex review; the first version read and deleted the
+  share before opening the notebook)*. Plain-HTTP pages have no Cache Storage: `takeShared`
+  returns nothing there, so `?shared` on the phone's dev server opens an empty sheet. Accepted:
+  a second window starting at the same instant as a share could empty the box first; the sheet
+  would open empty and the owner shares again.
+- 2026-11-14 — The text reaches the sheet as `shared` (`{ text, cut }`), seeds its box once, and
+  the sheet tells the app on mount (`onShared`) so the app drops its copy. — Back, Forward and a
+  later hold on + keep the existing rule: a reopened sheet is empty. The draft rules are the
+  existing ones (a non-blank box holds the automatic update reload; read-only notebooks show
+  their message).
+- 2026-11-14 — `composeShared`: title, text and address each on their own line, except a title
+  or address already contained in the text, or a title equal to the address. Cut to 2,000
+  characters (`QUICK_ADD_MAX`, the sheet's existing limit, now shared), never through a
+  surrogate pair; the sheet says "The shared text was shortened to 2,000 characters." — Android
+  fills `title` from the page title and puts the address inside `text`; `url` is rarely filled.
+  The worker caps each field at 20,000 characters before storing.
+- 2026-11-14 — With no note marked for Quick add, the sheet shows its usual hint and the shared
+  text in a read-only box labelled "Shared text". — The text would otherwise vanish. No "new
+  note" button: capture goes to an Inbox and "new note or existing" is a review-time decision
+  (2026-10-26).
+- 2026-11-14 — Links in Quick add (`linked` in `src/lib/quickAdd.js`): each `https://…` run gets
+  the editor's link mark (`noteSchema.marks.link.create`), if it parses as a URL and passes the
+  editor's rule, now exported as `isAllowedLink` from `src/editor/extensions.js` and used by
+  both. Trailing `. , ; : ! ? ' " ” ’ » …` stay outside, and so does a `)`, `]` or `}` that
+  closes nothing inside the address (`…/Macondo_(pueblo)` and `https://[::1]/` keep theirs). `http://`, `mailto:` and bare
+  domains stay plain text. — The editor allows only `https`, `mailto` and `note` links, and
+  typed text must not become a link by guesswork. The stored HTML equals what the editor writes
+  for the same link (tested through `normalizeBody`), so reopening the note changes nothing.
+  Deviation from the plan: the bracket rule (the plan left every trailing `)` outside).
+- 2026-11-14 — Accepted limits: only the installed, published app receives shares (not testable
+  on the dev server); the Share menu entry appears when Chrome rebuilds the WebAPK (a day or
+  more); a share while the app is open reloads it (editor input is flushed by the existing
+  `pagehide`/`visibilitychange` saves; an open Claude conversation or unsent Quick add draft is
+  lost, as with the shortcut); if the worker is missing (site data cleared) one share goes to
+  GitHub Pages as a POST body and gets an error page (BRIEF §7); shared text held in the sheet
+  is lost if Android closes the app.
+- 2026-11-14 — Codex review of the diff (read-only, `xhigh`, with `< /dev/null`). The worker
+  add-on, the import path, the listener order and the manifest entry were found clean. Five
+  findings, each reproduced as a failing test first, then fixed:
+  - **An update that activated during start-up reloaded the app and lost the shared text**: the
+    sheet reports its draft in an effect, one render after the boot lock is released. The boot
+    task now raises the draft flag together with the text, before the lock goes.
+  - **A failed notebook open threw the share away** (read and deleted before the open). Fixed by
+    the read order above.
+  - **A failed `caches.delete` left the text stored.** `takeShared` now falls back to deleting
+    the box's entries one by one; if that fails too, the next start tries again. So "always
+    empties" is "empties, and retries at every start".
+  - **A `]` or `}` after an address ended up inside the link** (`[https://example.com/a]`). The
+    unmatched-closer rule now covers all three bracket kinds.
+  - **Older than this change, more likely with shares:** a form feed or NUL in added text was
+    stored as typed, and the next add rewrote that line (the editor's parsing collapses form
+    feeds and drops NUL). `quickAddHtml` now stores the parse-stable form for these too.
+
+- 2026-11-14 — Verification. Full `npm test` once on the final code: 104 files, 2,799 of 2,799.
+  `npm run build` passes; the generated `sw.js` holds `importScripts("share-target.js")` and
+  the manifest holds `share_target`. `npm run browser-checks` on the final code, built app with
+  its real worker: 22 of 22, including the manifest entry, a form POST to `share-target` online
+  and offline opening the sheet with the text, the address left without a query, the box
+  emptied, **no share request reaching the test server**, and Add writing the line with a link
+  (`09-share-sheet`, `09b-share-added` read). `npm run shots` (before the review fixes, which
+  change no screen): 243 PNGs; `00b-share-no-quick-add-note`, `194f`–`194h` read. The dev
+  server has no worker, so the shots put the share where the worker would and open `?shared`.
+  A first shots run failed at the existing "Trash (1)" step: docs were edited while it ran and
+  the page most likely reloaded; untouched, the rerun passed. Note for later: the sample
+  notebook's trashed note (deleted 2026-10-15) is now past the 30-day limit, so any app start
+  after importing the sample empties it from Trash; a reload added to the shots before the
+  Trash steps would break them. Not seen: the phone, the real Android Share menu, the WebAPK
+  update, a share while the app is open, Chrome's history.

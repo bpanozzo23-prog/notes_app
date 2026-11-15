@@ -34,11 +34,13 @@ for (const name of ["a", "b"]) {
 const types = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".webmanifest": "application/manifest+json",
   ".png": "image/png", ".svg": "image/svg+xml", ".ico": "image/x-icon", ".woff2": "font/woff2" };
 let release = resolve(out, "build-a");
-const served = [], claudeRequests = [], answers = [];
+const served = [], claudeRequests = [], answers = [], sharePosts = [];
 const wait = (ms) => new Promise((done) => setTimeout(done, ms));
 const server = createServer(async (req, res) => {
   const path = new URL(req.url, "http://local").pathname;
   if (req.method === "POST" && path === "/notes_app/__fake-anthropic/v1/messages") return claude(req, res);
+  // Share → Notes is answered by the worker; a share that reaches the server has left the phone.
+  if (path === "/notes_app/share-target") { sharePosts.push(req.method); res.writeHead(405).end(); return; }
   const file = resolve(release, path.replace(/^\/notes_app\/?/, "") || "index.html");
   if (!path.startsWith("/notes_app/") || !file.startsWith(release + sep)) { res.writeHead(404).end(); return; }
   try {
@@ -129,6 +131,33 @@ async function checkQuickAddLaunch() {
   return clean;
 }
 await attempt("Quick add shortcut opens the sheet and consumes its query", checkQuickAddLaunch);
+await attempt("manifest has a Share target under the app base, sent as a POST", async () => {
+  const manifest = JSON.parse(await readFile(resolve(out, "build-a/manifest.webmanifest"), "utf8"));
+  const target = manifest.share_target, action = new URL(target?.action ?? "", url), base = new URL(url);
+  return target?.method === "POST" && action.origin === base.origin && action.pathname === `${base.pathname}share-target` &&
+    target.params?.title === "title" && target.params?.text === "text" && target.params?.url === "url";
+});
+// What Android's Share menu does: a form POST to the share target. The worker keeps the text
+// and opens the app; the address, the server and storage must end up without it.
+const sharedText = "Un artículo\nhttps://example.com/articulo";
+async function shareIntoApp() {
+  const before = sharePosts.length;
+  await page.evaluate(() => {
+    const form = document.createElement("form");
+    form.method = "post"; form.action = "share-target";
+    for (const [name, value] of [["title", "Un artículo"], ["text", "https://example.com/articulo"], ["url", ""]]) {
+      const field = document.createElement("textarea"); field.name = name; field.value = value; form.append(field);
+    }
+    document.body.append(form); form.submit();
+  }).catch(() => {});
+  await page.getByRole("dialog", { name: "Quick add", exact: true }).waitFor();
+  const text = await page.getByLabel("Text to add").inputValue();
+  const stored = await page.evaluate(() => caches.has("notes_app-share-target"));
+  const problems = [text !== sharedText && `text ${JSON.stringify(text)}`, new URL(page.url()).search !== "" && `address ${page.url()}`,
+    new URL(page.url()).pathname !== new URL(url).pathname && `path ${page.url()}`, stored && "share still stored",
+    sharePosts.length !== before && "the server received the share"].filter(Boolean);
+  return { ok: problems.length === 0, detail: problems.join("; ") };
+}
 
 // The made-up sample notebook, through the app's own import.
 await button("Settings").click();
@@ -152,11 +181,18 @@ await attempt("reopens offline with the notes", async () => {
   await button("Vocabulario — comida").waitFor();
   // The browser's own background worker-update check (sw.js and the workbox file it imports) isn't
   // covered by offline emulation and isn't page traffic; every app file must come from the cache.
-  const fetched = served.slice(before).filter((path) => !/\/(sw|workbox-[\w-]+)\.js$/.test(path));
+  const fetched = served.slice(before).filter((path) => !/\/(sw|workbox-[\w-]+|share-target)\.js$/.test(path));
   return { ok: fetched.length === 0, detail: fetched.join(", ") };
 });
 await shot(page, "01-offline-reopen");
 await attempt("Quick add shortcut opens offline and consumes its query", checkQuickAddLaunch);
+await attempt("a share opens Quick add with its text offline, and nothing is sent", async () => {
+  const result = await shareIntoApp();
+  await shot(page, "01b-offline-share");
+  await button("Cancel").click();
+  await page.getByRole("dialog", { name: "Quick add", exact: true }).waitFor({ state: "hidden" });
+  return result;
+});
 await attempt("Ask is disabled offline", async () => {
   await page.getByRole("button", { name: "Ask Claude" }).click();
   await page.getByText("You're offline. Claude needs a connection.").first().waitFor();
@@ -279,6 +315,22 @@ await attempt("the notes survived the update", async () => {
   return (await buildOf(page)) === "b";
 });
 await shot(page, "08-after-update");
+
+// 9. Share → Notes online, on the new release: the text arrives, Add writes it with a link.
+await attempt("a share opens Quick add with its text; address, storage and server stay clean", shareIntoApp);
+await shot(page, "09-share-sheet");
+await attempt("Add writes the shared line into the note's Inbox with a tappable link", async () => {
+  await button("Add").click();
+  const added = page.getByText(/^Added to “.+”$/);
+  await added.waitFor();
+  const title = (await added.innerText()).replace(/^Added to “(.+)”$/, "$1");
+  await button(title).click();
+  const link = page.locator('.ProseMirror li a[href="https://example.com/articulo"]');
+  await link.waitFor();
+  await shot(page, "09b-share-added");
+  const line = await link.locator("xpath=ancestor::li[1]").innerText();
+  return { ok: await link.count() === 1 && line.includes("Un artículo"), detail: `${title}: ${JSON.stringify(line)}` };
+});
 
 await browser.close();
 server.close();

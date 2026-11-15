@@ -56,3 +56,36 @@ it("stores added text in its parse-stable form, so a later add never rewrites an
   expect(second).toContain(item("A B<br>indented line"));
   expect(second.replace(item("Next"), "")).toBe(first);
 });
+
+const link = (href, text = href) => `<a target="_blank" rel="noopener noreferrer nofollow" href="${href}">${text}</a>`;
+it.each([
+  ["https://example.com/a?b=1&c=2", link("https://example.com/a?b=1&amp;c=2")],
+  ["Read https://example.com/a, then https://example.org.", `Read ${link("https://example.com/a")}, then ${link("https://example.org")}.`],
+  ["(see https://example.com/a)", `(see ${link("https://example.com/a")})`],
+  ["https://en.wikipedia.org/wiki/Macondo_(pueblo)", link("https://en.wikipedia.org/wiki/Macondo_(pueblo)")],
+  ["«https://example.com/a»… “https://example.com/b”!", `«${link("https://example.com/a")}»… “${link("https://example.com/b")}”!`],
+  ["An article\nHTTPS://Example.com/Path", `An article<br>${link("HTTPS://Example.com/Path")}`],
+  ["[https://example.com/a] {https://example.com/b}", `[${link("https://example.com/a")}] {${link("https://example.com/b")}}`],
+  ["[un artículo](https://example.com/a)", `[un artículo](${link("https://example.com/a")})`],
+  ["https://[::1]/x[1] and https://example.com/a{b}", `${link("https://[::1]/x[1]")} and ${link("https://example.com/a{b}")}`],
+  ["http://example.com stays plain", "http://example.com stays plain"],
+  ["https:// and https://. are not addresses", "https:// and https://. are not addresses"],
+  ["mailto:owner@example.com note:abc ftp://example.com", "mailto:owner@example.com note:abc ftp://example.com"],
+])("turns https addresses into the editor's own links: %j", (text, expected) => {
+  const output = quickAddHtml(inbox(), text);
+  expect(output).toBe(normalizeBody(inbox(bullets(expected))));
+  expect(normalizeBody(output)).toBe(output);
+});
+it("links an address after the date prefix and leaves earlier lines alone on the next add", () => {
+  const first = quickAddHtml(inbox(), "https://example.com/a", { date: true, now: new Date(2026, 10, 14, 12) });
+  expect(first).toBe(normalizeBody(inbox(bullets(`14 Nov — ${link("https://example.com/a")}`))));
+  const second = quickAddHtml(first, "Next");
+  expect(second.replace(item("Next"), "")).toBe(first);
+});
+it("drops NUL and collapses form feeds as the editor's parsing would, so the next add leaves the line alone", () => {
+  const first = quickAddHtml("<p>Keep</p>", "A\fB\u0000C \f D\nhttps://example.com/a\u0000b");
+  expect(first).toContain(item(`A BC D<br>${link("https://example.com/ab")}`));
+  expect(normalizeBody(first)).toBe(first);
+  const second = quickAddHtml(first, "Next");
+  expect(second.replace(item("Next"), "")).toBe(first);
+});

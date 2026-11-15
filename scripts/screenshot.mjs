@@ -116,6 +116,23 @@ const checkPopup = async () => {
 };
 
 await page.goto(url, { waitUntil: "networkidle" });
+// Share → Notes. The dev server has no offline worker, so the share is put where the worker's
+// add-on (public/share-target.js) would leave it, and the app is opened as the worker would.
+const shareIntoApp = async (shared) => {
+  await page.evaluate(async (value) => {
+    await (await caches.open("notes_app-share-target")).put("__shared", new Response(JSON.stringify(value)));
+  }, shared);
+  await page.goto(url + "?shared", { waitUntil: "networkidle" });
+  await page.getByRole("dialog", { name: "Quick add", exact: true }).waitFor();
+  assert.equal(new URL(page.url()).search, "", "the share must not stay in the address");
+  assert.equal(await page.evaluate(() => caches.has("notes_app-share-target")), false, "the stored share must be deleted once read");
+};
+// Before any note exists: shared text with no note marked for Quick add stays readable.
+await shareIntoApp({ title: "Un artículo sobre Macondo", text: "https://example.com/macondo", url: "" });
+assert.equal(await page.getByLabel("Shared text").inputValue(), "Un artículo sobre Macondo\nhttps://example.com/macondo");
+await shot("00b-share-no-quick-add-note");
+await button("Cancel").click();
+await page.getByRole("dialog", { name: "Quick add", exact: true }).waitFor({ state: "hidden" });
 // Non-screenshot smoke check: prove the in-page wrapper remains a stepped stream.
 await page.evaluate(() => {
   window.__claudeSmoke = { text: "", done: false, error: false };
@@ -1178,6 +1195,22 @@ await backFromScreen(page);
   await shot("194d-quick-add-note");
   await button("Note options").click(); await shot("194e-note-options-switches");
   await button("Cancel").click(); await back();
+  // Share → Notes: the sheet arrives holding the shared text; Add stores the address as a link.
+  await shareIntoApp({ title: "Un artículo sobre Macondo", text: "https://example.com/macondo", url: "" });
+  assert.equal(await page.getByLabel("Text to add").inputValue(), "Un artículo sobre Macondo\nhttps://example.com/macondo");
+  await shot("194f-share-sheet");
+  await button("Add").click(); await page.getByText(/^Added to “Libros por leer”$/).waitFor();
+  await page.getByRole("dialog", { name: "Quick add", exact: true }).waitFor({ state: "hidden" });
+  await button("Libros por leer").click(); await page.getByLabel("Note body").waitFor();
+  assert.equal(await page.locator('.ProseMirror li a[href="https://example.com/macondo"]').count(), 1);
+  await shot("194g-share-note");
+  await back();
+  await shareIntoApp({ title: "", text: "Una cita larga. ".repeat(160), url: "" });
+  assert.equal((await page.getByLabel("Text to add").inputValue()).length <= 2000, true);
+  await page.getByText("The shared text was shortened to 2,000 characters.").waitFor();
+  await shot("194h-share-shortened");
+  await button("Cancel").click();
+  await page.getByRole("dialog", { name: "Quick add", exact: true }).waitFor({ state: "hidden" });
 }
 // Leave a note open for the existing database guards and reload checks.
 await button("Vocabulario — comida").click();

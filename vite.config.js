@@ -16,6 +16,10 @@ export default defineConfig({
     manifest: {
       name: "Notes", short_name: "Notes", description: "Personal notes",
       display: "standalone", background_color: "#faf9f6", theme_color: "#faf9f6",
+      // Share → Notes: Android's Share menu POSTs here; public/share-target.js (loaded into the
+      // generated worker below) answers it, so shared text never appears in a web address.
+      share_target: { action: "./share-target", method: "POST", enctype: "application/x-www-form-urlencoded",
+        params: { title: "title", text: "text", url: "url" } },
       shortcuts: [{ name: "Quick add", short_name: "Quick add", description: "Add a line to one of your notes", url: "./?quick-add",
         icons: [{ src: "icons/icon-192.png", sizes: "192x192", type: "image/png" }] }],
       icons: [
@@ -24,6 +28,6 @@ export default defineConfig({
         { src: "icons/icon-512-maskable.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
       ],
     },
-    workbox: { globPatterns: ["**/*.{js,css,html,ico,png,svg,webmanifest,woff2}"] },
+    workbox: { globPatterns: ["**/*.{js,css,html,ico,png,svg,webmanifest,woff2}"], importScripts: ["share-target.js"] },
   })],
 });

@@ -4,6 +4,7 @@ import { createNote, createConflictCopy, NoteChangedElsewhereError, purgeExpired
 import { cleanupFiles } from "./db/files.js";
 import { quickAddToNote } from "./db/quickAdd.js";
 import { noteTitle } from "./lib/notebookView.js";
+import { takeShared } from "./lib/shareTarget.js";
 import QuickAddSheet from "./components/QuickAddSheet.jsx";
 import { SaveQueue } from "./lib/saveQueue.js";
 import { requestPersistence } from "./lib/persistence.js";
@@ -61,6 +62,8 @@ export default function App() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [quickAddDraft, setQuickAddDraft] = useState(false);
+  const [sharedDraft, setSharedDraft] = useState(null);
+  const [sharedTaken] = useState(() => () => setSharedDraft(null));
   const [waitingForReload, setWaitingForReload] = useState(false);
   const [workerReady, setWorkerReady] = useState(false);
   const activatedWorker = useRef(false);
@@ -91,8 +94,13 @@ export default function App() {
     });
     // The blank boot screen's scroll must not overwrite the saved visit before rows load.
     void nav.run(async () => {
-      const quickAdd = new URLSearchParams(window.location.search).has("quick-add");
-      if (quickAdd) window.history.replaceState(window.history.state, "", window.location.pathname);
+      // ?shared: another app's Share menu sent text (public/share-target.js); it opens Quick add too.
+      const params = new URLSearchParams(window.location.search);
+      const fromShare = params.has("shared"), quickAdd = fromShare || params.has("quick-add");
+      const stripQuery = () => window.history.replaceState(window.history.state, "", window.location.pathname);
+      // ?shared holds no text, so it stays until the share has been read: if opening the notebook
+      // fails, Reload still finds the share waiting.
+      if (quickAdd && !fromShare) stripQuery();
       // index.html shows this step if the app hasn't finished opening after a few seconds.
       const boot = window.__notesBoot ?? {};
       try {
@@ -106,7 +114,16 @@ export default function App() {
           catch (error) { setCleanupError(error.message || "Image cleanup failed."); }
         }
         boot.step = "loading the notes";
-        nav.restore(await refresh(), { quickAdd });
+        const data = await refresh();
+        // The shared text waits in Cache Storage, never in the address. Every start that gets
+        // this far empties that box, so nothing shared is left behind in storage.
+        boot.step = "checking for shared text";
+        const sharedText = await takeShared(fromShare);
+        if (fromShare) stripQuery();
+        // The draft flag goes up with the text, before the boot lock is released: an update that
+        // activated during start-up must wait for it like any unsent Quick add.
+        if (sharedText) { setSharedDraft(sharedText); setQuickAddDraft(true); }
+        nav.restore(data, { quickAdd });
         void getClaudeStatus().then((status) => { if (status.ready) return loadClaudeSdk(); }).catch(() => {});
         boot.step = "drawing the app";
         setReady(true);
@@ -256,7 +273,7 @@ export default function App() {
     {ready && route.screen === "list" && <SyncBar onOpen={open} busy={locked} />}
     {ready && <div className="flex flex-1 flex-col" inert={locked} aria-busy={locked}>
       {route.screen === "list" && <NotesList key={route.key} {...notebook} busy={locked} readOnly={access.readOnly} trashCount={notebook.trash.length} filter={route.filter} query={route.query} onQuery={nav.setQuery} onFilter={nav.setFilter} claudeReady={claudeReady} onOpen={open} onNew={() => run(newNote)} onQuickAdd={openQuickAdd} />}
-      {route.screen === "list" && route.quickAdd && <QuickAddSheet notes={notebook.notes} folders={notebook.folders} readOnly={access.readOnly} busy={locked} error={error} onClose={back} onAdd={addToNote} onDraft={setQuickAddDraft} />}
+      {route.screen === "list" && route.quickAdd && <QuickAddSheet notes={notebook.notes} folders={notebook.folders} readOnly={access.readOnly} busy={locked} error={error} shared={sharedDraft} onShared={sharedTaken} onClose={back} onAdd={addToNote} onDraft={setQuickAddDraft} />}
       {route.screen === "note" && selected && <Note key={route.key} {...shared} find={route.find} findShown={route.findShown} onFindShown={nav.setFindShown} onClearFind={nav.clearFind} onImageError={setMessage} initialNote={selected} notes={notebook.notes} folders={notebook.folders} queue={queue} status={status} onDelete={deleteNote} onOpenNote={openNote}
         formatting={formatting} claudeReady={claudeReady} onOpen={open} setMessage={setMessage} />}
       {route.screen === "claude-review" && <ClaudeReview openNote={openNote} {...notebook} {...shared} queue={queue} claudeReady={claudeReady} />}

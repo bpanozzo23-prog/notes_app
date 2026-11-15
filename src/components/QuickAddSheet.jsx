@@ -2,12 +2,16 @@ import { useEffect, useState } from "react";
 import { getPref, setPref } from "../db/db.js";
 import { dayMonth } from "../lib/dates.js";
 import { noteTitle, visibleNotes } from "../lib/notebookView.js";
+import { QUICK_ADD_MAX } from "../lib/shareTarget.js";
 import Dialog from "./Dialog.jsx";
 
-export default function QuickAddSheet({ notes, readOnly, busy, error, onClose, onAdd, onDraft }) {
+// `shared` is { text, cut } from another app's Share menu (src/lib/shareTarget.js). It seeds the
+// box once; `onShared` tells the app it has been taken, so a later sheet starts empty.
+export default function QuickAddSheet({ notes, readOnly, busy, error, shared = null, onShared, onClose, onAdd, onDraft }) {
   const chips = visibleNotes(notes.filter((note) => note.quickAdd), { type: "all" });
   const [selected, setSelected] = useState(null);
-  const [text, setText] = useState("");
+  const [text, setText] = useState(shared?.text ?? "");
+  const [shortened, setShortened] = useState(!!shared?.cut);
   const chosen = chips.find((note) => note.id === selected) ?? chips[0];
   const hasText = !!text.trim();
   useEffect(() => {
@@ -15,13 +19,14 @@ export default function QuickAddSheet({ notes, readOnly, busy, error, onClose, o
     void getPref("quickAddLast").then((id) => { if (active) setSelected((current) => current ?? id); }).catch(() => {});
     return () => { active = false; };
   }, []);
+  useEffect(() => { onShared?.(); }, [onShared]);
   useEffect(() => { onDraft(hasText); }, [hasText, onDraft]);
   useEffect(() => () => onDraft(false), [onDraft]);
   async function add() {
     if (!chosen || !hasText || busy || readOnly) return;
     const id = chosen.id;
     if (await onAdd(id, text)) {
-      setText("");
+      setText(""); setShortened(false);
       // Remembering a chip is optional; a failed preference write must never invite a duplicate add.
       void setPref("quickAddLast", id).catch(() => {});
     }
@@ -35,10 +40,14 @@ export default function QuickAddSheet({ notes, readOnly, busy, error, onClose, o
         {chips.map((note) => <button key={note.id} role="radio" aria-checked={chosen.id === note.id} className="filter-chip max-w-full truncate"
           disabled={busy} onClick={() => setSelected(note.id)}>{noteTitle(note)}</button>)}
       </div>
-      <textarea rows={3} maxLength={2000} data-initial-focus enterKeyHint="enter" aria-label="Text to add" className="app-input w-full"
+      <textarea rows={3} maxLength={QUICK_ADD_MAX} data-initial-focus enterKeyHint="enter" aria-label="Text to add" className="app-input w-full"
         placeholder={chosen.addDate ? `${dayMonth(new Date())} — …` : "What do you want to add?"} disabled={busy || readOnly}
         value={text} onChange={(event) => setText(event.target.value)} />
-    </> : <p>Turn on Quick add in a note's ⋯ menu to list it here.</p>}
+    </> : <>
+      <p>Turn on Quick add in a note's ⋯ menu to list it here.</p>
+      {hasText && <textarea rows={3} readOnly aria-label="Shared text" className="app-input mt-3 w-full" value={text} />}
+    </>}
+    {shortened && hasText && <p className="mt-3 text-sm">The shared text was shortened to {QUICK_ADD_MAX.toLocaleString("en-GB")} characters.</p>}
     {readOnly && <p className="mt-3 text-sm">Your notes are read-only right now, so nothing can be added.</p>}
     {error && <p role="alert" className="mt-3 text-sm text-red-700">{error}</p>}
   </Dialog>;

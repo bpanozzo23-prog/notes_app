@@ -14,6 +14,8 @@ import LineSpacing, { LINE_SPACINGS } from "./nodes/LineSpacing.js";
 import { Collapsible, CollapsibleListItem } from "./nodes/Collapsible.js";
 import { STARTER_HIGHLIGHT_COLORS } from "./formatting.js";
 
+// The one rule for what a link may point at; Quick add uses it too (src/lib/quickAdd.js).
+export function isAllowedLink(uri) { return /^(https:|mailto:|note:)/i.test(uri) && !/[\u0000-\u0020\u007f]/.test(uri); }
 export const extensions = [
   StarterKit.configure({
     document: false,
@@ -23,7 +25,7 @@ export const extensions = [
     heading: false,
     link: {
       protocols: ["note"], openOnClick: false, autolink: false,
-      isAllowedUri: (uri) => /^(https:|mailto:|note:)/i.test(uri) && !/[\u0000-\u0020\u007f]/.test(uri),
+      isAllowedUri: isAllowedLink,
     },
   }),
   TextStyleKit,

@@ -91,8 +91,9 @@ backup); local-first in IndexedDB, works offline.
 - "Collect" selection: tap several non-adjacent words, apply one formatting to all (mobile
   browsers cannot select non-contiguous ranges natively).
 - Comments / sticky notes attached to a passage, hidden by default.
-- Android share-sheet target ("Share → Notes"); from 0.4.9 it would open the Quick add sheet
-  with the shared text (2026-10-26).
+- ~~Android share-sheet target ("Share → Notes"); from 0.4.9 it would open the Quick add sheet
+  with the shared text (2026-10-26).~~ Built in 0.4.12 (2026-11-14): Notes appears in Android's
+  Share menu and shared text opens the Quick add sheet. Text only; sharing a picture is not built.
 - A count of unsorted Inbox items on the notes list, as a nudge to review (2026-10-26).
 - Claude "file my Inbox items": a Tidy pass that proposes a destination note and section for each
   Inbox line, approved as a set (2026-10-26). Only if sorting by hand turns out to be a chore.
@@ -118,7 +119,10 @@ what it reads to Anthropic under the owner's Claude account terms (not the API t
 uses), and Claude Code keeps transcripts with note text in `~/.claude/projects/`; the XPS history
 keeps notes deleted for good on the phone; nothing else goes to any cloud from there. The published
 app shares its web origin with mi-cuaderno (true since Phase 1b), so each app's code could read
-the other's stored data.
+the other's stored data. Text shared *into* the app from another app (0.4.12, 2026-11-14) is
+handed over inside the phone and never placed in a web address; the one exception is an
+installed app whose offline files are missing (site data cleared), where a single share would
+travel to GitHub's server as a request body and fail there.
 
 ## 8. Phases
 
