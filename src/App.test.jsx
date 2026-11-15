@@ -575,12 +575,12 @@ it("opens a newer database for reading, allows text export/copy, and disables ed
   const writeText = vi.fn().mockResolvedValue(undefined);
   Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
   fireEvent.click(screen.getByRole("button", { name: "Note options" }));
-  expect(screen.getByRole("button", { name: "Copy as text" }).disabled).toBe(false);
+  for (const label of ["Copy as text", "Share…", "Save as .md"]) expect(screen.getByRole("button", { name: label }).disabled).toBe(false);
   for (const label of ["Fold all sections", "Unfold all sections"]) expect(screen.getByRole("button", { name: label }).disabled).toBe(true);
   expect(screen.getByRole("button", { name: "Move to Trash…" }).disabled).toBe(true);
   fireEvent.click(screen.getByRole("button", { name: "Copy as text" }));
   await screen.findByText("Copied as text.");
-  expect(writeText.mock.calls[0][0]).toContain("# Newer notebook\nFolder: No folder");
+  expect(writeText.mock.calls[0][0]).toBe("# Newer notebook\n\n### Section\n\nBody\n");
   await back();
   fireEvent.click(screen.getByRole("button", { name: "Folders", exact: true }));
   await screen.findByLabelText("New folder name");

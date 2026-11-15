@@ -41,7 +41,8 @@ Free-form Spanish notes are welcome here.
 - **Storage format is HTML**, not Markdown: the owner's formatting wishes include colour, font
   size and underline, which Markdown cannot express. Tiptap reads and writes HTML ~~without loss~~
   within the configured extensions' supported vocabulary (clarified 2026-10-16), and
-  an LLM reads HTML fine. A Markdown projection may be derived for display or search but is never
+  an LLM reads HTML fine. A Markdown projection may be derived ~~for display or search~~ for
+  display, search or export (one note shared or saved as a `.md` file, 2026-11-01) but is never
   the source of truth.
 - **Everything about the toolbar is data**, so the owner can add, remove and reorder entries, and
   the colour menu is a list the owner orders (~~recent-first is the default~~ manual order only,
@@ -106,8 +107,11 @@ owner's own XPS; feature parity with Samsung Notes for its own sake.
 Notes are personal data. They live in the browser's IndexedDB and in backups the owner keeps; the
 repo never contains a note, a backup, or a key. If the repo becomes public, that rule is what makes
 it safe. ~~Notes leave the device only when the owner sends a Claude request, and then only to
-Anthropic (2026-10-18).~~ Notes leave the phone only to Anthropic when the owner sends a Claude
-request from the app, and to the owner's XPS while sync is connected (2026-10-19). On the XPS
+Anthropic (2026-10-18).~~ ~~Notes leave the phone only to Anthropic when the owner sends a Claude
+request from the app, and to the owner's XPS while sync is connected (2026-10-19).~~ Notes leave
+the phone only to Anthropic when the owner sends a Claude request from the app, to the owner's
+XPS while sync is connected (2026-10-19), and to whichever app the owner picks when sharing one
+note (2026-11-02). On the XPS
 (Phase 4): the notes sit in `~/notes` and `~/.local/share/notes_app-sync/` on a disk that isn't
 encrypted, readable by programs running as the owner; a Claude Code session in `~/notes` sends
 what it reads to Anthropic under the owner's Claude account terms (not the API terms the app

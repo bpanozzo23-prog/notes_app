@@ -2148,3 +2148,97 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   not run; owner phone verification remains pending.
 - 2026-10-30 — Owner verified the change on the phone ("looks good") and authorized commit
   and deployment. Release 0.4.10 is app-only; the sync service needs no deployment.
+
+## Share or save one note as Markdown (2026-11-01)
+
+- 2026-11-01 — Owner's choices: one note can leave the app as a Markdown file, to move it around
+  or hand it to an LLM, and so `.md` files no longer need a separate app. The file is `# Title`
+  then the body with its headings one level down (no folder, tags or dates line); Note options
+  gains **Share…** and **Save as .md**; **Copy as text** gives the same Markdown. Plan:
+  `~/.claude/plans/ethereal-kindling-prism.md`.
+- 2026-11-01 — Share sends `Title.txt` with type exactly `text/plain`, holding the Markdown;
+  Save as .md downloads `Title.md`. — Chrome on Android shares only listed file types and checks
+  both the name's extension and the exact MIME type; `md` and `text/markdown` aren't listed, so a
+  `.md` share fails with NotAllowedError (Chromium
+  `components/browser_ui/webshare/android/.../ShareServiceImpl.java`, read 2026-11-01). `txt`
+  with `text/plain` is listed. Only `files` is passed, so receiving apps take the file rather
+  than a title or text.
+- 2026-11-01 — A separate serializer, `src/lib/markdown.js`, walks the same parsed note as
+  `src/claude/projection.js`, which is untouched. — The projection feeds Claude's cached prompts,
+  Settings → Export notes as text and the XPS `notebook.md` (built on the phone by
+  `notebookToText(..., view: true)` in `src/sync/round.js`); a change there would reach the XPS at
+  the next sync. The projection also isn't valid Markdown in places (nested numbered lists
+  indented 2, checklists without `- `, callouts as `[Note]`, no code fences, line breaks lost).
+  `@tiptap/markdown` was not used: it adds `marked`, escapes naively, and would still need custom
+  code for callouts, images and note links. No new dependency.
+- 2026-11-01 — Markdown rules: bold `**`, italic `*`, strikethrough `~~`, code with a fence longer
+  than any backtick run inside; spaces at a mark's edge go outside its markers; web and mail
+  links as `[text](url)` (`<url>` when it holds spaces, brackets or parentheses); links to other
+  notes as `text [→ Title]` (`[→ a deleted note]` for Trash or missing), or just the words when
+  they already are that note's title; line breaks as `\` + newline; callouts as GitHub alerts
+  (`> [!NOTE]`, `TIP`, `WARNING`, `IMPORTANT`); checklists `- [ ]`/`- [x]`; nested lines
+  indented to their parent's text (3 under `1.`, 4 under `10.`); pictures as `[image]`; folded
+  lines and sections always included. Underline, colour, highlight, size, typeface, line
+  spacing and divider styles drop. Text escaping follows ProseMirror's Markdown serializer plus
+  CommonMark cases it misses (`_` only outside words, `<` before anything but a space, `&`
+  before an entity, also inside link addresses; line starts `#`, `>`, `-`, `+`, `1.`/`1)`, `=`).
+  `note:` links are recognised in any case, as the editor does. A numbered list Markdown can't
+  number (below 0, above 999999999) starts at 1. Checked with markdown-it (CommonMark +
+  strikethrough + task lists) in the scratchpad, not added to the repo.
+- 2026-11-01 — Accepted limits: emphasis that ends in punctuation against a letter
+  (`**Note:**text`) shows its asterisks; two neighbouring lists of the same kind merge into
+  one; `|` isn't escaped (a table needs a delimiter row, which the line-start `-` escape blocks
+  in most cases). Added 2026-11-02: marks that cross inside a word (bold `ab`, italic `bc` in
+  `abc`) show asterisks, since Markdown can't write crossing marks and the close-and-reopen
+  run `****` between letters breaks CommonMark's rule of three; repeated spaces become one,
+  as the editor itself does when it reopens a note.
+- 2026-11-01 — An untitled note is written as it stands, without `# Title` and without moving
+  its headings; its file is named after its first line. — Its title is its first line, so the
+  heading would repeat that line. Deviation from the plan, made while building.
+- 2026-11-01 — Copy, Share and Save build the text inside the tap from what is on screen: held
+  Android input forced through, the editor's current HTML, the title field, the note's text
+  recomputed (the screen's copy is stale and names untitled notes), this note's own entry
+  replacing its stale copy in the link lookup. The save queue flushes alongside, not before. —
+  Chrome opens the share sheet only from a fresh tap (transient activation), so nothing may be
+  awaited before `navigator.share`; the text can also leave while a save is failing. Supersedes
+  the 2026-10-18 rule that Copy flushes saves and reads fresh notes first; the save still starts
+  every time. `takeHeldInput` is shared with the save queue's before-flush hook.
+- 2026-11-01 — Share isn't wrapped in `run` (its busy state would last as long as the system
+  sheet). No share support (the plain-HTTP dev server, desktop browsers) → the `.md` downloads
+  with "This browser can't share files, so “…” was downloaded instead."; cancelling says
+  nothing; any other failure says "Couldn't share. Use Save as .md instead."
+- 2026-11-01 — File names: NFC; spaces collapsed; control and bidi characters removed;
+  `/ \ : |` → `-`; `* ? " < >` removed; spaces and dots trimmed at both ends; `..` → `…`; at
+  most 60 characters; Windows reserved names get `_`; empty → "Note". — Chrome refuses names with
+  `..`, slashes, leading or trailing spaces or a trailing dot; the rest keeps the file openable
+  on Android and the Surface. Accents and "—" are kept.
+- 2026-11-01 — `noteToText` removed from `src/lib/textExport.js` (no other user);
+  `notebookToText` is byte-for-byte unchanged. The three rows sit at the top of Note options in
+  the order Copy as text, Share…, Save as .md, and stay available on read-only notes.
+- 2026-11-02 — Codex review (read-only, `xhigh`). The first attempt sat idle because a
+  backgrounded `codex exec` waits for stdin; rerun with `< /dev/null`. No path that loses a note;
+  share call confirmed synchronous; `src/claude`, `src/sync`, `server` and `notebookToText`
+  confirmed unchanged. Fixed:
+  - Crossing marks reopened against a space (`**red *blue**** green*`, "green" not italic).
+    Markers now step outside spaces when they close or open, and of the marks opening together
+    the one that lasts longer opens first: `**red *blue*** *green*`.
+  - An empty first line followed by a paragraph pushed the paragraph out of its list item
+    (`-` + blank line ends the item). Now `-\n  Second`.
+  - `&copy;` inside a link address read as ©; `NOTE:` links (any case, as the editor accepts)
+    came out as web links; `<123@example.com>` became a mail link; list starts Markdown can't
+    write gave plain paragraphs; `CON.txt` stayed a reserved name on Windows.
+  - BRIEF §7's privacy sentence now names sharing a note.
+  - Declined: keeping repeated spaces in inline code. The editor collapses them itself when it
+    reopens a note (checked: `<code>x  y</code>` reloads as `x y`), so the file matches the note
+    as the app shows it and as Claude reads it.
+  Each fix has a test; every new output was rendered with markdown-it (scratchpad) and matched.
+- 2026-11-02 — Verification. Full `npm test` once on the final code: 102 files, 2,754 of 2,755
+  passed; the failure was `src/App.test.jsx` still expecting the old Copy text (`Folder: No
+  folder` line), updated to the exact Markdown plus Share…/Save as .md enabled on a newer
+  database; that file rerun alone, 66/66. Targeted: `markdown.test.js` 87, `file.test.js` 17,
+  `Note.share.test.jsx` 7. `npm run build` passes. Guard diff (`src/claude`, `src/sync`, `server`,
+  the text-export snapshot) empty. `npm run shots` (2026-11-01, before the review fixes, which
+  change no screen and no sample-note snapshot): 239 PNGs; Note options, the shared `.txt`, the
+  saved `.md` (same bytes) and the fallback message read; Share… was called with the tap's
+  activation live. Not seen: the phone, the real Android share sheet, receiving apps, Samsung
+  Keyboard.

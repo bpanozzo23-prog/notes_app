@@ -5,7 +5,7 @@ this one is for the owner: what was chosen, why, what it means for the app, what
 and how hard it would be to reverse ("lock-in"). Ordered by lock-in, hardest first. Updated whenever
 `DECISIONS.md` gains an entry with consequences for how the app behaves.
 
-Last updated 2026-10-20, at step 4c (§77).
+Last updated 2026-11-01, at 0.4.11 (§86).
 
 ---
 
@@ -876,6 +876,8 @@ the same tidy text the app already sends Claude when you ask a question.
 treat it like any copy of your notes. It isn't a backup: it can't be imported, has no pictures or
 settings, and doesn't change "Last backup".
 **Lock-in: none.**
+*(2026-11-01: Copy as text now gives the Markdown described in §86; Export notes as text is
+unchanged.)*
 
 ### 56. What Claude actually costs, measured
 
@@ -1596,3 +1598,57 @@ ordinary nested bullet list.
 
 **Owner phone check:** passed on the dev server, 2026-10-26 ("push"); the home-screen "Quick
 add" shortcut verified on the installed app after the update, 2026-10-26.
+
+### 86. Share or save a note as Markdown (0.4.11, 2026-11-01)
+
+**Chosen:** Note options (⋯) has three ways to get one note out of the app, all giving the same
+Markdown text:
+- **Copy as text** puts it on the clipboard (as before, but now real Markdown).
+- **Share…** opens Android's share sheet, so you can send it straight to the Claude app, Gmail,
+  Drive and so on.
+- **Save as .md** puts a Markdown file in Downloads.
+
+The file starts with the note's title as a heading, and your headings move down one level under
+it. For example:
+
+```
+# Vocabulario — comida
+
+### Frutas y verduras
+
+- **la manzana** — apple
+- *la cuenta, por favor* — the bill, please
+```
+
+**Kept:** headings, bold, italic, strikethrough, code, web links, bullet and numbered lists
+(nesting included), checklists, quotes, dividers, and callouts (written the way GitHub and
+Obsidian show them, `> [!TIP]`). A link to another note reads `words [→ Other note]`, or just the
+words when they already are that note's title. Pictures appear as `[image]`. Folded sections and
+lines are always included.
+
+**Dropped:** underline, colours, highlights, sizes, typefaces and line spacing. Markdown can't
+express them.
+
+**Small limits:** bold or italic that ends in punctuation right against a letter (`**Note:**text`),
+or that crosses another style in the middle of a word, shows its asterisks. Two spaces in a row
+become one, which the app itself also does when it reopens a note.
+
+**Why Share sends a `.txt` file:** Android's Chrome shares only a fixed list of file types and
+`.md` isn't on it; a `.md` file would fail with "Permission denied". So Share sends the same
+Markdown named `Title.txt`; Claude and other AI apps read it the same way. Save as .md makes a
+real `.md` file when you want one.
+
+**Untitled notes:** a note without a title is named after its first line, so its file is written
+as it stands (no extra title heading repeating that line).
+
+**Where it works:** the published app opens the share sheet. On the dev server (plain `http://`),
+browsers don't allow sharing, so Share saves the `.md` instead and says so.
+
+**Not chosen:** sharing a `.md` file (Android refuses it); a folder, tags and dates line at the
+top (you chose the title alone); a Markdown library (none handled callouts and note links, and
+the app's own converter is small); changing the text the app sends Claude or the XPS, which stays
+exactly as it was. Opening a `.md` file as a new note could come later.
+
+**What it leads to:** like any copy, a shared or saved note is outside the app's protections.
+
+**Lock-in: none.** No change to the notes, backups or the XPS service.

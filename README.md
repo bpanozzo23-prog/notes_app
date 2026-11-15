@@ -216,11 +216,18 @@ LLM can read. The code may become public; the notes never are.
   change. `docs/DECISIONS-EXPLAINED.md` §85. Owner-verified on the phone (dev server) 2026-10-26;
   released 2026-10-26.
 
-## Running it
+- **Optional Line break button, 0.4.10, 2026-10-30.** Settings → Formatting → Toolbar →
+  Add buttons → Lines & blocks → Line break. Tap it to continue a bullet on a new line without
+  another bullet; Enter still starts the next bullet. Owner-verified on the phone 2026-10-30.
+- **Share or save a note as Markdown, 0.4.11, 2026-11-01.** Note options (⋯) gains **Share…**
+  (Android's share sheet, for the Claude app, Gmail, Drive…) and **Save as .md** (a Markdown file
+  in Downloads); **Copy as text** gives the same Markdown. The file starts with `# Title`; bold,
+  italic, strikethrough, code, links, lists, checklists, quotes and callouts are kept; colours,
+  highlights and sizes aren't. Android only shares listed file types and `.md` isn't one, so
+  Share sends the same Markdown as `Title.txt`. App-only; no format change.
+  `docs/DECISIONS-EXPLAINED.md` §86. Owner phone check pending.
 
-Optional Line break button (0.4.10, 2026-10-30): Settings → Formatting → Toolbar →
-Add buttons → Lines & blocks → Line break. Tap it to continue a bullet on a new line without
-another bullet; Enter still starts the next bullet. Owner-verified on the phone 2026-10-30.
+## Running it
 
 ```
 npm ci             # only for a fresh checkout; dependencies are already installed on the XPS

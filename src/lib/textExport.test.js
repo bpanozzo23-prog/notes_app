@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { expect, it } from "vitest";
 import { noteFixture } from "../test/fixtures.js";
-import { notebookToText, noteToText } from "./textExport.js";
+import { notebookToText } from "./textExport.js";
 
 const now = new Date(2026, 9, 18, 14, 52);
 const folders = [{ id: "b", name: "Reading", position: 1 }, { id: "a", name: "Español", position: 0 }];
@@ -39,12 +39,10 @@ it("formats the header, metadata, headings, images and links without HTML", () =
   expect(text).toContain("[image]");
   expect(text).toContain("Old [→ a deleted note]");
   expect(text).not.toMatch(/SECRET|<h1>|data-file/);
-  expect(noteToText(source, folders, notes)).toBe("# Vocabulario\nFolder: Español · Tags: spanish, vocab · Created 1 Oct 2026 · Edited 16 Oct 2026 · Pinned\n\n## Words\n\n#### Details\n\nSee [→ Fallback title]\n\n[image]\n\nOld [→ a deleted note]\n");
 });
 
 it("exports empty notes, fallback titles and missing folders, omitting empty tags", () => {
   const empty = note("empty", { title: " ", text: "", html: "<p></p>", folderId: "missing" });
-  expect(noteToText(empty, folders, [empty])).toBe("# Untitled note\nFolder: No folder · Created 16 Oct 2026 · Edited 16 Oct 2026\n\n(empty note)\n");
   const text = notebookToText({ notes: [empty], folders, now });
   expect(text).toContain("1 note.");
   expect(text).toContain("## No folder\n\n### Untitled note");

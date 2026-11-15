@@ -254,6 +254,46 @@ await page.getByRole("dialog", { name: "Note options", exact: true }).getByRole(
 await page.getByText("Copied as text.", { exact: true }).waitFor();
 await shot("108-note-copied-as-text");
 await page.evaluate(() => { delete navigator.clipboard; });
+// Share… hands Android's share sheet a .txt file (it refuses .md); Save as .md downloads one.
+// The stub records whether the tap's user activation was still live when share was called:
+// Chrome refuses a share that something awaited before.
+await page.evaluate(() => {
+  window.__shared = [];
+  Object.defineProperty(navigator, "canShare", { configurable: true, value: () => true });
+  Object.defineProperty(navigator, "share", { configurable: true, value: async (data) => {
+    const active = navigator.userActivation?.isActive ?? null;
+    const file = data.files[0];
+    window.__shared.push({ active, keys: Object.keys(data), name: file.name, type: file.type, text: await file.text() });
+  } });
+});
+{
+  const optionsSheet = () => page.getByRole("dialog", { name: "Note options", exact: true });
+  await button("Note options").tap();
+  await optionsSheet().getByRole("button", { name: "Share…", exact: true }).tap();
+  await page.waitForFunction(() => window.__shared.length === 1);
+  const [shared] = await page.evaluate(() => window.__shared);
+  assert.equal(shared.active, true, "share must be called while the tap's activation is live");
+  assert.deepEqual(shared.keys, ["files"]);
+  assert.equal(shared.name, "Vocabulario — comida.txt");
+  assert.equal(shared.type, "text/plain");
+  assert.match(shared.text, /^# Vocabulario — comida\n\n### Frutas y verduras\n\n- \*\*la manzana\*\* — apple\n/);
+  writeFileSync(`${out}/108b-note-share.txt`, shared.text);
+  await shot("108b-note-shared");
+  await button("Note options").tap();
+  const [download] = await Promise.all([page.waitForEvent("download"), optionsSheet().getByRole("button", { name: "Save as .md", exact: true }).tap()]);
+  assert.equal(download.suggestedFilename(), "Vocabulario — comida.md");
+  await download.saveAs(`${out}/108c-note-save.md`);
+  assert.equal(await fs.readFile(`${out}/108c-note-save.md`, "utf8"), shared.text);
+  await page.getByText("Download started: “Vocabulario — comida.md”.", { exact: true }).waitFor();
+  await shot("108c-note-saved-md");
+  await page.evaluate(() => Object.defineProperty(navigator, "share", { configurable: true, value: undefined }));
+  await button("Note options").tap();
+  const [fallback] = await Promise.all([page.waitForEvent("download"), optionsSheet().getByRole("button", { name: "Share…", exact: true }).tap()]);
+  assert.equal(fallback.suggestedFilename(), "Vocabulario — comida.md");
+  await page.getByText("This browser can't share files, so “Vocabulario — comida.md” was downloaded instead.", { exact: true }).waitFor();
+  await shot("108d-note-share-fallback");
+  await page.evaluate(() => { delete navigator.share; delete navigator.canShare; delete window.__shared; });
+}
 // Indent nests the second bullet under the first; Outdent puts the note back as it was.
 {
   const vocabToolbar = page.getByRole("toolbar", { name: "Formatting", exact: true });

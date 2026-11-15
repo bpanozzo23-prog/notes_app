@@ -37,7 +37,3 @@ export function notebookToText({ notes, folders, now, view = false }) {
   }
   return `${sections.join("\n\n")}\n`;
 }
-
-export function noteToText(note, folders, notes) {
-  return `${noteBlock(note, lookupNotes(notes), 1, folders.find((folder) => folder.id === note.folderId)?.name ?? "No folder")}\n`;
-}

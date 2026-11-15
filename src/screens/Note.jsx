@@ -1,10 +1,10 @@
 import { captureSplitPayload } from "../claude/split.js";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
-import { Pin, Trash2, Sparkles, Copy, Ellipsis, ChevronsDownUp, ChevronsUpDown, ListPlus, CalendarDays } from "lucide-react";
-import { db } from "../db/db.js";
-import { isContentEdit, liveNotes } from "../db/notes.js";
-import { allFolders } from "../db/folders.js";
-import { noteToText } from "../lib/textExport.js";
+import { Pin, Trash2, Sparkles, Copy, Ellipsis, ChevronsDownUp, ChevronsUpDown, ListPlus, CalendarDays, Share2, FileDown } from "lucide-react";
+import { isContentEdit } from "../db/notes.js";
+import { noteToMarkdown } from "../lib/markdown.js";
+import { htmlToText } from "../lib/text.js";
+import { downloadText, safeFileName, shareTextFile } from "../lib/file.js";
 import { copyText } from "../lib/clipboard.js";
 import { foldAllHeadings, headingSections } from "../editor/nodes/HeadingFold.js";
 import NoteEditor from "../editor/NoteEditor.jsx";
@@ -20,7 +20,13 @@ import { noteTitle, tagsInUse, visibleNotes } from "../lib/notebookView.js";
 import { noteDates, nowIso } from "../lib/dates.js";
 import { saveStatusLabel } from "../lib/saveStatus.js";
 
-// The fields whose change counts as an edit, as in src/db/notes.js.
+// Hand over input ProseMirror is still holding (Android deletions wait 20 ms in its DOM observer;
+// a reload, Back or copy inside that window would miss them).
+function takeHeldInput(editor) {
+  const observer = editor?.view?.domObserver;
+  observer?.forceFlush?.();
+  observer?.flush?.();
+}
 
 export default function Note({ find, findShown, onFindShown, onClearFind, initialNote, notes, folders, toolbarIds, formatting, readOnly: locked = false, queue, status, busy, onBack, onDelete, onOpenNote, error, run, refresh, onImageError, claudeReady, onOpen, setMessage }) {
   const [note, setNote] = useState(initialNote);
@@ -37,17 +43,42 @@ export default function Note({ find, findShown, onFindShown, onClearFind, initia
   const [splitInstruction, setSplitInstruction] = useState("");
   const [instruction, setInstruction] = useState("");
   const [confirmTidy, setConfirmTidy] = useState(false);
+  // Copy, Share and Save all write what is on screen, built inside the tap: Android opens the
+  // share sheet only from a fresh tap, so nothing may be awaited first. The save starts alongside.
+  function markdownNow() {
+    const editor = editorRef.current;
+    takeHeldInput(editor);
+    const html = editor && !editor.isDestroyed ? editor.getHTML() : note.html;
+    const current = { ...note, html, text: htmlToText(html) };
+    queue.flush().catch(() => {});
+    const lookup = (id) => id === note.id ? current : notes.find((row) => row.id === id);
+    return { markdown: noteToMarkdown(current, lookup), title: noteTitle(current) };
+  }
   async function copyAsText() {
-    await queue.flush();
-    const [notes, folders] = await db.transaction("r", db.notes, db.folders, () => Promise.all([liveNotes(), allFolders()]));
-    const saved = notes.find((row) => row.id === note.id);
-    if (!saved) throw new Error("That note no longer exists or is in Trash.");
+    const { markdown } = markdownNow();
     try {
-      await copyText(noteToText(saved, folders, notes));
+      await copyText(markdown);
       setMessage("Copied as text.");
     } catch {
-      setMessage("Couldn't copy. Use Settings → Export notes as text.");
+      setMessage("Couldn't copy. Use Save as .md instead.");
     }
+  }
+  function saveMarkdown(markdown, title, instead = false) {
+    const name = safeFileName(title, "md");
+    try {
+      downloadText(markdown, name);
+      setMessage(instead ? `This browser can't share files, so “${name}” was downloaded instead.` : `Download started: “${name}”.`);
+    } catch {
+      setMessage("Couldn't save the file.");
+    }
+  }
+  function shareNote() {
+    setMessage("");
+    const { markdown, title } = markdownNow();
+    let sharing;
+    try { sharing = shareTextFile(markdown, safeFileName(title, "txt")); } catch (error) { sharing = Promise.reject(error); }
+    if (!sharing) { saveMarkdown(markdown, title, true); return; }
+    sharing.catch((error) => { if (error?.name !== "AbortError") setMessage("Couldn't share. Use Save as .md instead."); });
   }
   async function tidyNote(kind = "tidy", confirmed = false) {
     const existing = claudeSession.getSnapshot().proposal;
@@ -71,13 +102,7 @@ export default function Note({ find, findShown, onFindShown, onClearFind, initia
   const [linkEditor, setLinkEditor] = useState(null);
   const editorRef = useRef(null);
   const onEditor = useCallback((editor) => { editorRef.current = editor; }, []);
-  useEffect(() => queue.onBeforeFlush(() => {
-    // Hand over input ProseMirror is still holding before the queue saves (Android deletions
-    // wait 20 ms in its DOM observer; a reload or Back inside that window would drop them).
-    const observer = editorRef.current?.view?.domObserver;
-    observer?.forceFlush?.();
-    observer?.flush?.();
-  }), [queue]);
+  useEffect(() => queue.onBeforeFlush(() => takeHeldInput(editorRef.current)), [queue]);
   function openLinkPicker(editor) {
     // Synchronous focus lets Dialog remember the editor even for keyboard-activated buttons.
     editor.view.focus();
@@ -129,6 +154,8 @@ export default function Note({ find, findShown, onFindShown, onClearFind, initia
     {optionsSheet && <Dialog title="Note options" sheet busy={busy} onClose={() => setOptionsSheet(false)}>
       <div className="space-y-1">
         <button className="flex min-h-11 w-full items-center gap-3 rounded px-2 text-left hover:bg-black/5" disabled={busy} onClick={async () => { await run(copyAsText); setOptionsSheet(false); }}><Copy size={18} aria-hidden="true" />Copy as text</button>
+        <button className="flex min-h-11 w-full items-center gap-3 rounded px-2 text-left hover:bg-black/5" disabled={busy} onClick={() => { shareNote(); setOptionsSheet(false); }}><Share2 size={18} aria-hidden="true" />Share…</button>
+        <button className="flex min-h-11 w-full items-center gap-3 rounded px-2 text-left hover:bg-black/5" disabled={busy} onClick={() => { const { markdown, title } = markdownNow(); saveMarkdown(markdown, title); setOptionsSheet(false); }}><FileDown size={18} aria-hidden="true" />Save as .md</button>
         {[["quickAdd", "Quick add", ListPlus], ["addDate", "Add the date", CalendarDays]].map(([field, label, Icon]) => <button key={field} role="switch" aria-label={label} aria-checked={!!note[field]}
           className="flex min-h-11 w-full items-center gap-3 rounded px-2 text-left hover:bg-black/5" disabled={readOnly || busy || (field === "addDate" && !note.quickAdd)}
           onClick={() => edit({ [field]: !note[field] })}><Icon size={18} aria-hidden="true" />{label}<span className="ml-auto text-sm text-[var(--color-muted)]">{note[field] ? "On" : "Off"}</span></button>)}
