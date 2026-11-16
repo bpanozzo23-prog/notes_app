@@ -10,7 +10,8 @@
     "claude-check": "node scripts/claude-check.mjs",
     "browser-checks": "node scripts/browser-checks.mjs",
     "sync-deploy": "node scripts/sync-deploy.mjs",
-    "sync-check": "node scripts/sync-check.mjs"
+    "sync-check": "node scripts/sync-check.mjs",
+    "notebook-stats": "node scripts/notebook-stats.mjs"
   },
   "type": "module",
   "private": "true",

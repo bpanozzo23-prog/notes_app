@@ -2343,3 +2343,37 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   repository, and the app bundle says 0.4.12. App-only: the XPS service is unchanged, so no
   `npm run sync-deploy`. Neither version was checked on the phone before release (0.4.12 cannot
   be: only the installed, published app receives shares). Owner phone checks for both pending.
+
+## Notebook assessment (2026-11-15 to 2026-11-16)
+
+- 2026-11-15 — Owner asked for an assessment of how the notebook is used, to feed ideas for the
+  app, for organising and for what he wants from a notes app; plan approved in Plan Mode. Owner
+  in the session: "you can read everything". — Four weeks of daily use is the first real
+  evidence the project has had; the brief was written before any of it.
+- 2026-11-15 — Limits kept during the assessment: read-only (no note, proposal, store file or
+  app code changed); Trash and permanently deleted notes as counts and dates only; findings that
+  describe the notes live in `private-data/assessments/2026-11-15/`, never committed. — The
+  app's own rule is that Trash never goes to Claude, and a description of the notes is as
+  private as the notes.
+- 2026-11-15 — `scripts/notebook-stats.mjs` (`npm run notebook-stats`): numbers about the sync
+  store and its history, read with git's read commands only (`--no-optional-locks`), printing
+  counts, sizes and dates and never note text; titles, folder and tag names only with
+  `--names`, and never for Trash. Tested on a made-up store in a temporary folder (no text in
+  the output, store untouched). On the real store it is run only when the owner asks in that
+  session, like any other read of the notes. — A numbers-only tool can be rerun later and
+  compared; totals matched `notes-sync status`.
+- 2026-11-15 — Verification. Full `npm test` once on the final script: 105 files, 2,803 of
+  2,803. The app, the sync service and the notes were not changed, so no build, browser checks,
+  shots, deploy or phone check apply.
+- 2026-11-16 — Owner: no usage counter. — His answers covered the questions it would have
+  measured (notes are found by folder; some old notes are reopened; Ask Claude and Tidy not yet
+  tried; tags never filtered), and no feature choice depends on a count. Revisit only if a
+  decision hangs on a frequency that memory answers badly.
+- 2026-11-16 — Owner: keep for next time the numbers script, the dated findings and a short
+  method note, `docs/NOTEBOOK-ASSESSMENT.md`, which holds no note content. No reading checklist
+  is saved. — The same measurement months apart makes "what changed" answerable; how to read
+  the notes is better decided fresh, with a larger notebook, new needs and whatever model is
+  current.
+- 2026-11-16 — Nothing is planned from the findings. Any feature taken from them gets its own
+  proposal. Owner: "yeah you can commit" (the script, its test, the `package.json` line, the
+  method note and these entries).
