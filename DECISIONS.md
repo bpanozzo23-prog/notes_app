@@ -2407,3 +2407,9 @@ Append-only. One dated line per decision: what was decided, then why, after the 
   stays 0.4.12, since nothing the app does changed. Releasing this re-publishes the app once
   (new bundle and CSS), so the phone offers one more update with no visible change; after that,
   script and docs commits no longer do. App-only: no `npm run sync-deploy`.
+- 2026-11-16 — Owner: "commit and push". **Released `5ca0eb4`** by pushing `main` (GitHub Pages
+  deploy succeeded). Checked on the published site: the main bundle and CSS are the files built
+  locally from the final code; the bundle says 0.4.12 and holds no `package.json` scripts or
+  dependencies; the CSS has the 337 rules; `sw.js` lists the new bundle. App-only: no
+  `npm run sync-deploy`. Owner phone check pending: one update with no visible change (Settings
+  still 0.4.12, notes intact, screens unchanged).
