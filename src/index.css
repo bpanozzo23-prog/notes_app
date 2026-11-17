@@ -1,4 +1,7 @@
-@import "tailwindcss";
+/* Look for class names in the app's code only. Without source(), Tailwind scans every tracked
+   file (docs, DECISIONS.md, scripts), so a docs-only commit could add a rule, change the CSS
+   file and offer the phone an update that changes nothing (2026-11-16). */
+@import "tailwindcss" source("../src");
 
 :root {
   --color-paper: #faf9f6;

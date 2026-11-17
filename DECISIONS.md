@@ -2377,3 +2377,33 @@ Append-only. One dated line per decision: what was decided, then why, after the 
 - 2026-11-16 — Nothing is planned from the findings. Any feature taken from them gets its own
   proposal. Owner: "yeah you can commit" (the script, its test, the `package.json` line, the
   method note and these entries).
+
+## Empty app updates (2026-11-16)
+
+- 2026-11-16 — On the owner's request of 2026-11-16, `fa14a41` (notebook-stats and the
+  assessment note) was pushed. The GitHub Pages deploy succeeded; the published bundle is the
+  one built locally from that commit and still says 0.4.12. — The work existed only locally;
+  GitHub is its off-machine copy.
+- 2026-11-16 — That push re-published the app with a new main bundle although no app code
+  changed. Cause: `src/version.js` imported the whole `package.json`, so every script and
+  dependency line was in the bundle; the added `notebook-stats` line changed the bundle's file
+  name, the service worker's file list and so the phone's update offer. — Found while checking
+  what the push would do.
+- 2026-11-16 — Owner: fix it. `src/version.js` imports only `version`; the bundle carries the
+  version string and none of the scripts or dependencies. — Smallest change: Vite supports
+  named imports from JSON and leaves the rest of the file out.
+- 2026-11-16 — Tailwind looks for class names in `src/` only (`@import "tailwindcss"
+  source("../src")` in `src/index.css`). Without it Tailwind scanned every tracked file and
+  generated 15 rules the app never uses: `collapse`, `grow`, `invisible`, `outline` and
+  `shrink` from prose, and ten `[shot:…]` labels from `scripts/screenshot.mjs`. A docs-only
+  commit with another such word would have changed the CSS file the same way. The 337 remaining
+  rules are exactly the ones the app's code produces; no rule the app uses changed. — Same goal
+  as the version fix; `index.html` and `public/` hold no class names.
+- 2026-11-16 — Verification. Built twice from a copy of the final code, the second time with an
+  extra `package.json` script and a `DECISIONS.md` paragraph of Tailwind class words: every
+  built file identical. Full `npm test` once on the final code: 105 files, 2,803 of 2,803.
+  `npm run browser-checks` on the built app: 22 of 22. No `npm run shots`: no rule the app uses
+  changed, which comparing the CSS rule lists shows more exactly than screenshots. The version
+  stays 0.4.12, since nothing the app does changed. Releasing this re-publishes the app once
+  (new bundle and CSS), so the phone offers one more update with no visible change; after that,
+  script and docs commits no longer do. App-only: no `npm run sync-deploy`.
